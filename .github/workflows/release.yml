@@ -1,0 +1,66 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+  id-token: write # npm OIDC trusted publishing and provenance; no token needed
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the main-branch check below needs history
+      - uses: actions/setup-node@v4
+        with:
+          # npm 12.2.1 declares engines.node ^22.22.2 || ^24.15.0 || >=26; a bare "22" can resolve to an older cached 22.x
+          node-version: 22.22.2
+          cache: npm
+          registry-url: "https://registry.npmjs.org"
+      - name: Verify tag matches package.json and src/version.ts
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          PKG="$(node -p "require('./package.json').version")"
+          SRC="$(node -p "require('fs').readFileSync('src/version.ts', 'utf8').match(/VERSION = '([^']+)'/)?.[1] ?? ''")"
+          if [ "$TAG" != "$PKG" ] || [ "$TAG" != "$SRC" ]; then
+            echo "Tag '$GITHUB_REF_NAME' (=$TAG), package.json '$PKG' and src/version.ts '$SRC' must all match"
+            exit 1
+          fi
+          # npm would publish a prerelease under the latest dist-tag without --tag, so refuse it
+          case "$PKG" in
+            *-*)
+              echo "Version '$PKG' is a prerelease; this workflow publishes stable versions only (it would land on the latest dist-tag)"
+              exit 1
+              ;;
+          esac
+      - name: Verify the tagged commit is on main
+        run: |
+          git fetch --no-tags origin main:refs/remotes/origin/main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "Commit $GITHUB_SHA is not on main; releases must be tagged from main"
+            exit 1
+          fi
+      - run: npm ci
+      - name: Type-check
+        run: npm run typecheck
+      - name: Test
+        run: npm test
+      - name: Build
+        run: npm run build
+      - name: End-to-end (packed tarball in ESM/CJS/TS projects, real-socket fault injection against dist)
+        run: npm run test:e2e
+      # Pinned on purpose: `npm@latest` would let an unreviewed npm release run with our publish rights.
+      - name: Install npm 12.2.1 for OIDC
+        run: npm install -g npm@12.2.1
+      - name: Print toolchain versions
+        run: |
+          echo "node $(node --version)"
+          echo "npm $(npm --version)"
+      # No NODE_AUTH_TOKEN: with id-token: write and a trusted publisher configured on npmjs.com
+      # (repo Octen-Team/octen-js, workflow release.yml), npm authenticates via OIDC.
+      - name: Publish to npm (OIDC, provenance)
+        run: npm publish --provenance --access public

@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [20, 22, 24]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - name: Check packed artifacts (ESM, CJS, d.ts)
+        run: |
+          npm pack --dry-run --json | node -e "
+            const files = JSON.parse(require('fs').readFileSync(0, 'utf8'))[0].files.map((f) => f.path);
+            const need = ['dist/index.js', 'dist/index.cjs', 'dist/index.d.ts', 'dist/index.d.cts'];
+            const missing = need.filter((n) => !files.includes(n));
+            if (missing.length) { console.error('missing from package:', missing); process.exit(1); }
+            console.log('package contains', need.join(', '));
+          "
+      - name: Load the built CommonJS bundle
+        run: node -e "const m=require('./dist/index.cjs'); if (typeof m.Octen!=='function') process.exit(1)"
+      - name: Load the built ESM bundle
+        run: node --input-type=module -e "const m=await import('./dist/index.js'); if (m.default!==m.Octen) process.exit(1)"
+      - name: End-to-end (packed tarball in ESM/CJS/TS projects, real-socket fault injection against dist)
+        run: npm run test:e2e

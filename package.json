@@ -1,0 +1,71 @@
+{
+  "name": "@octen.ai/sdk",
+  "version": "0.1.0",
+  "description": "Official TypeScript SDK for the Octen API",
+  "keywords": [
+    "octen",
+    "search",
+    "web-search",
+    "news-search",
+    "place-search",
+    "search-api",
+    "sdk",
+    "typescript"
+  ],
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Octen-Team/octen-js.git"
+  },
+  "homepage": "https://github.com/Octen-Team/octen-js#readme",
+  "bugs": {
+    "url": "https://github.com/Octen-Team/octen-js/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:live": "vitest run --config vitest.live.config.ts",
+    "test:e2e": "npm run build && tsc -p tsconfig.e2e.json && vitest run --config vitest.e2e.config.ts && SKIP_BUILD=1 bash test/e2e/package.e2e.sh",
+    "build": "tsup",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build",
+    "spec-drift": "tsx scripts/spec-drift.ts"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "20.19.43",
+    "tsup": "8.5.1",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3",
+    "vitest": "4.1.12"
+  }
+}
