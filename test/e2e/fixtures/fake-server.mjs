@@ -1,5 +1,5 @@
 // Local fake server for the packed-install smoke test: checks x-api-key / user-agent / request body and returns a minimal valid response per path.
-// Prints one line "PORT <n>" on stdout once started; exits on SIGTERM; GET /__requests returns the number of requests received.
+// Prints one line "PORT <n>" on stdout once started; exits on SIGTERM; GET /__requests returns the requests received (path and any validation problems).
 import { createServer } from 'node:http';
 
 const EXPECTED_KEY = process.env.FAKE_EXPECTED_KEY ?? 'fake-e2e-key';
