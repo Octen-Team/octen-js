@@ -1,0 +1,55 @@
+{
+  "name": "@octen.ai/sdk",
+  "version": "0.1.0",
+  "description": "Official TypeScript SDK for the Octen API",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Octen-Team/octen-js.git"
+  },
+  "homepage": "https://github.com/Octen-Team/octen-js#readme",
+  "bugs": {
+    "url": "https://github.com/Octen-Team/octen-js/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "build": "tsup"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "20.19.43",
+    "tsup": "8.5.1",
+    "typescript": "6.0.3",
+    "vitest": "4.1.12"
+  }
+}
