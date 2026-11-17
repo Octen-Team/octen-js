@@ -3884,7 +3884,7 @@
                       "index": 2,
                       "delta": {
                         "type": "text_delta",
-                        "text": "北京今天多云转晴，最高气温32度。"
+                        "text": "Beijing is cloudy turning sunny today, with a high of 32\u00b0C."
                       }
                     }
                   },
