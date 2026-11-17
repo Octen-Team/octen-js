@@ -192,6 +192,19 @@ describe('HttpCore.post', () => {
     expect(f).toHaveBeenCalledTimes(1);
   });
 
+  // The loop re-checks the signal before every attempt, so a sleep that resolves after an abort still stops.
+  test('a sleep that resolves after the caller aborted does not send again', async () => {
+    const ac = new AbortController();
+    const f = sequence(json(503, {}), json(200, { ok: 1 }));
+    const { core } = makeCore(f as unknown as FetchFn, {
+      sleep: async () => {
+        ac.abort();
+      },
+    });
+    await expect(core.post('/x', {}, { signal: ac.signal })).rejects.toBeInstanceOf(OctenAbortError);
+    expect(f).toHaveBeenCalledTimes(1);
+  });
+
   test('abort during the default backoff sleep rejects promptly', async () => {
     const ac = new AbortController();
     const f = vi.fn(async () => json(503, {}));

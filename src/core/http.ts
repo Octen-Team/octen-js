@@ -149,24 +149,29 @@ export class HttpCore {
       if (callerSignal?.aborted) throw abortError(callerSignal);
 
       const result = await this.attemptOnce(url, headers, payload, timeoutMs, callerSignal);
-
+      let error: Error;
+      let delay: number | null;
       if (result.kind === 'response') {
         const judged = judgeResponse(result.status, result.headers, result.text);
         if (judged.ok) return judged.body as T;
         if (isRedirect(result.status)) throw redirectError(judged.error, result.headers);
-        if (!isRetryableStatus(result.status) || attempt > this.maxRetries) throw judged.error;
-        const retryAfterMs = parseRetryAfter(result.headers.get('retry-after'), Date.now());
-        const delay = retryDelayMs(attempt, result.status, retryAfterMs, this.random);
-        if (delay === 'give-up') throw judged.error;
-        await this.backoff(delay, callerSignal);
-        continue;
+        error = judged.error;
+        delay = this.nextDelay(attempt, isRetryableStatus(result.status), result.status, result.headers);
+      } else {
+        error = result.error;
+        delay = this.nextDelay(attempt, result.retryable, null, null);
       }
-
-      if (!result.retryable || attempt > this.maxRetries) throw result.error;
-      const delay = retryDelayMs(attempt, null, null, this.random);
-      if (delay === 'give-up') throw result.error;
+      if (delay === null) throw error;
       await this.backoff(delay, callerSignal);
     }
+  }
+
+  // Wait before the next attempt, or null to give up; status and headers are null for transport errors.
+  private nextDelay(attempt: number, retryable: boolean, status: number | null, headers: Headers | null): number | null {
+    if (!retryable || attempt > this.maxRetries) return null;
+    const retryAfterMs = headers === null ? null : parseRetryAfter(headers.get('retry-after'), Date.now());
+    const delay = retryDelayMs(attempt, status, retryAfterMs, this.random);
+    return delay === 'give-up' ? null : delay;
   }
 
   private serialize(body: unknown): string {
@@ -202,7 +207,6 @@ export class HttpCore {
       if (callerSignal?.aborted) throw abortError(callerSignal);
       throw err;
     }
-    if (callerSignal?.aborted) throw abortError(callerSignal);
   }
 
   // 一次尝试：超时计时与响应体读取同属一个 signal，读完正文才解除。

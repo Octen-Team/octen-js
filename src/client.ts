@@ -113,5 +113,3 @@ export default class Octen {
     this.placeSearch = new PlaceSearchResource(http);
   }
 }
-
-export { Octen };
