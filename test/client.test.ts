@@ -219,8 +219,8 @@ describe('defaultHeaders validation', () => {
     ['value above U+00FF', { 'x-a': '中' }],
     ['non-string value', { 'x-a': 5 as unknown as string }],
     ['invalid header name', { 'bad name': 'v' }],
-  ])('%s is OctenValidationError("headers")', (_label, defaultHeaders) => {
-    expect(fieldOf(() => new Octen({ apiKey: 'sk-test', defaultHeaders }))).toBe('headers');
+  ])('%s is OctenValidationError("defaultHeaders")', (_label, defaultHeaders) => {
+    expect(fieldOf(() => new Octen({ apiKey: 'sk-test', defaultHeaders }))).toBe('defaultHeaders');
   });
 
   test('valid headers pass', () => {
@@ -397,4 +397,50 @@ describe('timeout precedence', () => {
   test('timeout: undefined counts as not set', async () => {
     expect(await timeoutAfterMs({ timeout: undefined }, broad)).toBe(120_000);
   });
+});
+
+describe('final-review fixes (A, client level)', () => {
+  test('A1: client timeout above the setTimeout limit is rejected, the limit itself is accepted', () => {
+    expect(fieldOf(() => new Octen({ apiKey: 'sk-test', timeout: 2_147_483_648 }))).toBe('timeout');
+    expect(() => new Octen({ apiKey: 'sk-test', timeout: 2_147_483_647 })).not.toThrow();
+  });
+
+  class Custom {
+    'x-a' = 'b';
+  }
+  test.each([
+    ['a Headers instance', new Headers({ 'x-a': 'b' })],
+    ['an array', [['x-a', 'b']]],
+    ['a Map', new Map([['x-a', 'b']])],
+    ['a class instance', new Custom()],
+    ['null', null],
+  ])('A3: defaultHeaders given as %s is OctenValidationError("defaultHeaders")', (_label, defaultHeaders) => {
+    expect(
+      fieldOf(() => new Octen({ apiKey: 'sk-test', defaultHeaders: defaultHeaders as unknown as Record<string, string> })),
+    ).toBe('defaultHeaders');
+  });
+
+  test.each(['x-api-key', 'X-API-KEY', 'X-Api-Key'])('A3: defaultHeaders %s is rejected, pointing at apiKey', (name) => {
+    let err: unknown;
+    try {
+      new Octen({ apiKey: 'sk-test', defaultHeaders: { [name]: 'other' } });
+    } catch (e) {
+      err = e;
+    }
+    expect(err).toBeInstanceOf(OctenValidationError);
+    expect((err as OctenValidationError).field).toBe('defaultHeaders');
+    expect((err as OctenValidationError).message).toMatch(/apiKey/);
+  });
+
+  test('A3: an object with a null prototype is a plain object', () => {
+    const headers = Object.assign(Object.create(null) as Record<string, string>, { 'x-a': 'b' });
+    expect(() => new Octen({ apiKey: 'sk-test', defaultHeaders: headers })).not.toThrow();
+  });
+
+  test.each(['http://user:pw@localhost:8888', 'https://user@api.example.com', 'https://:pw@api.example.com/'])(
+    'A5: baseURL with credentials %j is OctenValidationError("baseURL")',
+    (baseURL) => {
+      expect(fieldOf(() => new Octen({ apiKey: 'sk-test', baseURL }))).toBe('baseURL');
+    },
+  );
 });

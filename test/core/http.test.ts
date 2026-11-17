@@ -288,14 +288,15 @@ describe('HttpCore.post', () => {
     expect(seen?.body).toBe('{"query":"q"}');
   });
 
-  test('the API key cannot be overridden by default or per-request headers', async () => {
+  // The client rejects x-api-key in defaultHeaders; HttpCore still writes the key last as a backstop.
+  test('the API key is written last even if defaultHeaders reaching HttpCore carry one', async () => {
     let seen: RequestInit | undefined;
     const f = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
       seen = init;
       return json(200, { ok: 1 });
     });
     const { core } = makeCore(f as unknown as FetchFn, { defaultHeaders: { 'X-API-Key': 'other' } });
-    await core.post('/x', {}, { headers: { 'x-api-key': 'other2' } });
+    await core.post('/x', {});
     expect(new Headers(seen?.headers).get('x-api-key')).toBe('sk-test');
   });
 
@@ -411,5 +412,142 @@ describe('HttpCore.post request validation', () => {
       .catch((e: unknown) => e);
     expect((err as OctenValidationError).field).toBe('headers');
     expect(f).not.toHaveBeenCalled();
+  });
+});
+
+describe('final-review fixes (A)', () => {
+  test('A1: per-request timeout above the setTimeout limit is rejected, the limit itself is accepted', async () => {
+    const f = vi.fn(async () => json(200, { ok: 1 }));
+    const { core } = makeCore(f as unknown as FetchFn);
+    const err = await core.post('/x', {}, { timeout: 2_147_483_648 }).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(OctenValidationError);
+    expect((err as OctenValidationError).field).toBe('timeout');
+    expect(f).not.toHaveBeenCalled();
+    await expect(core.post('/x', {}, { timeout: 2_147_483_647 })).resolves.toEqual({ ok: 1 });
+  });
+
+  class Custom {
+    'x-a' = 'b';
+  }
+  test.each([
+    ['a Headers instance', new Headers({ 'x-a': 'b' })],
+    ['an array', [['x-a', 'b']]],
+    ['a Map', new Map([['x-a', 'b']])],
+    ['a class instance', new Custom()],
+  ])('A3: per-request headers given as %s are OctenValidationError("headers")', async (_label, headers) => {
+    const f = vi.fn(async () => json(200, {}));
+    const { core } = makeCore(f as unknown as FetchFn);
+    const err = await core
+      .post('/x', {}, { headers: headers as unknown as Record<string, string> })
+      .catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(OctenValidationError);
+    expect((err as OctenValidationError).field).toBe('headers');
+    expect(f).not.toHaveBeenCalled();
+  });
+
+  test.each(['x-api-key', 'X-API-Key', 'X-Api-KEY'])('A3: per-request %s header is rejected, pointing at apiKey', async (name) => {
+    const f = vi.fn(async () => json(200, {}));
+    const { core } = makeCore(f as unknown as FetchFn);
+    const err = await core.post('/x', {}, { headers: { [name]: 'other' } }).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(OctenValidationError);
+    expect((err as OctenValidationError).field).toBe('headers');
+    expect((err as OctenValidationError).message).toMatch(/apiKey/);
+    expect(f).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    ['cause.cause.code', networkError('ECONNRESET'), 'Connection error: fetch failed (ECONNRESET)'],
+    ['cause.code', Object.assign(new Error('socket hang up'), { code: 'EPIPE' }), 'Connection error: socket hang up (EPIPE)'],
+    ['no code', new TypeError('fetch failed'), 'Connection error: fetch failed'],
+    ['non-string code', Object.assign(new Error('odd'), { code: 42 }), 'Connection error: odd'],
+  ])('A4: connection error message includes the cause (%s)', async (_label, thrown, message) => {
+    const f = sequence(thrown);
+    const { core } = makeCore(f as unknown as FetchFn);
+    const err = (await core.post('/x', {}).catch((e: unknown) => e)) as OctenConnectionError;
+    expect(err).toBeInstanceOf(OctenConnectionError);
+    expect(err.message).toBe(message);
+    expect(err.cause).toBe(thrown);
+    expect(f).toHaveBeenCalledTimes(1);
+  });
+
+  test.each([
+    [301, { location: 'https://other.example.com/search' }, 'HTTP 301 redirect to https://other.example.com/search; redirects are not followed, check baseURL'],
+    [302, {}, 'HTTP 302 redirect; redirects are not followed, check baseURL'],
+    [307, { location: '/v2/search' }, 'HTTP 307 redirect to /v2/search; redirects are not followed, check baseURL'],
+  ])('A6: a %i response explains that redirects are not followed', async (status, headers, message) => {
+    const f = sequence(new Response('<html>Moved</html>', { status, headers }));
+    const { core } = makeCore(f as unknown as FetchFn);
+    const err = (await core.post('/x', {}).catch((e: unknown) => e)) as OctenAPIError;
+    expect(err.constructor).toBe(OctenAPIError);
+    expect(err.status).toBe(status);
+    expect(err.message).toBe(message);
+    expect(f).toHaveBeenCalledTimes(1);
+  });
+
+  test('A6: status 0 (opaque redirect in browsers) says a redirect was blocked', async () => {
+    const opaque = { status: 0, headers: new Headers(), text: async () => '' } as unknown as Response;
+    const f = sequence(opaque);
+    const { core } = makeCore(f as unknown as FetchFn);
+    const err = (await core.post('/x', {}).catch((e: unknown) => e)) as OctenAPIError;
+    expect(err.constructor).toBe(OctenAPIError);
+    expect(err.status).toBe(0);
+    expect(err.message).toMatch(/redirect was blocked/);
+    expect(err.message).toMatch(/check baseURL/);
+    expect(f).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('A7: error names', () => {
+  const init = { status: 500, code: null, message: 'm', requestId: null, body: null };
+  const expected = [
+    'OctenError',
+    'OctenAPIError',
+    'OctenAuthenticationError',
+    'OctenPermissionDeniedError',
+    'OctenBadRequestError',
+    'OctenServerError',
+    'OctenRateLimitError',
+    'OctenTimeoutError',
+    'OctenConnectionError',
+    'OctenAbortError',
+    'OctenValidationError',
+  ];
+
+  function instances(mod: typeof import('../../src/core/errors')): Record<string, Error> {
+    return {
+      OctenError: new mod.OctenError('m'),
+      OctenAPIError: new mod.OctenAPIError(init),
+      OctenAuthenticationError: new mod.OctenAuthenticationError(init),
+      OctenPermissionDeniedError: new mod.OctenPermissionDeniedError(init),
+      OctenBadRequestError: new mod.OctenBadRequestError(init),
+      OctenServerError: new mod.OctenServerError(init),
+      OctenRateLimitError: new mod.OctenRateLimitError({ ...init, retryAfter: null }),
+      OctenTimeoutError: new mod.OctenTimeoutError(),
+      OctenConnectionError: new mod.OctenConnectionError(),
+      OctenAbortError: new mod.OctenAbortError(),
+      OctenValidationError: new mod.OctenValidationError('f'),
+    };
+  }
+
+  test('every class reports its own name', async () => {
+    const mod = await import('../../src/core/errors');
+    const all = instances(mod);
+    expect(Object.keys(all)).toEqual(expected);
+    for (const [name, err] of Object.entries(all)) expect(err.name, name).toBe(name);
+  });
+
+  // Consumers' bundlers rename classes when minifying; the names must not depend on that.
+  test('names survive minification of the class identifiers', async () => {
+    const { build } = await import('esbuild');
+    const out = await build({
+      entryPoints: [new URL('../../src/core/errors.ts', import.meta.url).pathname],
+      bundle: true,
+      minify: true,
+      format: 'esm',
+      write: false,
+    });
+    const code = out.outputFiles[0]!.text;
+    const mod = (await import(`data:text/javascript;base64,${Buffer.from(code).toString('base64')}`)) as typeof import('../../src/core/errors');
+    for (const [name, err] of Object.entries(instances(mod))) expect(err.name, name).toBe(name);
   });
 });

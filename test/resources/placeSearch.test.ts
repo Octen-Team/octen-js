@@ -73,3 +73,17 @@ describe('PlaceSearchResource.search', () => {
     expect(new Headers(init.headers).get('x-extra')).toBe('yes');
   });
 });
+
+describe('A2: non-finite numbers in place search', () => {
+  test.each([
+    [{ query: 'q', latitude: Number.NaN, longitude: 1 }, 'latitude'],
+    [{ query: 'q', latitude: 1, longitude: Number.POSITIVE_INFINITY }, 'longitude'],
+    [{ query: 'q', places: { count: Number.NaN } }, 'places.count'],
+  ])('%j -> OctenValidationError(%s), nothing sent', async (params, field) => {
+    const { core, fetchImpl } = makeFetch();
+    const err = await new PlaceSearchResource(core).search(params).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(OctenValidationError);
+    expect((err as OctenValidationError).field).toBe(field);
+    expect(fetchImpl).toHaveBeenCalledTimes(0);
+  });
+});

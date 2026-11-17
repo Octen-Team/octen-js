@@ -116,4 +116,10 @@ async function main(): Promise<number> {
   return 1;
 }
 
-process.exitCode = await main();
+// Exit 1 means drift, so an unexpected throw must not fall through to Node's default exit code 1.
+try {
+  process.exitCode = await main();
+} catch (err) {
+  console.error(`spec-drift failed unexpectedly: ${err instanceof Error ? (err.stack ?? err.message) : String(err)}`);
+  process.exitCode = 2;
+}

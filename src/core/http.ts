@@ -1,11 +1,12 @@
 import { judgeResponse } from './envelope';
 import {
   OctenAbortError,
+  OctenAPIError,
   OctenConnectionError,
   OctenTimeoutError,
   OctenValidationError,
 } from './errors';
-import { assertValidHeaders } from './headers';
+import { normalizeHeaders } from './headers';
 import { isPreSendNetworkError, isRetryableStatus, parseRetryAfter, retryDelayMs } from './retry';
 import { VERSION } from '../version';
 
@@ -76,6 +77,45 @@ function abortError(signal: AbortSignal): OctenAbortError {
   return new OctenAbortError('Request was aborted.', { cause: signal.reason });
 }
 
+// Larger values overflow setTimeout's 32-bit delay and fire after 1 ms.
+const MAX_TIMEOUT_MS = 2_147_483_647;
+
+export function assertValidTimeout(value: unknown, field = 'timeout'): void {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0 || value > MAX_TIMEOUT_MS) {
+    throw new OctenValidationError(
+      field,
+      `${field} must be a finite number of milliseconds greater than 0 and at most ${MAX_TIMEOUT_MS}.`,
+    );
+  }
+}
+
+function stringCode(x: unknown): string | undefined {
+  if (typeof x !== 'object' || x === null || !('code' in x)) return undefined;
+  return typeof x.code === 'string' ? x.code : undefined;
+}
+
+// Node's fetch only says "fetch failed"; the errno code sits on its cause.
+function connectionErrorMessage(err: unknown): string {
+  const message = err instanceof Error ? err.message : String(err);
+  const cause = typeof err === 'object' && err !== null && 'cause' in err ? err.cause : undefined;
+  const code = stringCode(err) ?? stringCode(cause);
+  return `Connection error: ${message}${code === undefined ? '' : ` (${code})`}`;
+}
+
+function isRedirect(status: number): boolean {
+  return status === 0 || (status >= 300 && status < 400);
+}
+
+// fetch runs with redirect: 'manual'; browsers hide the redirect behind status 0 (opaque redirect).
+function redirectError(err: OctenAPIError, headers: Headers): OctenAPIError {
+  const location = headers.get('location');
+  const message =
+    err.status === 0
+      ? 'A redirect was blocked (status 0, opaque redirect); redirects are not followed, check baseURL'
+      : `HTTP ${err.status} redirect${location ? ` to ${location}` : ''}; redirects are not followed, check baseURL`;
+  return new OctenAPIError({ status: err.status, code: err.code, message, requestId: err.requestId, body: err.body });
+}
+
 export class HttpCore {
   private readonly apiKey: string;
   private readonly baseURL: string;
@@ -100,11 +140,8 @@ export class HttpCore {
   async post<T>(path: string, body: unknown, req: RequestOptions = {}): Promise<T> {
     const url = `${this.baseURL}${path.startsWith('/') ? '' : '/'}${path}`;
     const payload = this.serialize(body);
-    if (req.timeout != null && !(Number.isFinite(req.timeout) && req.timeout > 0)) {
-      throw new OctenValidationError('timeout', 'timeout must be a finite number of milliseconds greater than 0.');
-    }
-    assertValidHeaders(req.headers, 'headers');
-    const headers = this.buildHeaders(req.headers);
+    if (req.timeout != null) assertValidTimeout(req.timeout);
+    const headers = this.buildHeaders(normalizeHeaders(req.headers));
     const timeoutMs = req.timeout ?? this.timeoutMs;
     const callerSignal = req.signal;
 
@@ -116,6 +153,7 @@ export class HttpCore {
       if (result.kind === 'response') {
         const judged = judgeResponse(result.status, result.headers, result.text);
         if (judged.ok) return judged.body as T;
+        if (isRedirect(result.status)) throw redirectError(judged.error, result.headers);
         if (!isRetryableStatus(result.status) || attempt > this.maxRetries) throw judged.error;
         const retryAfterMs = parseRetryAfter(result.headers.get('retry-after'), Date.now());
         const delay = retryDelayMs(attempt, result.status, retryAfterMs, this.random);
@@ -140,15 +178,14 @@ export class HttpCore {
   }
 
   // 用 Headers 合并以便大小写不敏感；API Key 最后写入，不允许被覆盖。
-  private buildHeaders(perRequest: Record<string, string> | undefined): Record<string, string> {
+  private buildHeaders(perRequest: Headers): Record<string, string> {
     const merged = new Headers({
       'content-type': 'application/json',
       accept: 'application/json',
       'user-agent': `octen-js-sdk/${VERSION}`,
     });
-    for (const source of [this.defaultHeaders, perRequest]) {
-      for (const [k, v] of Object.entries(source ?? {})) merged.set(k, v);
-    }
+    for (const [k, v] of Object.entries(this.defaultHeaders)) merged.set(k, v);
+    for (const [k, v] of perRequest) merged.set(k, v);
     merged.set('x-api-key', this.apiKey);
     return Object.fromEntries(merged.entries());
   }
@@ -221,7 +258,7 @@ export class HttpCore {
       }
       return {
         kind: 'error',
-        error: new OctenConnectionError(undefined, { cause: err }),
+        error: new OctenConnectionError(connectionErrorMessage(err), { cause: err }),
         retryable: !sent && isPreSendNetworkError(err),
       };
     } finally {

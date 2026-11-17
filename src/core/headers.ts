@@ -1,20 +1,28 @@
 import { OctenValidationError } from './errors';
+import { isPlainObject } from '../schema/descriptor';
 
-/** 逐项交给 Headers 校验（名称与值的字符集以运行时为准），失败统一抛 OctenValidationError(field)。 */
-export function assertValidHeaders(headers: Record<string, string> | undefined, field: string): void {
-  if (headers === undefined) return;
-  if (typeof headers !== 'object' || headers === null) {
-    throw new OctenValidationError(field, `${field} must be an object of string values.`);
+/**
+ * Validates caller headers (plain object of strings; names and values checked by the runtime's Headers)
+ * and returns them normalised. x-api-key is refused so the apiKey option stays the only source of the key.
+ */
+export function normalizeHeaders(headers: unknown, field = 'headers'): Headers {
+  const out = new Headers();
+  if (headers === undefined) return out;
+  if (!isPlainObject(headers)) {
+    throw new OctenValidationError(field, `${field} must be a plain object of string values.`);
   }
-  const probe = new Headers();
   for (const [name, value] of Object.entries(headers)) {
     if (typeof value !== 'string') {
       throw new OctenValidationError(field, `Header "${name}" must have a string value.`);
     }
     try {
-      probe.set(name, value);
+      out.set(name, value);
     } catch {
       throw new OctenValidationError(field, `Header "${name}" has an invalid name or value.`);
     }
   }
+  if (out.has('x-api-key')) {
+    throw new OctenValidationError(field, `${field} cannot set x-api-key; pass the key with the apiKey option.`);
+  }
+  return out;
 }

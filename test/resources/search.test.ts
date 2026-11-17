@@ -219,3 +219,20 @@ export function typeLevelChecks(res: SearchResource) {
   // @ts-expect-error num_highlights is not in the public spec
   void res.search({ query: 'q', highlight: { num_highlights: 1 } });
 }
+
+// JSON.stringify would turn these into null and send them; the path format matches checkUnknownFields.
+describe('A2: values JSON cannot carry are rejected before sending', () => {
+  test.each([
+    ['search', { query: 'q', count: Number.NaN }, 'count'],
+    ['search', { query: 'q', highlight: { enable: true, max_tokens: Number.POSITIVE_INFINITY } }, 'highlight.max_tokens'],
+    ['search', { query: 'q', include_domains: ['a.com', undefined] }, 'include_domains[1]'],
+    ['broadSearch', { query: 'q', search_options: { count: Number.NEGATIVE_INFINITY } }, 'search_options.count'],
+    ['newsSearch', { query: 'q', include_domains: [undefined] }, 'include_domains[0]'],
+  ] as const)('%s %j -> OctenValidationError(%s)', async (method, params, field) => {
+    const { core, fetchImpl } = makeFetch();
+    const err = await call(new SearchResource(core), method, params).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(OctenValidationError);
+    expect((err as OctenValidationError).field).toBe(field);
+    expect(fetchImpl).toHaveBeenCalledTimes(0);
+  });
+});

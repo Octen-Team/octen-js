@@ -78,7 +78,7 @@ export type Infer<D extends Desc, M extends InferMode = 'request'> = D extends {
 
 export type InferResponse<D extends Desc> = Infer<D, 'response'>;
 
-function isPlainObject(v: unknown): v is Record<string, unknown> {
+export function isPlainObject(v: unknown): v is Record<string, unknown> {
   if (typeof v !== 'object' || v === null) return false;
   const proto = Object.getPrototypeOf(v) as unknown;
   return proto === Object.prototype || proto === null;

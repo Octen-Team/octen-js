@@ -1,10 +1,18 @@
 // 跨模块副本（ESM 与 CJS 各一份）时 instanceof 会失效，所以用全局 Symbol 标记来判断。
 const OCTEN_ERROR_MARK = Symbol.for('octen.error');
 
+// Literal names: consumers' bundlers rename classes when minifying, so new.target.name is unreliable.
+function setName(cls: { prototype: Error }, name: string): void {
+  Object.defineProperty(cls.prototype, 'name', { value: name, writable: true, configurable: true });
+}
+
 export class OctenError extends Error {
+  static {
+    setName(this, 'OctenError');
+  }
+
   constructor(message?: string, options?: { cause?: unknown }) {
     super(message, options);
-    this.name = new.target.name;
   }
 }
 Object.defineProperty(OctenError.prototype, OCTEN_ERROR_MARK, { value: true });
@@ -22,6 +30,10 @@ export type APIErrorInit = {
 };
 
 export class OctenAPIError extends OctenError {
+  static {
+    setName(this, 'OctenAPIError');
+  }
+
   readonly status: number;
   readonly code: number | null;
   readonly requestId: string | null;
@@ -36,12 +48,32 @@ export class OctenAPIError extends OctenError {
   }
 }
 
-export class OctenAuthenticationError extends OctenAPIError {}
-export class OctenPermissionDeniedError extends OctenAPIError {}
-export class OctenBadRequestError extends OctenAPIError {}
-export class OctenServerError extends OctenAPIError {}
+export class OctenAuthenticationError extends OctenAPIError {
+  static {
+    setName(this, 'OctenAuthenticationError');
+  }
+}
+export class OctenPermissionDeniedError extends OctenAPIError {
+  static {
+    setName(this, 'OctenPermissionDeniedError');
+  }
+}
+export class OctenBadRequestError extends OctenAPIError {
+  static {
+    setName(this, 'OctenBadRequestError');
+  }
+}
+export class OctenServerError extends OctenAPIError {
+  static {
+    setName(this, 'OctenServerError');
+  }
+}
 
 export class OctenRateLimitError extends OctenAPIError {
+  static {
+    setName(this, 'OctenRateLimitError');
+  }
+
   // 单位秒；响应没有（或无法解析）Retry-After 时为 null。
   readonly retryAfter: number | null;
 
@@ -52,24 +84,40 @@ export class OctenRateLimitError extends OctenAPIError {
 }
 
 export class OctenTimeoutError extends OctenError {
+  static {
+    setName(this, 'OctenTimeoutError');
+  }
+
   constructor(message = 'Request timed out.', options?: { cause?: unknown }) {
     super(message, options);
   }
 }
 
 export class OctenConnectionError extends OctenError {
+  static {
+    setName(this, 'OctenConnectionError');
+  }
+
   constructor(message = 'Connection error.', options?: { cause?: unknown }) {
     super(message, options);
   }
 }
 
 export class OctenAbortError extends OctenError {
+  static {
+    setName(this, 'OctenAbortError');
+  }
+
   constructor(message = 'Request was aborted.', options?: { cause?: unknown }) {
     super(message, options);
   }
 }
 
 export class OctenValidationError extends OctenError {
+  static {
+    setName(this, 'OctenValidationError');
+  }
+
   readonly field: string;
 
   constructor(field: string, message?: string) {

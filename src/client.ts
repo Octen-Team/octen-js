@@ -1,7 +1,7 @@
 import { isBrowser, readApiKeyFromEnv } from './core/env';
 import { OctenValidationError } from './core/errors';
-import { assertValidHeaders } from './core/headers';
-import { HttpCore } from './core/http';
+import { normalizeHeaders } from './core/headers';
+import { assertValidTimeout, HttpCore } from './core/http';
 import { PlaceSearchResource } from './resources/placeSearch';
 import { SearchResource } from './resources/search';
 
@@ -52,14 +52,16 @@ function resolveBaseURL(value: string | undefined): string {
       'baseURL must be an absolute http(s) URL without whitespace, query or fragment.',
     );
   }
+  const parsed = new URL(raw);
+  if (parsed.username !== '' || parsed.password !== '') {
+    throw new OctenValidationError('baseURL', 'baseURL must not contain credentials (user:password@); use apiKey.');
+  }
   return raw.replace(/\/+$/, '');
 }
 
 function resolveTimeout(value: number | undefined): number {
   if (value === undefined) return DEFAULT_TIMEOUT_MS;
-  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
-    throw new OctenValidationError('timeout', 'timeout must be a finite number of milliseconds greater than 0.');
-  }
+  assertValidTimeout(value);
   return value;
 }
 
@@ -98,8 +100,7 @@ export default class Octen {
     const baseURL = resolveBaseURL(opts.baseURL);
     const timeoutMs = resolveTimeout(opts.timeout);
     const maxRetries = resolveMaxRetries(opts.maxRetries);
-    assertValidHeaders(opts.defaultHeaders, 'headers');
-    const defaultHeaders = { ...opts.defaultHeaders };
+    const defaultHeaders = Object.fromEntries(normalizeHeaders(opts.defaultHeaders, 'defaultHeaders'));
     const http = new HttpCore({
       apiKey,
       baseURL,
