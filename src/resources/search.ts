@@ -6,14 +6,16 @@ import { PulseSearchRequestDesc, type PulseSearchParams, type PulseSearchRespons
 import { SearchRequestDesc, type SearchParams, type SearchResponse } from '../schema/search';
 import { prepareBody } from './request';
 
-// broadSearch 要并行跑多路搜索，默认 60 秒不够（设计文档 §5）
+// broadSearch 要并行跑多路搜索，默认 30 秒不够（设计文档 §5.5）；优先级：单次 timeout > 客户端显式 timeout > 120 秒
 const BROAD_SEARCH_TIMEOUT_MS = 120_000;
 
 export class SearchResource {
   private readonly http: HttpCore;
+  private readonly clientTimeoutExplicit: boolean;
 
-  constructor(http: HttpCore) {
+  constructor(http: HttpCore, clientTimeoutExplicit = false) {
     this.http = http;
+    this.clientTimeoutExplicit = clientTimeoutExplicit;
   }
 
   async search(params: SearchParams, options?: RequestOptions): Promise<SearchResponse> {
@@ -22,6 +24,10 @@ export class SearchResource {
 
   async broadSearch(params: BroadSearchParams, options?: RequestOptions): Promise<BroadSearchResponse> {
     const body = prepareBody(BroadSearchRequestDesc, params);
+    // 客户端显式设了 timeout 就原样交给 HttpCore（它会用客户端的值），否则补上 120 秒
+    if (this.clientTimeoutExplicit && options?.timeout == null) {
+      return await this.http.post('/broad-search', body, options);
+    }
     return await this.http.post('/broad-search', body, {
       ...options,
       timeout: options?.timeout ?? BROAD_SEARCH_TIMEOUT_MS,

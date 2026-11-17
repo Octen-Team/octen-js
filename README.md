@@ -138,7 +138,7 @@ Each method accepts an optional second argument:
 
 | Option | Meaning |
 |---|---|
-| `timeout` | Milliseconds for each attempt of this call; overrides the client default and the Broad Search default |
+| `timeout` | Milliseconds for each attempt of this call. Precedence: this option, then an explicitly set client `timeout`, then the endpoint default (120 s for Broad Search, 30 s otherwise) |
 | `signal` | An `AbortSignal`; aborting rejects with `OctenAbortError` and stops retrying |
 | `headers` | Extra headers for this call (the `x-api-key` header cannot be overridden) |
 
@@ -162,9 +162,10 @@ const client = new Octen({
 });
 ```
 
-- `timeout` counts each attempt and includes reading the response body. **Broad Search is the exception: it defaults to 120 s and ignores the client-level `timeout`**, because it runs many sub-queries; pass `{ timeout }` in the request options of that call to change it.
+- `timeout` counts each attempt and includes reading the response body. An explicit client `timeout` applies to every endpoint, Broad Search included; without one, Broad Search defaults to 120 s (it runs many sub-queries) and every other endpoint to 30 s. A per-request `timeout` beats both.
 - Only the `x-api-key` header carries credentials. Redirects are never followed (a redirect is reported as an error), so the key cannot be forwarded to another host.
 - The `User-Agent` is `octen-js-sdk/<version>`.
+- Every optional option accepts an explicit `undefined` and then behaves as if omitted, so `new Octen({ apiKey: process.env.OCTEN_API_KEY })` compiles under `exactOptionalPropertyTypes` and falls back to the environment variable.
 - Invalid options (empty key, malformed `baseURL`, non-positive `timeout`, negative `maxRetries`, and so on) throw `OctenValidationError` from the constructor.
 
 ## Errors
@@ -256,7 +257,7 @@ Compared with `octen-py` 0.11.1:
 | Error classes | Dedicated classes for 401 and 429 | Also 403, 400/422 and 5xx subclasses |
 | Auth headers | `x-api-key` and `Authorization: Bearer` | `x-api-key` only |
 | Deprecated `topic` parameter | Still present | Not exposed |
-| Broad Search timeout | 30 s like every endpoint | 120 s, separate default |
+| Broad Search timeout | 30 s like every endpoint | 120 s, separate default, unless a client `timeout` is set explicitly |
 
 ## Development and releasing
 
@@ -269,7 +270,7 @@ npm run spec-drift   # compares the live OpenAPI spec with testdata/openapi.json
 
 `testdata/openapi.json` is a snapshot of the public OpenAPI spec that the contract tests compare against; see `testdata/README.md`. A weekly workflow (`spec-drift.yml`) fails when the six endpoints' schemas change upstream; it never rewrites the snapshot.
 
-**Releasing.** The version lives in two places, `package.json` and `src/version.ts` (a smoke test fails if they differ), so a release bumps both. To release: bump both, add a `CHANGELOG.md` entry, merge to `main`, then push a `v<version>` tag. `release.yml` checks that the tag equals both versions, type-checks, tests, builds and publishes with npm provenance through OIDC trusted publishing (no token stored). The very first version has to be published manually by a maintainer of the `@octen.ai` npm organization, after which the trusted publisher (repository `Octen-Team/octen-js`, workflow `release.yml`) is configured in the package settings.
+**Releasing.** The version lives in two places, `package.json` and `src/version.ts` (a smoke test fails if they differ), so a release bumps both. To release: bump both, add a `CHANGELOG.md` entry, merge to `main`, then push a `v<version>` tag. `release.yml` refuses prerelease versions (a `-` in the version) and tags that are not on `main`, checks that the tag equals both versions, type-checks, tests, builds and publishes with npm provenance through OIDC trusted publishing (no token stored). The very first version has to be published manually by a maintainer of the `@octen.ai` npm organization, after which the trusted publisher (repository `Octen-Team/octen-js`, workflow `release.yml`) is configured in the package settings.
 
 ## License
 

@@ -118,6 +118,41 @@ describe('Octen client construction', () => {
 });
 
 describe('apiKey resolution', () => {
+  test('apiKey: undefined behaves like omitting it (environment fallback)', async () => {
+    vi.stubEnv('OCTEN_API_KEY', 'sk-env');
+    const f = okFetch();
+    // 类型层面：exactOptionalPropertyTypes 下 { apiKey: string | undefined } 必须能编译
+    const fromEnv: string | undefined = process.env.OCTEN_API_KEY;
+    await new Octen({ apiKey: fromEnv, fetch: f as unknown as FetchFn }).search.search({ query: 'q' });
+    expect(new Headers(f.mock.calls[0]?.[1]?.headers).get('x-api-key')).toBe('sk-env');
+  });
+
+  test('every optional option accepts an explicit undefined', () => {
+    expect(
+      () =>
+        new Octen({
+          apiKey: 'sk-test',
+          baseURL: undefined,
+          timeout: undefined,
+          maxRetries: undefined,
+          defaultHeaders: undefined,
+          fetch: undefined,
+          dangerouslyAllowBrowser: undefined,
+        }),
+    ).not.toThrow();
+    const o = lastOptions();
+    expect(o.baseURL).toBe('https://api.octen.ai');
+    expect(o.timeoutMs).toBe(30000);
+    expect(o.maxRetries).toBe(3);
+  });
+
+  test('request options accept an explicit undefined', async () => {
+    const f = okFetch();
+    const c = new Octen({ apiKey: 'sk-test', fetch: f as unknown as FetchFn });
+    await c.search.search({ query: 'q' }, { timeout: undefined, signal: undefined, headers: undefined });
+    expect(f).toHaveBeenCalledTimes(1);
+  });
+
   test('falls back to OCTEN_API_KEY when apiKey is not passed', async () => {
     vi.stubEnv('OCTEN_API_KEY', 'sk-env');
     const f = okFetch();
@@ -300,5 +335,66 @@ describe('public entry point', () => {
     for (const hidden of ['HttpCore', 'checkUnknownFields', 'prepareBody', 'retryDelayMs']) {
       expect(publicApi).not.toHaveProperty(hidden);
     }
+  });
+});
+
+// 优先级：单次 timeout > 客户端显式 timeout > 接口默认（broadSearch 120000，其余 30000）；设计文档 §5.5
+describe('timeout precedence', () => {
+  // fetch 永不返回，用假时钟以 1000 ms 为步长找出 SDK 在多少毫秒后放弃
+  async function timeoutAfterMs(
+    options: ConstructorParameters<typeof Octen>[0],
+    run: (c: Octen) => Promise<unknown>,
+  ): Promise<number> {
+    vi.useFakeTimers();
+    try {
+      const hang = vi.fn((_input: string | URL | Request, _init?: RequestInit) => new Promise<Response>(() => {}));
+      const c = new Octen({ apiKey: 'sk-test', fetch: hang as unknown as FetchFn, ...options });
+      let error: unknown;
+      let settled = false;
+      void run(c).catch((e: unknown) => {
+        error = e;
+        settled = true;
+      });
+      let elapsed = 0;
+      while (!settled && elapsed < 200_000) {
+        await vi.advanceTimersByTimeAsync(1000);
+        elapsed += 1000;
+      }
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).name).toBe('OctenTimeoutError');
+      return elapsed;
+    } finally {
+      vi.useRealTimers();
+    }
+  }
+  const search = (c: Octen) => c.search.search({ query: 'q' });
+  const broad = (c: Octen) => c.search.broadSearch({ query: 'q' });
+
+  test('no timeout set: broadSearch 120000, search 30000', async () => {
+    expect(await timeoutAfterMs({}, broad)).toBe(120_000);
+    expect(await timeoutAfterMs({}, search)).toBe(30_000);
+  });
+
+  test('explicit client timeout applies to broadSearch and search alike', async () => {
+    expect(await timeoutAfterMs({ timeout: 10_000 }, broad)).toBe(10_000);
+    expect(await timeoutAfterMs({ timeout: 10_000 }, search)).toBe(10_000);
+  });
+
+  test('a longer explicit client timeout also applies to broadSearch', async () => {
+    expect(await timeoutAfterMs({ timeout: 150_000 }, broad)).toBe(150_000);
+  });
+
+  test('a per-request timeout overrides both the default and the client timeout', async () => {
+    const withTimeout = (ms: number) => ({
+      broad: (c: Octen) => c.search.broadSearch({ query: 'q' }, { timeout: ms }),
+      search: (c: Octen) => c.search.search({ query: 'q' }, { timeout: ms }),
+    });
+    expect(await timeoutAfterMs({}, withTimeout(5000).broad)).toBe(5000);
+    expect(await timeoutAfterMs({ timeout: 10_000 }, withTimeout(5000).broad)).toBe(5000);
+    expect(await timeoutAfterMs({ timeout: 10_000 }, withTimeout(5000).search)).toBe(5000);
+  });
+
+  test('timeout: undefined counts as not set', async () => {
+    expect(await timeoutAfterMs({ timeout: undefined }, broad)).toBe(120_000);
   });
 });

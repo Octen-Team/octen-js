@@ -10,18 +10,19 @@ const DEFAULT_TIMEOUT_MS = 30_000;
 const DEFAULT_MAX_RETRIES = 3;
 
 export type ClientOptions = {
+  // 可选项显式传 undefined 等同没传，便于 exactOptionalPropertyTypes 下写 { apiKey: process.env.X }
   /** 缺省读环境变量 OCTEN_API_KEY */
-  apiKey?: string;
+  apiKey?: string | undefined;
   /** 默认 https://api.octen.ai */
-  baseURL?: string;
-  /** 毫秒，默认 30000 */
-  timeout?: number;
+  baseURL?: string | undefined;
+  /** 毫秒，默认 30000；显式设置时对所有接口生效（含 broadSearch） */
+  timeout?: number | undefined;
   /** 默认 3 */
-  maxRetries?: number;
-  defaultHeaders?: Record<string, string>;
-  fetch?: typeof fetch;
+  maxRetries?: number | undefined;
+  defaultHeaders?: Record<string, string> | undefined;
+  fetch?: typeof fetch | undefined;
   /** 浏览器里会暴露 API Key，必须显式确认 */
-  dangerouslyAllowBrowser?: boolean;
+  dangerouslyAllowBrowser?: boolean | undefined;
 };
 
 function resolveApiKey(opts: ClientOptions): string {
@@ -107,7 +108,7 @@ export default class Octen {
       defaultHeaders,
       fetch: resolveFetch(opts.fetch),
     });
-    this.search = new SearchResource(http);
+    this.search = new SearchResource(http, opts.timeout !== undefined);
     this.placeSearch = new PlaceSearchResource(http);
   }
 }

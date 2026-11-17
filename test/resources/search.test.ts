@@ -149,6 +149,18 @@ describe('SearchResource request options', () => {
     expect(post.mock.calls[0]?.[2]).toEqual({ timeout: 120000 });
   });
 
+  test('broadSearch with an explicit client timeout adds no timeout of its own', async () => {
+    const { core, post } = spyCore();
+    await new SearchResource(core, true).broadSearch({ query: 'q' });
+    expect((post.mock.calls[0] as unknown[])[2]).toBeUndefined();
+  });
+
+  test('broadSearch: a per-request timeout still wins over an explicit client timeout', async () => {
+    const { core, post } = spyCore();
+    await new SearchResource(core, true).broadSearch({ query: 'q' }, { timeout: 5000 });
+    expect(post.mock.calls[0]?.[2]).toEqual({ timeout: 5000 });
+  });
+
   test('broadSearch does not mutate the caller options object', async () => {
     const { core } = spyCore();
     const r: RequestOptions = { headers: { 'x-a': 'b' } };

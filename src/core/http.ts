@@ -11,9 +11,9 @@ import { VERSION } from '../version';
 
 export type RequestOptions = {
   /** 毫秒，覆盖本次请求的超时 */
-  timeout?: number;
-  signal?: AbortSignal;
-  headers?: Record<string, string>;
+  timeout?: number | undefined;
+  signal?: AbortSignal | undefined;
+  headers?: Record<string, string> | undefined;
 };
 
 export type HttpCoreOptions = {
