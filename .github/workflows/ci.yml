@@ -38,3 +38,5 @@ jobs:
         run: node -e "const m=require('./dist/index.cjs'); if (typeof m.Octen!=='function') process.exit(1)"
       - name: Load the built ESM bundle
         run: node --input-type=module -e "const m=await import('./dist/index.js'); if (m.default!==m.Octen) process.exit(1)"
+      - name: End-to-end (packed tarball in ESM/CJS/TS projects, real-socket fault injection against dist)
+        run: npm run test:e2e

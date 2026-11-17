@@ -44,6 +44,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:live": "vitest run --config vitest.live.config.ts",
+    "test:e2e": "npm run build && tsc -p tsconfig.e2e.json && vitest run --config vitest.e2e.config.ts && SKIP_BUILD=1 bash test/e2e/package.e2e.sh",
     "build": "tsup",
     "spec-drift": "tsx scripts/spec-drift.ts"
   },
