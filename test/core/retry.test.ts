@@ -51,6 +51,21 @@ describe('retry rules', () => {
     expect(parseRetryAfter(null, now)).toBeNull();
   });
 
+  test('parseRetryAfter: valid delta-seconds and trimmed whitespace', () => {
+    const now = Date.parse('2026-11-17T00:00:00Z');
+    expect(parseRetryAfter('5', now)).toBe(5000);
+    expect(parseRetryAfter(' 5 ', now)).toBe(5000);
+  });
+
+  // 这些输入 V8 的 Date.parse 会宽松接受成过去的日期（得到 0 = 立即重试），必须返回 null 让调用方回退到退避。
+  test.each(['5.5', '-1', '+5', '1.', '3 4', '-5 ', '', '1e3'])(
+    'parseRetryAfter: malformed %j returns null',
+    (header) => {
+      const now = Date.parse('2026-11-17T00:00:00Z');
+      expect(parseRetryAfter(header, now)).toBeNull();
+    },
+  );
+
   test('pre-send network error whitelist', () => {
     const e = (code: string) => Object.assign(new TypeError('fetch failed'), { cause: { code } });
     for (const c of ['ECONNREFUSED', 'ENOTFOUND', 'EAI_AGAIN']) expect(isPreSendNetworkError(e(c))).toBe(true);

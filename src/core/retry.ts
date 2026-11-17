@@ -4,6 +4,8 @@ const MAX_DELAY_MS = 60000;
 const BASE_DELAY_MS = 1000;
 const RETRY_AFTER_STATUS: ReadonlySet<number> = new Set([429, 503]);
 const PRE_SEND_ERROR_CODES: ReadonlySet<string> = new Set(['ECONNREFUSED', 'ENOTFOUND', 'EAI_AGAIN']);
+// 只有形如 "Tue, 17 Nov 2026 00:00:10 GMT" 的字符串才交给 Date.parse（它对 "5.5"、"-1" 等会宽松地返回过去的日期）。
+const HTTP_DATE_SHAPE = /^[A-Za-z]{3,9},?\s+\S.*\d{2}:\d{2}:\d{2}/;
 
 export function isRetryableStatus(status: number): boolean {
   return RETRYABLE_STATUS.has(status);
@@ -14,6 +16,7 @@ export function parseRetryAfter(header: string | null, now: number): number | nu
   if (header === null) return null;
   const value = header.trim();
   if (/^\d+$/.test(value)) return Number(value) * 1000;
+  if (!HTTP_DATE_SHAPE.test(value)) return null;
   const at = Date.parse(value);
   if (Number.isNaN(at)) return null;
   return Math.max(0, at - now);
