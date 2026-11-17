@@ -238,7 +238,7 @@ For billing-sensitive jobs, set `maxRetries: 0` and handle retries yourself. Ser
 
 ## Runtimes and browsers
 
-- **Node 20+** is the supported runtime, and the only one tested in CI (Node 20 and 22).
+- **Node 20+** is the supported runtime, and the only one tested in CI (Node 20, 22 and 24).
 - The SDK only needs a global `fetch` (or the `fetch` option), so it is expected to work on Bun, Deno, Vercel Edge and Cloudflare Workers, but these are **not tested** here. `OCTEN_API_KEY` is read only if `process.env` exists and is accessible, so on those runtimes pass `apiKey` explicitly.
 - **Not for browsers.** An API key in front-end code is visible to everyone who opens the page. When the SDK detects a browser (both `window` and `document` exist) the constructor throws `OctenValidationError` unless you pass `dangerouslyAllowBrowser: true`. Call Octen from your server instead, and only use the flag if you accept the exposure (for example a throwaway key).
 
@@ -264,13 +264,23 @@ Compared with `octen-py` 0.11.1:
 ```bash
 npm ci
 npm run typecheck && npm test && npm run build
+npm run test:e2e     # builds dist, runs real-socket fault injection and a packed-tarball smoke test
 OCTEN_LIVE=1 OCTEN_API_KEY=... npm run test:live   # real, billed calls
 npm run spec-drift   # compares the live OpenAPI spec with testdata/openapi.json
 ```
 
 `testdata/openapi.json` is a snapshot of the public OpenAPI spec that the contract tests compare against; see `testdata/README.md`. A weekly workflow (`spec-drift.yml`) fails when the six endpoints' schemas change upstream; it never rewrites the snapshot.
 
-**Releasing.** The version lives in two places, `package.json` and `src/version.ts` (a smoke test fails if they differ), so a release bumps both. To release: bump both, add a `CHANGELOG.md` entry, merge to `main`, then push a `v<version>` tag. `release.yml` refuses prerelease versions (a `-` in the version) and tags that are not on `main`, checks that the tag equals both versions, type-checks, tests, builds and publishes with npm provenance through OIDC trusted publishing (no token stored). The very first version has to be published manually by a maintainer of the `@octen.ai` npm organization, after which the trusted publisher (repository `Octen-Team/octen-js`, workflow `release.yml`) is configured in the package settings.
+**Releasing.** The version lives in two places, `package.json` and `src/version.ts` (a smoke test fails if they differ), so a release bumps both. To release: bump both, add a `CHANGELOG.md` entry, merge to `main`, then push a `v<version>` tag. `release.yml` refuses prerelease versions (a `-` in the version) and tags that are not on `main`, checks that the tag equals both versions, type-checks, tests, builds, runs `test:e2e` and publishes with npm provenance through OIDC trusted publishing (no token stored). `prepublishOnly` also runs typecheck, tests and build before any `npm publish`.
+
+**First publish (once, by hand).** Trusted publishing can only be configured on a package that already exists, so a maintainer of the `@octen.ai` npm organization publishes the first version:
+
+1. Check out a clean copy of the `main` merge commit that carries the release (`git status` shows nothing).
+2. `npm ci`
+3. `npm run typecheck && npm test && npm run test:e2e`
+4. `npm pack --dry-run` and inspect the list: only `dist/`, `README.md`, `LICENSE`, `CHANGELOG.md` and `package.json`.
+5. `npm publish --access public`, logged in (`npm whoami`) as an organization member with publish rights.
+6. On npmjs.com, in the package settings, add a trusted publisher: GitHub Actions, repository `Octen-Team/octen-js`, workflow `release.yml`. Every later version is released by pushing its tag. Pushing a tag for the hand-published version would make `release.yml` fail at publish, since that version already exists.
 
 ## License
 

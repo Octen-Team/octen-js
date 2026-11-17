@@ -25,9 +25,9 @@ TARBALL_NAME="$(npm pack --pack-destination "$TMP" --json | node -e "console.log
 TARBALL="$TMP/$TARBALL_NAME"
 echo "tarball $TARBALL_NAME"
 
-# 0. 包内容：只有 dist、README、LICENSE、package.json，没有源码或测试
+# 0. Package contents: only dist, README, LICENSE, CHANGELOG and package.json; no sources or tests
 LISTING="$(tar -tzf "$TARBALL")"
-for need in package/dist/index.js package/dist/index.cjs package/dist/index.d.ts package/dist/index.d.cts package/package.json package/README.md package/LICENSE; do
+for need in package/dist/index.js package/dist/index.cjs package/dist/index.d.ts package/dist/index.d.cts package/package.json package/README.md package/LICENSE package/CHANGELOG.md; do
   echo "$LISTING" | grep -qx "$need" || fail "tarball is missing $need"
 done
 if echo "$LISTING" | grep -Eq '^package/(src|test|testdata|scripts|\.superpowers)/'; then fail "tarball contains source/test files"; fi

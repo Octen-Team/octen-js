@@ -51,6 +51,8 @@ jobs:
         run: npm test
       - name: Build
         run: npm run build
+      - name: End-to-end (packed tarball in ESM/CJS/TS projects, real-socket fault injection against dist)
+        run: npm run test:e2e
       # Pinned on purpose: `npm@latest` would let an unreviewed npm release run with our publish rights.
       - name: Install npm 12.2.1 for OIDC
         run: npm install -g npm@12.2.1

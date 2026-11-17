@@ -2,6 +2,16 @@
   "name": "@octen.ai/sdk",
   "version": "0.1.0",
   "description": "Official TypeScript SDK for the Octen API",
+  "keywords": [
+    "octen",
+    "search",
+    "web-search",
+    "news-search",
+    "place-search",
+    "search-api",
+    "sdk",
+    "typescript"
+  ],
   "license": "MIT",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -23,7 +33,8 @@
   "files": [
     "dist",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "CHANGELOG.md"
   ],
   "sideEffects": false,
   "engines": {
@@ -46,6 +57,7 @@
     "test:live": "vitest run --config vitest.live.config.ts",
     "test:e2e": "npm run build && tsc -p tsconfig.e2e.json && vitest run --config vitest.e2e.config.ts && SKIP_BUILD=1 bash test/e2e/package.e2e.sh",
     "build": "tsup",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build",
     "spec-drift": "tsx scripts/spec-drift.ts"
   },
   "dependencies": {},
