@@ -1,0 +1,44 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+  id-token: write # npm OIDC trusted publishing and provenance; no token needed
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          # trusted publishing needs npm 11.5.1+ and Node 22.14+
+          node-version: 22
+          cache: npm
+          registry-url: "https://registry.npmjs.org"
+      - run: npm ci
+      - name: Verify tag matches package.json and src/version.ts
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          PKG="$(node -p "require('./package.json').version")"
+          SRC="$(node -p "require('fs').readFileSync('src/version.ts', 'utf8').match(/VERSION = '([^']+)'/)?.[1] ?? ''")"
+          if [ "$TAG" != "$PKG" ] || [ "$TAG" != "$SRC" ]; then
+            echo "Tag '$GITHUB_REF_NAME' (=$TAG), package.json '$PKG' and src/version.ts '$SRC' must all match"
+            exit 1
+          fi
+      - name: Type-check
+        run: npm run typecheck
+      - name: Test
+        run: npm test
+      - name: Build
+        run: npm run build
+      # Pinned on purpose: `npm@latest` would let an unreviewed npm release run with our publish rights.
+      - name: Install npm 12.2.1 for OIDC
+        run: npm install -g npm@12.2.1
+      # No NODE_AUTH_TOKEN: with id-token: write and a trusted publisher configured on npmjs.com
+      # (repo Octen-Team/octen-js, workflow release.yml), npm authenticates via OIDC.
+      - name: Publish to npm (OIDC, provenance)
+        run: npm publish --provenance --access public

@@ -2,7 +2,11 @@ name: CI
 
 on:
   push:
+    branches: [main]
   pull_request:
+
+permissions:
+  contents: read
 
 jobs:
   test:
@@ -23,11 +27,14 @@ jobs:
       - run: npm run build
       - name: Check packed artifacts (ESM, CJS, d.ts)
         run: |
-          npm pack --dry-run --json > pack.json
-          node -e "
-            const files = JSON.parse(require('fs').readFileSync('pack.json', 'utf8'))[0].files.map((f) => f.path);
+          npm pack --dry-run --json | node -e "
+            const files = JSON.parse(require('fs').readFileSync(0, 'utf8'))[0].files.map((f) => f.path);
             const need = ['dist/index.js', 'dist/index.cjs', 'dist/index.d.ts', 'dist/index.d.cts'];
             const missing = need.filter((n) => !files.includes(n));
             if (missing.length) { console.error('missing from package:', missing); process.exit(1); }
             console.log('package contains', need.join(', '));
           "
+      - name: Load the built CommonJS bundle
+        run: node -e "const m=require('./dist/index.cjs'); if (typeof m.Octen!=='function') process.exit(1)"
+      - name: Load the built ESM bundle
+        run: node --input-type=module -e "const m=await import('./dist/index.js'); if (m.default!==m.Octen) process.exit(1)"

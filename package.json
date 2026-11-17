@@ -44,12 +44,14 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:live": "vitest run --config vitest.live.config.ts",
-    "build": "tsup"
+    "build": "tsup",
+    "spec-drift": "tsx scripts/spec-drift.ts"
   },
   "dependencies": {},
   "devDependencies": {
     "@types/node": "20.19.43",
     "tsup": "8.5.1",
+    "tsx": "4.23.15",
     "typescript": "6.0.3",
     "vitest": "4.1.12"
   }
