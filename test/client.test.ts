@@ -76,7 +76,20 @@ describe('Octen client construction', () => {
     expect(o.timeoutMs).toBe(1234);
     expect(o.maxRetries).toBe(0);
     expect(o.defaultHeaders).toEqual({ 'x-a': 'b' });
-    expect(o.fetch).toBe(f);
+  });
+
+  test('a user-supplied fetch is called without the HttpCore/client as this', async () => {
+    const thisValues: unknown[] = [];
+    const f = function (this: unknown, _input: string | URL | Request, _init?: RequestInit) {
+      thisValues.push(this);
+      return Promise.resolve(
+        new Response(JSON.stringify({ code: 0 }), { status: 200, headers: { 'content-type': 'application/json' } }),
+      );
+    } as unknown as FetchFn;
+    const c = new Octen({ apiKey: 'sk-test', fetch: f });
+    await c.search.search({ query: 'q' });
+    expect(thisValues).toHaveLength(1);
+    expect(thisValues[0] === undefined || thisValues[0] === globalThis).toBe(true);
   });
 
   test('exposes search and placeSearch resources', () => {
@@ -201,12 +214,36 @@ describe('numeric option validation', () => {
 });
 
 describe('baseURL validation', () => {
-  test.each(['not a url', '/relative', 'ftp://example.test', 'javascript:alert(1)', ''])(
+  test.each([
+    'not a url',
+    '/relative',
+    'ftp://example.test',
+    'javascript:alert(1)',
+    '',
+    ' https://x.test',
+    'https://x.test ',
+    'https://x.test/ ',
+    'https://x.test/a b',
+    'https://x.test?x=1',
+    'https://x.test/p?x=1',
+    'https://x.test/p#frag',
+    'https://x.test/?',
+    'http:example.com',
+    'https:///path',
+    'https://',
+  ])(
     '%j is OctenValidationError("baseURL")',
     (baseURL) => {
       expect(fieldOf(() => new Octen({ apiKey: 'sk-test', baseURL }))).toBe('baseURL');
     },
   );
+
+  test('path prefixes are kept and one trailing slash is stripped', () => {
+    new Octen({ apiKey: 'sk-test', baseURL: 'https://gw.test/octen/' });
+    expect(lastOptions().baseURL).toBe('https://gw.test/octen');
+    new Octen({ apiKey: 'sk-test', baseURL: 'http://localhost:8888' });
+    expect(lastOptions().baseURL).toBe('http://localhost:8888');
+  });
 
   test('http and https are accepted', () => {
     expect(() => new Octen({ apiKey: 'sk-test', baseURL: 'http://localhost:8888' })).not.toThrow();

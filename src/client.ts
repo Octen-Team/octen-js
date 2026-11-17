@@ -42,14 +42,14 @@ function resolveApiKey(opts: ClientOptions): string {
 
 function resolveBaseURL(value: string | undefined): string {
   const raw = value === undefined ? DEFAULT_BASE_URL : value;
-  let protocol: string | undefined;
-  try {
-    protocol = typeof raw === 'string' ? new URL(raw).protocol : undefined;
-  } catch {
-    protocol = undefined;
-  }
-  if (protocol !== 'http:' && protocol !== 'https:') {
-    throw new OctenValidationError('baseURL', 'baseURL must be an absolute http: or https: URL.');
+  // 只接受 http(s)://host[:port][/path 前缀]；空白、query、hash 都会拼出坏 URL
+  const wellFormed =
+    typeof raw === 'string' && /^https?:\/\/[^\s/?#]+[^\s?#]*$/i.test(raw) && URL.canParse(raw);
+  if (!wellFormed) {
+    throw new OctenValidationError(
+      'baseURL',
+      'baseURL must be an absolute http(s) URL without whitespace, query or fragment.',
+    );
   }
   return raw.replace(/\/+$/, '');
 }
@@ -71,7 +71,8 @@ function resolveMaxRetries(value: number | undefined): number {
 }
 
 function resolveFetch(value: typeof fetch | undefined): typeof fetch {
-  if (value !== undefined) return value;
+  // 包一层让用户传入的 fetch 以 this === undefined 调用，避免 Workers/浏览器里 Illegal invocation
+  if (value !== undefined) return (input, init) => value(input, init);
   if (typeof globalThis.fetch !== 'function') {
     throw new OctenValidationError('fetch', 'No global fetch is available; pass a `fetch` implementation.');
   }
