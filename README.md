@@ -47,7 +47,7 @@ const client = new Octen(); // reads OCTEN_API_KEY
 client.search.search({ query: 'hello' }).then((res) => console.log(res.request_id));
 ```
 
-Responses are the parsed JSON bodies, so field names are snake_case exactly as in the [API reference](https://docs.octen.ai). Apart from `request_id`, response fields are typed as optional (hence the `?.` above), and unknown extra fields are passed through untouched.
+Responses are the parsed JSON bodies, so field names are snake_case exactly as in the [API reference](https://docs.octen.ai). Response fields are typed as optional (hence the `?.` above) except `request_id` and the `type` of each Business Search entity; the SDK does not check response structure at runtime, and unknown extra fields are passed through untouched.
 
 ## The six methods
 
@@ -130,7 +130,7 @@ for (const p of places.data?.places ?? []) {
 
 ### Local validation
 
-Before sending anything the SDK checks that `query` is a non-empty string and rejects keys it does not know, at every nesting level (`OctenValidationError`, with the offending path in `field`, for example `highlight.max_token`). It does not check value ranges (for example `count`); out-of-range values come back from the server as a 400 (`OctenBadRequestError`). Keys whose value is `undefined` are treated as not passed. `broadSearch`'s `search_options` takes the same keys as `search`.
+Before sending anything the SDK checks that `query` is a non-empty string and rejects keys it does not know, at every nesting level (`OctenValidationError`, with the offending path in `field`, for example `highlight.max_token`). It does not check value ranges (for example `count`); out-of-range values come back from the server as a 400 (`OctenBadRequestError`). Keys whose value is `undefined` are treated as not passed. Values that JSON would silently turn into `null` are rejected instead: `NaN` and `Infinity` anywhere, and `undefined` items inside arrays (`field` is then the item's path, for example `include_domains[1]`). `broadSearch`'s `search_options` takes the same keys as `search`.
 
 ## Request options
 
@@ -140,7 +140,7 @@ Each method accepts an optional second argument:
 |---|---|
 | `timeout` | Milliseconds for each attempt of this call. Precedence: this option, then an explicitly set client `timeout`, then the endpoint default (120 s for Broad Search, 30 s otherwise) |
 | `signal` | An `AbortSignal`; aborting rejects with `OctenAbortError` and stops retrying |
-| `headers` | Extra headers for this call (the `x-api-key` header cannot be overridden) |
+| `headers` | Extra headers for this call, as a plain object of strings. Setting `x-api-key` here throws `OctenValidationError`; the key only comes from `apiKey` |
 
 ```ts
 const ac = new AbortController();
@@ -154,9 +154,10 @@ await client.search.search({ query: 'hello' }, { signal: ac.signal, timeout: 10_
 const client = new Octen({
   apiKey: 'sk-...',          // default: process.env.OCTEN_API_KEY; the constructor throws if neither is set
   baseURL: 'https://api.octen.ai',
-  timeout: 30_000,           // ms per attempt, default 30 s
+  timeout: 60_000,           // ms per attempt; once set it applies to every endpoint, broadSearch included
+                             // (unset: 30 s, and 120 s for broadSearch)
   maxRetries: 3,             // default 3 (at most 4 requests)
-  defaultHeaders: {},        // sent with every request
+  defaultHeaders: {},        // plain object, sent with every request; must not contain x-api-key
   fetch: customFetch,        // default: the runtime's global fetch
   dangerouslyAllowBrowser: false,
 });
@@ -166,7 +167,7 @@ const client = new Octen({
 - Only the `x-api-key` header carries credentials. Redirects are never followed (a redirect is reported as an error), so the key cannot be forwarded to another host.
 - The `User-Agent` is `octen-js-sdk/<version>`.
 - Every optional option accepts an explicit `undefined` and then behaves as if omitted, so `new Octen({ apiKey: process.env.OCTEN_API_KEY })` compiles under `exactOptionalPropertyTypes` and falls back to the environment variable.
-- Invalid options (empty key, malformed `baseURL`, non-positive `timeout`, negative `maxRetries`, and so on) throw `OctenValidationError` from the constructor.
+- Invalid options (empty key, malformed `baseURL` or one with `user:password@`, a `timeout` outside 1 to 2147483647 ms, negative `maxRetries`, `defaultHeaders` that is not a plain object or sets `x-api-key`, and so on) throw `OctenValidationError` from the constructor, with `field` naming the option.
 
 ## Errors
 
@@ -178,10 +179,10 @@ Every error the SDK throws extends `OctenError`. API errors (`OctenAPIError` and
 | 403 (no permission, insufficient balance) | `OctenPermissionDeniedError` |
 | 400, 422 | `OctenBadRequestError` |
 | 429 (retries used up, or `Retry-After` above 60 s) | `OctenRateLimitError`, has `retryAfter` |
-| 5xx (retries used up) | `OctenServerError` |
+| 5xx (retries used up, or a 503 whose `Retry-After` is above 60 s) | `OctenServerError` |
 | Any other non-2xx; a 2xx that is not a usable result (see below) | `OctenAPIError` |
 | Client timeout (`timeout`) | `OctenTimeoutError` |
-| Network error | `OctenConnectionError` |
+| Network error | `OctenConnectionError` (the message includes the cause, such as `ECONNREFUSED`; the original error is in `cause`) |
 | Aborted through `signal` | `OctenAbortError` |
 | Rejected by the SDK before sending | `OctenValidationError` (has `field`) |
 
@@ -211,7 +212,7 @@ try {
 
 Prefer `isOctenError()` over `instanceof OctenError` when a process may load both the ESM and the CommonJS build of the package: with two copies of the classes `instanceof` fails, while the marker that `isOctenError` checks works across copies. `instanceof` against a subclass has the same limit, so in that situation branch on `err.name` instead.
 
-The message is taken from the response body's `msg`, `message`, `detail` or `error` field (in that order), else the first 500 characters of the body, else `HTTP <status>`. Quote `requestId` when contacting support.
+The message is taken from the response body's `msg`, `message`, `detail` or `error` field (the first non-empty string, in that order; when `error` is an object, the same keys are searched inside it, recursively), else the first 500 characters of the body, else `HTTP <status>`. A redirect (3xx) instead gets a message saying that redirects are not followed and to check `baseURL`. Quote `requestId` when contacting support.
 
 ## Retries and timeouts
 
@@ -220,7 +221,7 @@ The message is taken from the response body's `msg`, `message`, `detail` or `err
 - HTTP 408, 429, 500, 502, 503 and 504.
 - Network errors that happen before the request is sent: on Node, errors whose `cause.code` is `ECONNREFUSED`, `ENOTFOUND` or `EAI_AGAIN`.
 
-**Waiting between attempts:** `1 s * 2^(n-1)` before retry `n`, plus up to 25% random jitter, at most 60 s. A `Retry-After` header (seconds or an HTTP date) is honoured on 429 and 503 only; if it asks for more than 60 s the SDK stops and throws, and `OctenRateLimitError.retryAfter` carries the value in seconds.
+**Waiting between attempts:** `1 s * 2^(n-1)` before retry `n`, plus up to 25% random jitter, at most 60 s. A `Retry-After` header (seconds or an HTTP date) is honoured on 429 and 503 only; if it asks for more than 60 s the SDK stops and throws at once. Only `OctenRateLimitError` (429) has `retryAfter`, the requested wait in seconds (rounded up); a 503 that gives up this way throws `OctenServerError`, which has no `retryAfter`.
 
 **Not retried:**
 

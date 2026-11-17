@@ -71,7 +71,7 @@ type InferBase<D extends Desc, M extends InferMode> = D extends ScalarDesc
         ? InferUnion<D, M>
         : never;
 
-/** 从描述推导 TS 类型。M 默认 'request'；响应描述用 `InferResponse`（或 `Infer<D, 'response'>`）。 */
+/** TS type inferred from a descriptor; M defaults to 'request', use `InferResponse` for responses. */
 export type Infer<D extends Desc, M extends InferMode = 'request'> = D extends { readonly nullable: true }
   ? InferBase<D, M> | null
   : InferBase<D, M>;

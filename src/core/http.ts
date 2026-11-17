@@ -11,9 +11,11 @@ import { isPreSendNetworkError, isRetryableStatus, parseRetryAfter, retryDelayMs
 import { VERSION } from '../version';
 
 export type RequestOptions = {
-  /** 毫秒，覆盖本次请求的超时 */
+  /** Milliseconds for each attempt of this call; overrides the client and endpoint timeouts. */
   timeout?: number | undefined;
+  /** Aborting rejects with OctenAbortError and stops retrying. */
   signal?: AbortSignal | undefined;
+  /** Plain object of extra headers; must not contain x-api-key (use the client's apiKey). */
   headers?: Record<string, string> | undefined;
 };
 
@@ -32,7 +34,7 @@ type AttemptResult =
   | { kind: 'response'; status: number; headers: Headers; text: string }
   | { kind: 'error'; error: Error; retryable: boolean };
 
-// 让 promise 在 signal 中止时立即以 signal.reason 拒绝，即使底层实现不理会 signal。
+// Rejects with signal.reason as soon as the signal aborts, even if the wrapped work ignores the signal.
 function abortable<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     if (signal.aborted) {
@@ -54,7 +56,7 @@ function abortable<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
   });
 }
 
-// 可被 signal 打断的默认 sleep；中止时清掉定时器，不让进程多挂最长 60 秒。
+// Default backoff sleep; an abort clears the timer so the process is not held open for up to 60 s.
 function interruptibleSleep(ms: number, signal: AbortSignal | undefined): Promise<void> {
   return new Promise<void>((resolve, reject) => {
     if (signal?.aborted) {
@@ -182,7 +184,7 @@ export class HttpCore {
     }
   }
 
-  // 用 Headers 合并以便大小写不敏感；API Key 最后写入，不允许被覆盖。
+  // Merged through Headers so names are case-insensitive; the API key is written last as a backstop.
   private buildHeaders(perRequest: Headers): Record<string, string> {
     const merged = new Headers({
       'content-type': 'application/json',
@@ -209,7 +211,7 @@ export class HttpCore {
     }
   }
 
-  // 一次尝试：超时计时与响应体读取同属一个 signal，读完正文才解除。
+  // One attempt: the timeout covers reading the body too, so its timer is cleared only after the body is read.
   private async attemptOnce(
     url: string,
     headers: Record<string, string>,

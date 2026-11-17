@@ -10,18 +10,23 @@ const DEFAULT_TIMEOUT_MS = 30_000;
 const DEFAULT_MAX_RETRIES = 3;
 
 export type ClientOptions = {
-  // 可选项显式传 undefined 等同没传，便于 exactOptionalPropertyTypes 下写 { apiKey: process.env.X }
-  /** 缺省读环境变量 OCTEN_API_KEY */
+  // An explicit undefined means "not set", so { apiKey: process.env.X } works under exactOptionalPropertyTypes.
+  /** Defaults to the OCTEN_API_KEY environment variable. */
   apiKey?: string | undefined;
-  /** 默认 https://api.octen.ai */
+  /** Defaults to https://api.octen.ai. */
   baseURL?: string | undefined;
-  /** 毫秒，默认 30000；显式设置时对所有接口生效（含 broadSearch） */
+  /**
+   * Milliseconds per attempt. Once set it applies to every endpoint, broadSearch included;
+   * when unset: 30000, and 120000 for broadSearch.
+   */
   timeout?: number | undefined;
-  /** 默认 3 */
+  /** Retries after the first attempt; defaults to 3. */
   maxRetries?: number | undefined;
+  /** Plain object of headers sent with every request; must not contain x-api-key (use apiKey). */
   defaultHeaders?: Record<string, string> | undefined;
+  /** Defaults to the runtime's global fetch. */
   fetch?: typeof fetch | undefined;
-  /** 浏览器里会暴露 API Key，必须显式确认 */
+  /** Required in a browser, where the API key would be exposed to anyone who opens the page. */
   dangerouslyAllowBrowser?: boolean | undefined;
 };
 
@@ -43,7 +48,7 @@ function resolveApiKey(opts: ClientOptions): string {
 
 function resolveBaseURL(value: string | undefined): string {
   const raw = value === undefined ? DEFAULT_BASE_URL : value;
-  // 只接受 http(s)://host[:port][/path 前缀]；空白、query、hash 都会拼出坏 URL
+  // Only http(s)://host[:port][/path prefix]; whitespace, a query or a hash would corrupt joined URLs.
   const wellFormed =
     typeof raw === 'string' && /^https?:\/\/[^\s/?#]+[^\s?#]*$/i.test(raw) && URL.canParse(raw);
   if (!wellFormed) {
@@ -74,12 +79,12 @@ function resolveMaxRetries(value: number | undefined): number {
 }
 
 function resolveFetch(value: typeof fetch | undefined): typeof fetch {
-  // 包一层让用户传入的 fetch 以 this === undefined 调用，避免 Workers/浏览器里 Illegal invocation
+  // Call the user's fetch without the client as `this`, avoiding "Illegal invocation" in Workers and browsers.
   if (value !== undefined) return (input, init) => value(input, init);
   if (typeof globalThis.fetch !== 'function') {
     throw new OctenValidationError('fetch', 'No global fetch is available; pass a `fetch` implementation.');
   }
-  // 调用时才取全局 fetch，便于测试替换与运行时 polyfill
+  // Look up the global fetch per call so test stubs and late polyfills are picked up.
   return (input, init) => globalThis.fetch(input, init);
 }
 
