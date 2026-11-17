@@ -43,6 +43,7 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:live": "vitest run --config vitest.live.config.ts",
     "build": "tsup"
   },
   "dependencies": {},
