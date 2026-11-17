@@ -1,11 +1,11 @@
 import type { ArrayDesc, ObjectDesc } from './descriptor';
 
-// 多个接口共用的描述片段，逐字段对应 testdata/openapi.json（OpenAPI 对比测试逐项核对）。
-// 请求描述不放 nullable；响应描述除 request_id 外都不标 required，标量不带枚举（服务端可能新增取值）。
+// Description fragments shared by several endpoints, mapped field by field to testdata/openapi.json (checked by the OpenAPI comparison test).
+// Request descriptions are never nullable; response descriptions mark nothing required except request_id, and scalars carry no enums (the server may add values).
 
 export const stringArray = { t: 'array', items: { t: 'string' } } as const satisfies ArrayDesc;
 
-/** 请求里的 language：数组元素是固定的 18 个语言码 */
+/** language in requests: array elements are a fixed set of 18 language codes */
 export const languageArray = {
   t: 'array',
   items: {
@@ -14,7 +14,7 @@ export const languageArray = {
   },
 } as const satisfies ArrayDesc;
 
-/** 请求里的 highlight / full_content 选项 */
+/** highlight / full_content options in requests */
 export const contentOptions = {
   t: 'object',
   fields: { enable: { t: 'boolean' }, max_tokens: { t: 'integer' } },
@@ -23,7 +23,7 @@ export const contentOptions = {
 const timeBasis = { t: 'string', enum: ['auto', 'published', 'crawled'] } as const;
 const timeRange = { t: 'string', enum: ['day', 'week', 'month', 'year', 'd', 'w', 'm', 'y'] } as const;
 
-/** /search、/broad-search 的 search_options、/news-search、/business-search、place 的 web_search 共有的时间与域名过滤 */
+/** Time and domain filters shared by /search and /broad-search search_options, /news-search, /business-search, and place web_search */
 export const timeFilterFields = {
   time_basis: timeBasis,
   time_range: timeRange,
@@ -36,7 +36,7 @@ export const domainFilterFields = {
   exclude_domains: stringArray,
 } as const;
 
-/** /search 请求与 /broad-search 的 search_options 完全相同的字段 */
+/** Fields that /search requests and /broad-search search_options have in common */
 export const webSearchOptionFields = {
   result_type: { t: 'string', enum: ['standard', 'dynamic'] },
   count: { t: 'integer' },
@@ -57,7 +57,7 @@ const image = {
   fields: { url: { t: 'string' }, description: { t: 'string' } },
 } as const satisfies ObjectDesc;
 
-/** 响应里一条网页结果（SearchResult 及其同构结构） */
+/** A web result in a response (SearchResult and structurally identical shapes) */
 export const webResultFields = {
   title: { t: 'string' },
   url: { t: 'string' },

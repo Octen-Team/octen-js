@@ -17,7 +17,7 @@ export const PlaceSearchRequestDesc = {
       t: 'object',
       fields: {
         count: { t: 'integer' },
-        // 服务端与外部文档支持（0–5，默认 0），公开 OpenAPI 缺（known_diffs.json）
+        // Supported by the server and external docs (0–5, default 0); missing from the public OpenAPI (known_diffs.json)
         max_reviews: { t: 'integer' },
       },
     },
@@ -64,7 +64,7 @@ const place = {
     status: { t: 'string' },
     rating: { t: 'number' },
     review_count: { t: 'integer' },
-    // 自由结构，键由服务端决定
+    // Free-form structure; keys are decided by the server
     attributes: { t: 'object', fields: {} },
   },
 } as const satisfies ObjectDesc;

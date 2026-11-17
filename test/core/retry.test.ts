@@ -20,7 +20,7 @@ describe('retry rules', () => {
   test('backoff with jitter bounds', () => {
     expect(retryDelayMs(1, 500, null, () => 0)).toBe(1000);
     expect(retryDelayMs(3, 500, null, () => 1)).toBe(5000); // 4000 × 1.25
-    expect(retryDelayMs(10, 500, null, () => 1)).toBe(60000); // 上限
+    expect(retryDelayMs(10, 500, null, () => 1)).toBe(60000); // cap
   });
 
   test('Retry-After only for 429 and 503', () => {
@@ -57,7 +57,7 @@ describe('retry rules', () => {
     expect(parseRetryAfter(' 5 ', now)).toBe(5000);
   });
 
-  // 这些输入 V8 的 Date.parse 会宽松接受成过去的日期（得到 0 = 立即重试），必须返回 null 让调用方回退到退避。
+  // V8's Date.parse leniently accepts these inputs as past dates (giving 0 = retry immediately); they must return null so callers fall back to backoff.
   test.each(['5.5', '-1', '+5', '1.', '3 4', '-5 ', '', '1e3'])(
     'parseRetryAfter: malformed %j returns null',
     (header) => {

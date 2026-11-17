@@ -1,4 +1,4 @@
-// 装包后的 ESM 消费者：默认导出 / 具名导出 / 真实请求 / 与 CJS 副本并存时 isOctenError 仍可用
+// ESM consumer of the installed package: default export / named exports / real request / isOctenError still works alongside a CJS copy
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import Octen, { Octen as Named, OctenValidationError, isOctenError } from '@octen.ai/sdk';
@@ -11,7 +11,7 @@ const res = await client.search.search({ query: 'hello' });
 assert.equal(res.request_id, 'fake-/search');
 assert.equal(res.data.results[0].url, 'https://example.com');
 
-// 同一进程里同时加载 CJS 副本：两份错误类不同，instanceof 失效，isOctenError 必须仍为 true（README 承诺）
+// Load a CJS copy in the same process: the two error classes differ so instanceof fails, but isOctenError must still be true (promised in the README)
 const require = createRequire(import.meta.url);
 const cjs = require('@octen.ai/sdk');
 assert.notEqual(cjs.Octen, Octen, 'ESM and CJS builds are expected to be separate copies');

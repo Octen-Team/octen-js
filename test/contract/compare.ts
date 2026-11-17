@@ -2,8 +2,8 @@ import { readFileSync } from 'node:fs';
 import type { Desc } from '../../src/schema/descriptor';
 import type { FlatSchema } from './flatten';
 
-// SDK 描述树与扁平化 OpenAPI 的对比（设计文档 §5.6「比较内容」）。路径格式：
-// `<SchemaName>.a.b`，数组元素 `a[]`，联合变体 `a[]{company}`。
+// Comparison of the SDK descriptor tree against the flattened OpenAPI. Path format:
+// `<SchemaName>.a.b`, array elements `a[]`, union variants `a[]{company}`.
 export type KnownDiff = { path: string; reason: string };
 
 type Mode = 'request' | 'response';
@@ -62,7 +62,7 @@ function walk(mode: Mode, desc: Desc, flat: FlatSchema, path: string, known: Set
   }
 
   if (SCALARS.has(desc.t) && SCALARS.has(flat.type)) {
-    // 响应只比字段名和可否为 null，标量的具体类型与枚举不比（§5.6）
+    // Responses compare only field names and nullability, not scalar types or enums
     if (mode === 'response') return;
     if (desc.t !== flat.type) {
       out.push(`${path}: type mismatch (sdk ${desc.t}, spec ${flat.type})`);
@@ -84,19 +84,19 @@ function compare(mode: Mode, desc: Desc, flat: FlatSchema, knownDiffs: readonly 
   const used = new Set<string>();
   const out: string[] = [];
   walk(mode, desc, flat, path, known, used, out);
-  // 清单只许变短：规范补上了字段、或 SDK 删了字段，条目必须删除
+  // The list may only shrink: once the spec adds a field or the SDK drops one, the entry must be deleted
   for (const d of mine) {
     if (!used.has(d.path)) out.push(`${d.path}: listed in known_diffs.json but not an SDK-only field; remove the entry`);
   }
   return out;
 }
 
-/** 请求：字段多 / 少、基本类型、枚举、必填、可否为 null，逐层含数组元素。SDK 多出的字段须登记在 knownDiffs。 */
+/** Request: extra / missing fields, base type, enum, required, nullability, at every level including array elements. Extra SDK fields must be registered in knownDiffs. */
 export function compareRequest(desc: Desc, flat: FlatSchema, knownDiffs: readonly KnownDiff[], path: string): string[] {
   return compare('request', desc, flat, knownDiffs, path);
 }
 
-/** 响应：字段名（逐层含数组元素与联合变体）、可否为 null。SDK 多出的字段须登记在 knownDiffs，SDK 缺的一律报。 */
+/** Response: field names (at every level including array elements and union variants) and nullability. Extra SDK fields must be registered in knownDiffs; fields the SDK lacks are always reported. */
 export function compareResponse(desc: Desc, flat: FlatSchema, knownDiffs: readonly KnownDiff[], path: string): string[] {
   return compare('response', desc, flat, knownDiffs, path);
 }

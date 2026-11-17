@@ -32,7 +32,7 @@ export const BusinessSearchRequestDesc = {
   },
 } as const satisfies ObjectDesc;
 
-// BusinessNewsItem：与网页结果同构但没有 authors
+// BusinessNewsItem: same shape as a web result but without authors
 const { authors: _authors, ...newsItemFields } = webResultFields;
 const newsItems = {
   t: 'array',
@@ -148,7 +148,7 @@ const personEntity = {
   },
 } as const satisfies ObjectDesc;
 
-// 运行时遇到未知 type 原样返回；类型只含已知变体（见 descriptor.ts 的 InferUnion）
+// At runtime an unknown type is returned as is; the type covers known variants only (see InferUnion in descriptor.ts)
 const businessEntity = {
   t: 'union',
   tag: 'type',
@@ -177,7 +177,7 @@ export const BusinessSearchResponseDesc = {
           fields: { num_search_queries: { t: 'integer' }, full_content_extra_count: { t: 'integer' } },
         },
         latency: { t: 'number' },
-        // 与其他接口不同：BusinessSearchMeta.warning 在规范里不可为 null
+        // Unlike other endpoints: BusinessSearchMeta.warning is not nullable in the spec
         warning: { t: 'string' },
       },
     },

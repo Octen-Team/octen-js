@@ -28,7 +28,7 @@ function tryParse(raw: string): { ok: true; value: unknown } | { ok: false } {
   }
 }
 
-// 依次取 msg、message、detail、error；error 是对象时在里面递归找。
+// Try msg, message, detail, error in order; if error is an object, search inside it recursively.
 function findMessage(obj: Record<string, unknown>): string | null {
   for (const key of MESSAGE_KEYS) {
     const v = obj[key];
@@ -79,7 +79,7 @@ function buildError(status: number, headers: Headers, init: APIErrorInit): Octen
   return new OctenAPIError(init);
 }
 
-// 2xx：响应体必须是非空 JSON 对象，且 code 不是非 0 数字；其余一律按状态码归类。
+// 2xx: the body must be a non-empty JSON object whose code is not a non-zero number; anything else is classified by status code.
 export function judgeResponse(status: number, headers: Headers, rawText: string): Judgement {
   const parsedResult = tryParse(rawText);
   const parsed = parsedResult.ok ? parsedResult.value : undefined;

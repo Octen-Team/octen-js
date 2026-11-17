@@ -39,7 +39,7 @@ const goodReq = {
   },
 } as const satisfies ObjectDesc;
 
-// 在 goodReq 上做单点改动，便于断言每类差异
+// Make a single-point change on goodReq so each kind of difference can be asserted
 function mutate(f: (d: any) => void): ObjectDesc {
   const d = structuredClone(goodReq) as any;
   f(d);
@@ -94,7 +94,7 @@ describe('compareRequest', () => {
   test('known diff for this root that no longer applies is reported', () => {
     const known: KnownDiff[] = [{ path: 'Req.opts.max_reviews', reason: 'documented elsewhere' }];
     expect(compareRequest(goodReq, reqFlat, known, 'Req')).toEqual([expect.stringMatching(/Req\.opts\.max_reviews.*known_diffs/)]);
-    // 其他根的条目不归这次比较管
+    // Entries for other roots are not this comparison's concern
     expect(compareRequest(goodReq, reqFlat, [{ path: 'Other.x', reason: 'r' }], 'Req')).toEqual([]);
   });
 

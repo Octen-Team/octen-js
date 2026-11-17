@@ -2,8 +2,8 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { flattenSchema, type FlatSchema, type OpenAPI } from '../test/contract/flatten';
 
-// 每周对比线上 OpenAPI 与 testdata/openapi.json：只看六个接口的请求和响应结构，经 flattenSchema 规范化后逐项比较。
-// 有差异退出码 1，无法运行（下载失败、规范无法展开）退出码 2；从不改写快照（设计文档 §5.6）。
+// Weekly diff of the live OpenAPI against testdata/openapi.json: only the request and response schemas of the six endpoints, normalized via flattenSchema and compared item by item.
+// Exits 1 on any difference, 2 if it cannot run (download failure, spec cannot be flattened); never rewrites the snapshot.
 const LIVE_URL = process.env.SPEC_DRIFT_URL ?? 'https://docs.octen.ai/api-reference/openapi.json';
 const SNAPSHOT_PATH =
   process.env.SPEC_DRIFT_SNAPSHOT ?? fileURLToPath(new URL('../testdata/openapi.json', import.meta.url));
@@ -16,7 +16,7 @@ function isRaw(v: unknown): v is Raw {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
-// 从 paths 取接口的请求 / 响应 schema 引用，规范里改了 schema 名也能跟上
+// Take each endpoint's request / response schema ref from paths, so renamed schemas are still followed
 function schemaRef(spec: OpenAPI, path: string, side: 'request' | 'response'): string {
   const paths = spec.paths;
   const op = isRaw(paths) && isRaw(paths[path]) ? (paths[path] as Raw).post : undefined;
@@ -95,7 +95,7 @@ async function main(): Promise<number> {
   try {
     live = flattenAll(await downloadLive());
   } catch (err) {
-    // 线上规范出现 flattenSchema 不认识的结构，同样需要人去看
+    // A structure flattenSchema does not recognize in the live spec also needs a human look
     console.error(`cannot read the live spec (${LIVE_URL}): ${String(err)}`);
     return 2;
   }

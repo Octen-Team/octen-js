@@ -14,7 +14,7 @@ export const PulseSearchRequestDesc = {
   },
 } as const satisfies ObjectDesc;
 
-// Pulse 的 title 可能为 null（规范标 nullable）
+// Pulse title may be null (marked nullable in the spec)
 const pulseResult = {
   t: 'object',
   fields: { ...webResultFields, title: { t: 'string', nullable: true } },

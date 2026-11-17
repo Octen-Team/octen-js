@@ -1,4 +1,4 @@
-// Workers 等环境没有 process；Deno 2 未授权 --allow-env 时访问 process.env 会抛错，一律视为未设置。
+// Workers and similar runtimes have no process; Deno 2 throws on process.env without --allow-env, so treat both as unset.
 export function readApiKeyFromEnv(): string | undefined {
   try {
     const value = globalThis.process?.env?.OCTEN_API_KEY;

@@ -1,4 +1,4 @@
-// 每一行 @ts-expect-error 都必须真的报错；少报一处，tsc 会以 "unused directive" 失败。
+// Every @ts-expect-error must really error; if one fails to, tsc fails with "unused directive".
 import Octen from '@octen.ai/sdk';
 
 const client = new Octen({ apiKey: 'k' });

@@ -1,5 +1,5 @@
-// 装包冒烟用的本地假服务器：校验 x-api-key / user-agent / 请求体，按路径回一个最小合法响应。
-// 启动后在 stdout 打印一行 "PORT <n>"；收到 SIGTERM 退出；GET /__requests 返回收到的请求数。
+// Local fake server for the packed-install smoke test: checks x-api-key / user-agent / request body and returns a minimal valid response per path.
+// Prints one line "PORT <n>" on stdout once started; exits on SIGTERM; GET /__requests returns the number of requests received.
 import { createServer } from 'node:http';
 
 const EXPECTED_KEY = process.env.FAKE_EXPECTED_KEY ?? 'fake-e2e-key';

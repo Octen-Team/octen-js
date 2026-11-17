@@ -1,4 +1,4 @@
-// 跨模块副本（ESM 与 CJS 各一份）时 instanceof 会失效，所以用全局 Symbol 标记来判断。
+// instanceof breaks across duplicated modules (one ESM copy, one CJS copy), so identify errors by a global Symbol marker.
 const OCTEN_ERROR_MARK = Symbol.for('octen.error');
 
 // Literal names: consumers' bundlers rename classes when minifying, so new.target.name is unreliable.
@@ -74,7 +74,7 @@ export class OctenRateLimitError extends OctenAPIError {
     setName(this, 'OctenRateLimitError');
   }
 
-  // 单位秒；响应没有（或无法解析）Retry-After 时为 null。
+  // Seconds; null when the response has no Retry-After or it cannot be parsed.
   readonly retryAfter: number | null;
 
   constructor(init: APIErrorInit & { retryAfter: number | null }) {

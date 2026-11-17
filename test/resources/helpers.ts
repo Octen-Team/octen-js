@@ -9,7 +9,7 @@ export function jsonResponse(body: unknown): Response {
   return new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
 }
 
-/** 假 fetch：记录每次请求的 URL 与解析后的请求体，并返回给定的响应体。 */
+/** Fake fetch: records each request's URL and parsed body, and returns the given response body. */
 export function makeFetch(responseBody: unknown = { code: 0, request_id: 'req_1' }) {
   const calls: Captured[] = [];
   const fetchImpl = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {

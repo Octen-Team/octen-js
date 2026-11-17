@@ -129,7 +129,7 @@ describe('checkUnknownFields', () => {
     expect(() => checkUnknownFields(U, { e: [{ type: 'company', nmae: 'x' }] })).toThrow(
       expect.objectContaining({ field: 'e[0].nmae' }),
     );
-    // 未知 tag 不在推导类型里，但运行时照常放行、原样保留
+    // Unknown tag is not in the inferred type, but at runtime it passes through and is preserved as is
     expect(() => checkUnknownFields(U, { e: [{ type: 'robot', anything: 1 }] })).not.toThrow();
   });
 });
@@ -163,7 +163,7 @@ describe('Infer', () => {
     expectTypeOf({ query: 'q', count: undefined }).toExtend<P>();
     expectTypeOf<{ count: number }>().not.toExtend<P>();
     expectTypeOf<{ query: string; time_range: 'month' }>().not.toExtend<P>();
-    // @ts-expect-error 对象字面量上的多余字段被拒
+    // @ts-expect-error extra field on an object literal is rejected
     const extra: P = { query: 'q', extra: 1 };
     void extra;
   });
@@ -179,7 +179,7 @@ describe('Infer', () => {
     type Entity = NonNullable<Data['entities']>[number];
     expectTypeOf({ type: 'company' as const, name: 'n', more: 1 }).toExtend<Entity>();
     expectTypeOf<{ name: string }>().not.toExtend<Entity>();
-    // 推导出的联合只含已知变体：tag 恰好是已知字面量，没有 tag 为 string 的兜底变体
+    // The inferred union has known variants only: the tag is exactly the known literals, with no fallback variant whose tag is string
     expectTypeOf<Entity['type']>().toEqualTypeOf<'company' | 'person'>();
     expectTypeOf<string>().not.toExtend<Entity['type']>();
     expectTypeOf({ type: 'robot' as string, anything: 1 }).not.toExtend<Entity>();

@@ -1,16 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import Octen, { OctenAPIError, OctenBadRequestError, OctenValidationError } from '../../src/index';
 
-// 线上参数矩阵与反例。打生产 https://api.octen.ai 并计费：只有 OCTEN_LIVE=1 且有 OCTEN_API_KEY 才运行，否则整组 skip。
-// 取值范围出处：testdata/openapi.json（公开 OpenAPI 快照）；place max_reviews 出处 testdata/known_diffs.json。
-// 原则：反例断言为结构化 4xx 的具体错误类，绝不是 5xx；与预期不符就让测试红并记成发现，不放宽断言。
+// Live parameter matrix and negative cases. Hits production https://api.octen.ai and is billed: runs only with OCTEN_LIVE=1 and OCTEN_API_KEY, otherwise the whole group is skipped.
+// Value-range sources: testdata/openapi.json (public OpenAPI snapshot); place max_reviews: testdata/known_diffs.json.
+// Principle: negative cases assert a specific structured 4xx error class, never 5xx; if results differ from expectation, let the test fail and record a finding rather than loosen the assertion.
 const apiKey = process.env.OCTEN_API_KEY ?? '';
 const enabled = process.env.OCTEN_LIVE === '1' && apiKey !== '';
 const client = () => (enabled ? new Octen({ apiKey }) : (undefined as never as Octen));
 
 type Hit = { request_id?: string | undefined };
 
-// 成功用例：记录 request_id（不是密钥）与耗时，供测试记录核对
+// Successful cases: record request_id (not a secret) and elapsed time for the test log
 async function succeed<T extends Hit>(name: string, run: () => Promise<T>): Promise<T> {
   const t0 = performance.now();
   const res = await run();
@@ -21,7 +21,7 @@ async function succeed<T extends Hit>(name: string, run: () => Promise<T>): Prom
   return res;
 }
 
-// 反例：必须是 400/422 的 OctenBadRequestError；无论通过与否都把观测值打出来
+// Negative cases: must be an OctenBadRequestError with 400/422; print the observations whether or not they pass
 async function rejectsAs4xx(name: string, run: () => Promise<unknown>): Promise<OctenBadRequestError> {
   const t0 = performance.now();
   const err = await run().then(
@@ -174,7 +174,7 @@ describe.skipIf(!enabled)('live matrix: success cases (billed, minimal counts)',
       const res = await succeed(`pulseSearch mode=${mode}`, () =>
         client().search.pulseSearch({ query: 'octen search api', mode, count: 1 }),
       );
-      // billed_mode：openapi 写明 standard 在拿不到页面详情时按 lite 计费，所以只对 lite 断言相等
+      // billed_mode: openapi says standard is billed as lite when page details are unavailable, so assert equality only for lite
       console.log(`[live-matrix] pulseSearch mode=${mode} billed_mode=${res.meta?.usage?.billed_mode}`);
       if (mode === 'lite') expect(res.meta?.usage?.billed_mode).toBe('lite');
       expect(res.data?.results?.length ?? 0).toBeLessThanOrEqual(1);
@@ -230,7 +230,7 @@ describe.skipIf(!enabled)('live matrix: success cases (billed, minimal counts)',
 
 describe.skipIf(!enabled)('live matrix: negative cases (must be structured 4xx, never 5xx)', () => {
   const q = { query: 'octen' };
-  // 非法值绕过 TypeScript 类型检查，模拟 JS 调用方或类型被转换掉的写法
+  // Invalid values bypass TypeScript type checking, simulating JS callers or code whose types were cast away
   const bad = <T>(v: unknown) => v as T;
   const cases: Array<[string, () => Promise<unknown>]> = [
     ['search count=0', () => client().search.search({ ...q, count: 0 })],

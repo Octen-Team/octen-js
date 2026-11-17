@@ -1,9 +1,9 @@
 import { readFileSync } from 'node:fs';
 
-// 把 OpenAPI 结构展开成只含对比所需信息的扁平树（设计文档 §5.6「解析规范」）。仅测试使用，不进 dist。
+// Expand the OpenAPI structure into a flat tree holding only what the comparison needs. Test-only, not part of dist.
 export type OpenAPI = { components?: { schemas?: Record<string, unknown> }; [key: string]: unknown };
 
-/** request：只认对象 / 数组 / 标量；response：另外认白名单里的 oneOf + discriminator。 */
+/** request: only objects / arrays / scalars; response: also oneOf + discriminator from the allowlist. */
 export type FlatContext = 'request' | 'response';
 
 export type FlatScalar = {
@@ -16,12 +16,12 @@ export type FlatArray = { type: 'array'; nullable: boolean; items: FlatSchema };
 export type FlatUnion = { type: 'union'; nullable: boolean; tag: string; variants: Record<string, FlatObject> };
 export type FlatSchema = FlatScalar | FlatObject | FlatArray | FlatUnion;
 
-// 新增联合结构必须显式登记，避免对比测试静默接受规范里的新 oneOf
+// New union structures must be registered explicitly so the comparison test cannot silently accept a new oneOf in the spec
 const RESPONSE_UNIONS = new Set(['BusinessEntity']);
 
 const STRUCTURAL = new Set(['$ref', 'allOf', 'type', 'nullable', 'enum', 'properties', 'required', 'items']);
 const UNION_KEYWORDS = new Set(['oneOf', 'discriminator']);
-// 注解与取值范围约束：不参与对比
+// Annotations and value-range constraints: not compared
 const IGNORED = new Set([
   'description', 'example', 'examples', 'default', 'format', 'title', 'deprecated', 'externalDocs',
   'maxLength', 'minLength', 'minimum', 'maximum', 'exclusiveMinimum', 'exclusiveMaximum',
@@ -31,10 +31,10 @@ const SCALAR_TYPES = new Set(['string', 'integer', 'number', 'boolean']);
 const REF_PREFIX = '#/components/schemas/';
 
 type Raw = Record<string, unknown>;
-// 子结构的原始定义，连同解析到它时的 $ref 链（用于检测循环引用）
+// Raw definition of a sub-structure, with the $ref chain used to resolve it (for cycle detection)
 type Def = { node: unknown; stack: readonly string[] };
 
-// 一个结点经 $ref / allOf 合并后的中间形态；properties 先收集原始定义，构建时再展开
+// Intermediate form of a node after merging via $ref / allOf; properties are collected as raw definitions first and expanded at build time
 type Merged = {
   type?: string;
   nullable: boolean;
@@ -94,7 +94,7 @@ function merge(ctx: Ctx, node: unknown, where: string, stack: readonly string[],
   if (node.type !== undefined) {
     let t = node.type;
     if (Array.isArray(t)) {
-      // OpenAPI 3.1 写法 ["string", "null"]
+      // OpenAPI 3.1 form ["string", "null"]
       const nonNull = t.filter((x) => x !== 'null');
       if (nonNull.length !== 1 || nonNull.length === t.length) fail(where, `unsupported type ${JSON.stringify(t)}`);
       own.nullable = true;
@@ -154,7 +154,7 @@ function combine(a: Merged, b: Merged, where: string): Merged {
   return out;
 }
 
-// 同一属性 / items 在多个 allOf 成员里出现时，展开后必须一致
+// When the same property / items appears in several allOf members, the expanded results must agree
 function buildOne(ctx: Ctx, defs: readonly Def[], where: string): FlatSchema {
   const built = defs.map((d) => build(ctx, merge(ctx, d.node, where, d.stack), where));
   const first = built[0] as FlatSchema;
@@ -223,7 +223,7 @@ function buildUnion(
   return { type: 'union', nullable, tag, variants };
 }
 
-/** 展开 `ref`（形如 `#/components/schemas/X`）指向的对象结构。context 默认 'request'（最严格）。 */
+/** Expand the object structure that `ref` (like `#/components/schemas/X`) points to. context defaults to 'request' (the strictest). */
 export function flattenSchema(spec: OpenAPI, ref: string, context: FlatContext = 'request'): FlatObject {
   const ctx: Ctx = { spec, context };
   const name = refName(ref, ref);
@@ -232,7 +232,7 @@ export function flattenSchema(spec: OpenAPI, ref: string, context: FlatContext =
   return flat;
 }
 
-/** 读取 testdata/openapi.json 快照（用 fs 读，避免 tsc 给 500 KB 的 JSON 推导字面量类型）。 */
+/** Read the testdata/openapi.json snapshot (via fs, so tsc does not infer literal types for the 500 KB JSON). */
 export function loadSnapshot(): OpenAPI {
   return JSON.parse(readFileSync(new URL('../../testdata/openapi.json', import.meta.url), 'utf8')) as OpenAPI;
 }

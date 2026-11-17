@@ -1,7 +1,7 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { describe, expect, it } from 'vitest';
-// 刻意从构建产物导入（不是 src）：验证发布出去的 dist 在真实 socket 上的行为。先 npm run build。
+// Deliberately imports from the build output (not src): verifies the published dist over real sockets. Run npm run build first.
 import Octen, {
   OctenAPIError,
   OctenAbortError,
@@ -16,7 +16,7 @@ type Handler = (req: IncomingMessage, res: ServerResponse, n: number) => void;
 type Arrival = { n: number; at: number; headers: IncomingMessage['headers']; body: string };
 type Fake = { url: string; arrivals: Arrival[]; socketCloses: number[]; close: () => Promise<void> };
 
-// 每个测试一个作用域：并发测试各自清理自己的服务器和定时器，不会关掉别人的
+// One scope per test: concurrent tests each clean up their own servers and timers without closing anyone else's
 function scoped(onTestFinished: (fn: () => Promise<void> | void) => void) {
   const servers: Fake[] = [];
   const timers = new Set<ReturnType<typeof setTimeout>>();
@@ -25,7 +25,7 @@ function scoped(onTestFinished: (fn: () => Promise<void> | void) => void) {
     await Promise.all(servers.map((f) => f.close()));
   });
   return {
-    // 延迟回调；清理时统一取消，避免往已销毁的 socket 写数据
+    // Delayed callbacks; cancelled together on cleanup to avoid writing to destroyed sockets
     later(ms: number, fn: () => void) {
       const t = setTimeout(() => {
         timers.delete(t);
@@ -81,7 +81,7 @@ function client(url: string, extra: { timeout?: number; maxRetries?: number } = 
   return new Octen({ apiKey: 'e2e-key', baseURL: url, ...extra });
 }
 
-// 记录场景观测值，供测试记录核对
+// Record per-scenario observations for the test log
 function observe(name: string, started: number, fields: Record<string, unknown>) {
   const elapsed = Math.round(performance.now() - started);
   console.log(`[e2e] ${name} elapsed_ms=${elapsed} ${Object.entries(fields).map(([k, v]) => `${k}=${String(v)}`).join(' ')}`);
@@ -106,7 +106,7 @@ async function rejection(p: Promise<unknown>): Promise<unknown> {
   );
 }
 
-// 每个场景有各自的服务器，互不干扰；并发执行，把真实退避等待（约 7-9 s）压在同一个窗口里
+// Each scenario has its own server and they do not interfere; run concurrently so the real backoff waits (about 7-9 s) overlap in one window
 describe.concurrent('transport fault injection against dist/', () => {
   it('server answers after 1 s, client timeout 300 ms -> OctenTimeoutError, server saw 1 request', async ({ onTestFinished }) => {
     const sc = scoped(onTestFinished);
@@ -117,7 +117,7 @@ describe.concurrent('transport fault injection against dist/', () => {
     const ms = observe('timeout-after-send', t0, { requests: s.arrivals.length, error: (err as Error).name });
     expect(err).toBeInstanceOf(OctenTimeoutError);
     expect(s.arrivals).toHaveLength(1);
-    expect(ms).toBeLessThan(900); // 300 ms 超时，没有退避重试
+    expect(ms).toBeLessThan(900); // 300 ms timeout, no backoff retry
     // The abort must reach the socket, not just reject the promise (server answers at 1000 ms and keeps alive).
     const closeAfter = await socketCloseAfter(s, settledAt, 500);
     observe('timeout-after-send socket', t0, { socket_close_after_settle_ms: closeAfter });
@@ -164,7 +164,7 @@ describe.concurrent('transport fault injection against dist/', () => {
 
   it('connection refused (port closed) -> OctenConnectionError after 4 attempts', async ({ onTestFinished }) => {
     const sc = scoped(onTestFinished);
-    // 开一个服务器拿到空闲端口再关掉，端口此刻没人监听
+    // Open a server to get a free port and close it again; nobody is listening on the port now
     const probe = await sc.server(() => undefined);
     const url = probe.url;
     await probe.close();
@@ -181,7 +181,7 @@ describe.concurrent('transport fault injection against dist/', () => {
     expect(err).toBeInstanceOf(OctenConnectionError);
     expect(cause).toBe('ECONNREFUSED');
     expect(calls).toBe(4);
-    // 退避 1 s + 2 s + 4 s，各带最多 25% 抖动
+    // Backoff 1 s + 2 s + 4 s, each with up to 25% jitter
     expect(ms).toBeGreaterThanOrEqual(7000);
     expect(ms).toBeLessThan(11_000);
   });
@@ -201,7 +201,7 @@ describe.concurrent('transport fault injection against dist/', () => {
     const ms = observe('503-then-200', t0, { requests: s.arrivals.length, request_id: res.request_id });
     expect(res.request_id).toBe('rid-ok');
     expect(s.arrivals).toHaveLength(2);
-    expect(ms).toBeGreaterThanOrEqual(950); // 第 1 次退避 1 s
+    expect(ms).toBeGreaterThanOrEqual(950); // first backoff 1 s
   });
 
   // Retry-After: 0 must beat the >= 1 s default backoff, so a short gap proves the header was honoured.

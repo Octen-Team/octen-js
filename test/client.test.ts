@@ -121,7 +121,7 @@ describe('apiKey resolution', () => {
   test('apiKey: undefined behaves like omitting it (environment fallback)', async () => {
     vi.stubEnv('OCTEN_API_KEY', 'sk-env');
     const f = okFetch();
-    // 类型层面：exactOptionalPropertyTypes 下 { apiKey: string | undefined } 必须能编译
+    // Type level: { apiKey: string | undefined } must compile under exactOptionalPropertyTypes
     const fromEnv: string | undefined = process.env.OCTEN_API_KEY;
     await new Octen({ apiKey: fromEnv, fetch: f as unknown as FetchFn }).search.search({ query: 'q' });
     expect(new Headers(f.mock.calls[0]?.[1]?.headers).get('x-api-key')).toBe('sk-env');
@@ -207,7 +207,7 @@ describe('apiKey resolution', () => {
 
   test.each([
     ['CR/LF', 'sk-a\r\nx-evil: 1'],
-    ['above U+00FF', 'sk-中文'],
+    ['above U+00FF', 'sk-\u4e2d\u6587'],
   ])('apiKey with %s is OctenValidationError("apiKey")', (_label, apiKey) => {
     expect(fieldOf(() => new Octen({ apiKey }))).toBe('apiKey');
   });
@@ -216,7 +216,7 @@ describe('apiKey resolution', () => {
 describe('defaultHeaders validation', () => {
   test.each([
     ['CR/LF value', { 'x-a': 'a\r\nb' }],
-    ['value above U+00FF', { 'x-a': '中' }],
+    ['value above U+00FF', { 'x-a': '\u4e2d' }],
     ['non-string value', { 'x-a': 5 as unknown as string }],
     ['invalid header name', { 'bad name': 'v' }],
   ])('%s is OctenValidationError("defaultHeaders")', (_label, defaultHeaders) => {
@@ -338,9 +338,9 @@ describe('public entry point', () => {
   });
 });
 
-// 优先级：单次 timeout > 客户端显式 timeout > 接口默认（broadSearch 120000，其余 30000）；设计文档 §5.5
+// Precedence: per-call timeout > explicit client timeout > endpoint default (broadSearch 120000, others 30000)
 describe('timeout precedence', () => {
-  // fetch 永不返回，用假时钟以 1000 ms 为步长找出 SDK 在多少毫秒后放弃
+  // fetch never returns; use a fake clock in 1000 ms steps to find after how many ms the SDK gives up
   async function timeoutAfterMs(
     options: ConstructorParameters<typeof Octen>[0],
     run: (c: Octen) => Promise<unknown>,

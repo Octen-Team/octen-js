@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import Octen, { OctenAuthenticationError, OctenBadRequestError, OctenTimeoutError } from '../../src/index';
 
-// 打生产 https://api.octen.ai 并计费：只有 OCTEN_LIVE=1 且有 OCTEN_API_KEY 才运行，否则整组 skip。
+// Hits production https://api.octen.ai and is billed: runs only with OCTEN_LIVE=1 and OCTEN_API_KEY, otherwise the whole group is skipped.
 const apiKey = process.env.OCTEN_API_KEY ?? '';
 const enabled = process.env.OCTEN_LIVE === '1' && apiKey !== '';
 
@@ -9,7 +9,7 @@ function expectOk(res: { request_id?: string | undefined; data?: unknown }, name
   expect(typeof res.request_id).toBe('string');
   expect(res.request_id).not.toBe('');
   expect(res.data).toBeDefined();
-  // request_id 不是密钥，打到 stdout 供测试记录核对
+  // request_id is not a secret; print it to stdout for the test log
   console.log(`[live] ${name} request_id=${res.request_id}`);
 }
 
@@ -61,7 +61,7 @@ describe.skipIf(!enabled)('live: production API', () => {
     );
   });
 
-  // 服务端处理该请求约 1.5 s：500 ms 超时发生在请求已发出之后，SDK 不得重试（否则重复计费）
+  // The server takes about 1.5 s to process this request: the 500 ms timeout fires after the request was sent, so the SDK must not retry (otherwise double billing)
   it('broadSearch client timeout after send -> OctenTimeoutError, fetch called exactly once', async () => {
     let calls = 0;
     let sentAt = '';

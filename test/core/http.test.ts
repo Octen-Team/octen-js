@@ -407,7 +407,7 @@ describe('HttpCore.post request validation', () => {
 
   test.each([
     ['CR/LF', 'a\r\nx-evil: 1'],
-    ['above U+00FF', 'caf中'],
+    ['above U+00FF', 'caf\u4e2d'],
   ])('per-request header value with %s is OctenValidationError("headers")', async (_label, value) => {
     const f = vi.fn(async () => json(200, {}));
     const { core } = makeCore(f as unknown as FetchFn);

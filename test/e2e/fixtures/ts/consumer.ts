@@ -1,8 +1,8 @@
-// 用户常见写法：在 strict 与 exactOptionalPropertyTypes 两套配置下都必须通过 tsc，并且能真实运行。
+// Common user patterns: must pass tsc under both strict and exactOptionalPropertyTypes configs, and actually run.
 import Octen, { OctenAPIError, OctenRateLimitError, isOctenError } from '@octen.ai/sdk';
 import type { SearchResponse } from '@octen.ai/sdk';
 
-// 显式 undefined：exactOptionalPropertyTypes 下也必须能编译（README 承诺）
+// Explicit undefined: must also compile under exactOptionalPropertyTypes (promised in the README)
 const client = new Octen({ apiKey: process.env.OCTEN_API_KEY, baseURL: process.env.OCTEN_FAKE_BASE_URL, maxRetries: 0 });
 
 export async function callAllSix(): Promise<string[]> {

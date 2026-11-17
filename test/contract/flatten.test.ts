@@ -21,11 +21,11 @@ function specWith(x: unknown): OpenAPI {
 describe('flattenSchema', () => {
   test('flatten merges top-level and property-level allOf', () => {
     const f = flattenSchema(spec, '#/components/schemas/SearchRequest');
-    expect(Object.keys(f.properties)).toContain('include_domains'); // 来自 allOf WebSearchOptions
+    expect(Object.keys(f.properties)).toContain('include_domains'); // from allOf WebSearchOptions
     expect(f.required).toContain('query');
     const b = flattenSchema(spec, '#/components/schemas/BroadSearchRequest');
-    // 断言写法同简报；FlatSchema 是联合类型，这里显式收窄到对象
-    expect((b.properties.search_options as FlatObject).properties).toHaveProperty('count'); // 属性上的 allOf
+    // FlatSchema is a union type, so narrow explicitly to an object here
+    expect((b.properties.search_options as FlatObject).properties).toHaveProperty('count'); // allOf on a property
   });
 
   test('flatten rejects unknown keywords in requests', () => {

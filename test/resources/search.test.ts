@@ -7,7 +7,7 @@ import { BASE, makeFetch } from './helpers';
 type Row = {
   method: 'search' | 'broadSearch' | 'newsSearch' | 'businessSearch' | 'pulseSearch';
   path: string;
-  // 非法字段：顶层一个，嵌套一个（§5.1 列出的未公开字段）
+  // Invalid fields: one at top level, one nested (undocumented fields)
   badTop: Record<string, unknown>;
   badNested: Record<string, unknown>;
 };
@@ -45,7 +45,7 @@ const rows: Row[] = [
   },
 ];
 
-// 用「调用方式」绕开各方法 params 类型不同：测试故意传类型之外的值
+// Use call-style invocation to get around the differing params types of each method: the tests deliberately pass values outside the types
 function call(res: SearchResource, method: Row['method'], params: unknown, r?: RequestOptions): Promise<unknown> {
   return (res[method] as (p: unknown, r?: RequestOptions) => Promise<unknown>).call(res, params, r);
 }
@@ -184,7 +184,7 @@ describe('SearchResource.businessSearch entities', () => {
     const res = await new SearchResource(core).businessSearch({ query: 'q' });
     expect(res.data?.entities).toEqual(body.data.entities);
     expect(res.data?.entities?.[1]).toEqual(unknownEntity);
-    // 类型层面：按 type 收窄后能直接访问变体字段（编译即验证）
+    // Type level: after narrowing by type, variant fields are directly accessible (verified by compiling)
     for (const e of res.data?.entities ?? []) {
       if (e.type === 'company') void e.metrics?.stock?.price;
       else if (e.type === 'person') void e.career?.[0]?.organization;
@@ -210,7 +210,7 @@ describe('SearchResource request-side validation details', () => {
   });
 });
 
-// 类型层面：§5.1 的未公开字段在编译期就被拒（@ts-expect-error 若不再报错，typecheck 会失败）。函数不执行。
+// Type level: undocumented fields are rejected at compile time (if @ts-expect-error stops erroring, typecheck fails). The function is never executed.
 export function typeLevelChecks(res: SearchResource) {
   // @ts-expect-error topic is not in the public spec
   void res.search({ query: 'q', topic: 'news' });

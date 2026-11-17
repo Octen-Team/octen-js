@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# 装包冒烟：npm pack 出 tarball，装进临时项目，分别验证 ESM / CJS / TypeScript（多套 tsconfig）。
-# 用法：bash test/e2e/package.e2e.sh        （SKIP_BUILD=1 跳过 npm run build）
-# 不联网：tarball 零依赖；typescript 与 @types/node 从本仓库 node_modules 软链进临时项目。
+# Packed-install smoke test: npm pack a tarball, install it into a temp project, verify ESM / CJS / TypeScript (several tsconfigs).
+# Usage: bash test/e2e/package.e2e.sh        (SKIP_BUILD=1 skips npm run build)
+# Offline: the tarball has zero dependencies; typescript and @types/node are symlinked from this repo's node_modules into the temp project.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -33,7 +33,7 @@ done
 if echo "$LISTING" | grep -Eq '^package/(src|test|testdata|scripts|\.superpowers)/'; then fail "tarball contains source/test files"; fi
 pass "tarball contents"
 
-# 假服务器
+# Fake server
 node "$FIX/fake-server.mjs" >"$TMP/fake.out" &
 FAKE_PID=$!
 for _ in $(seq 1 50); do grep -q '^PORT ' "$TMP/fake.out" && break; sleep 0.1; done
@@ -67,7 +67,7 @@ cp "$FIX/cjs.cjs" "$CJS/"
 (cd "$CJS" && node cjs.cjs) || fail "CJS consumer"
 pass "CJS consumer (default === named, real request)"
 
-# 3. TypeScript，ESM 项目：三套 tsconfig 的类型检查 + 反例
+# 3. TypeScript, ESM project: type-check with three tsconfigs + negative cases
 TSE="$(new_project ts-esm module)"
 link_ts_tools "$TSE"
 cp "$FIX"/ts/*.ts "$FIX"/ts/tsconfig.*.json "$TSE/"
@@ -84,11 +84,11 @@ JSON
   echo "$OUT" | grep -q 'cuont' || fail "bad-field.ts failed under $cfg for the wrong reason: $OUT"
   pass "bad-field.ts (cuont) is rejected under $cfg: $(echo "$OUT" | head -1 | cut -c1-120)"
 done
-# 编译后真实运行（ESM）
+# Run the compiled output (ESM)
 (cd "$TSE" && node "$TSC" -p tsconfig.exact.json --noEmit false --outDir out >/dev/null && node out/consumer.js) || fail "ts-esm emitted consumer run"
 pass "ts-esm: compiled consumer runs against fake server (six methods)"
 
-# 4. TypeScript，CJS 项目（NodeNext + type=commonjs，走 index.d.cts）
+# 4. TypeScript, CJS project (NodeNext + type=commonjs, uses index.d.cts)
 TSC_DIR="$(new_project ts-cjs commonjs)"
 link_ts_tools "$TSC_DIR"
 cp "$FIX"/ts/*.ts "$FIX"/ts/tsconfig.nodenext.json "$TSC_DIR/"
@@ -97,7 +97,7 @@ pass "tsc --noEmit ts-cjs nodenext (resolves index.d.cts)"
 (cd "$TSC_DIR" && node "$TSE/node_modules/typescript/bin/tsc" -p tsconfig.nodenext.json --noEmit false --outDir out >/dev/null && node out/consumer.js) || fail "ts-cjs emitted consumer run"
 pass "ts-cjs: compiled CommonJS consumer runs against fake server (six methods)"
 
-# 5. 假服务器收到的请求都合规（key / UA / content-type / body）
+# 5. Every request the fake server received is well-formed (key / UA / content-type / body)
 node -e "
 fetch('$OCTEN_FAKE_BASE_URL/__requests').then(r => r.json()).then(seen => {
   const bad = seen.filter(s => s.problems.length);

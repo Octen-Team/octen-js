@@ -12,7 +12,7 @@ import { BASE, makeFetch } from '../resources/helpers';
 import { compareRequest, compareResponse, loadKnownDiffs } from './compare';
 import { flattenSchema, loadSnapshot } from './flatten';
 
-// 公开 OpenAPI 快照（testdata/openapi.json）是每个字段的唯一出处；设计文档 §5.6、§5.1。
+// The public OpenAPI snapshot (testdata/openapi.json) is the single source for every field.
 const spec = loadSnapshot();
 const knownDiffs = loadKnownDiffs();
 const ref = (name: string) => `#/components/schemas/${name}`;
@@ -93,7 +93,7 @@ describe('OpenAPI contract', () => {
     });
   }
 
-  // 条目指向没被对比的 schema 就永远不会被检查，过期条目会藏起来
+  // An entry pointing at a schema that is not compared would never be checked, so stale entries would hide
   test('every known_diffs entry points at a schema this test compares', () => {
     const compared = new Set(endpoints.flatMap((ep) => [ep.request[0], ep.response[0]]));
     expect(knownDiffs.length).toBeGreaterThan(0);

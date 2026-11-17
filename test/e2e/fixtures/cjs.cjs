@@ -1,4 +1,4 @@
-// 装包后的 CJS 消费者
+// CJS consumer of the installed package
 const assert = require('node:assert/strict');
 const sdk = require('@octen.ai/sdk');
 const { Octen, isOctenError, OctenRateLimitError } = sdk;

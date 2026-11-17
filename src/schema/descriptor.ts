@@ -1,6 +1,6 @@
 import { OctenValidationError } from '../core/errors';
 
-// 每个接口的请求 / 响应写成一棵常量描述树：类型推导、未知字段检查、OpenAPI 对比测试共用（设计文档 §5.6）。
+// Each endpoint's request / response is a constant descriptor tree, shared by type inference, unknown-field checks, and the OpenAPI comparison test.
 export type ScalarDesc = {
   readonly t: 'string' | 'integer' | 'number' | 'boolean';
   readonly enum?: readonly string[];
@@ -22,7 +22,7 @@ export type ArrayDesc = {
   readonly nullable?: true;
 };
 
-// 按 tag 字段区分的联合结构（目前只有响应里的 BusinessEntity）。
+// Union structures discriminated by a tag field (currently only BusinessEntity in responses).
 export type UnionDesc = {
   readonly t: 'union';
   readonly tag: string;
@@ -40,15 +40,15 @@ type Simplify<T> = { [K in keyof T]: T[K] } & {};
 type RequiredKeys<F> = { [K in keyof F]-?: F[K] extends { readonly required: true } ? K : never }[keyof F];
 type OptionalKeys<F> = Exclude<keyof F, RequiredKeys<F>>;
 
-// 请求：可选键显式接受 undefined（运行时视为没传）。响应：每层对象都允许任意多余键。
+// Requests: optional keys explicitly accept undefined (treated as not passed at runtime). Responses: every object level allows arbitrary extra keys.
 type InferObject<D extends ObjectDesc, M extends InferMode> = Simplify<
   { [K in RequiredKeys<D['fields']>]: Infer<D['fields'][K], M> } & {
     [K in OptionalKeys<D['fields']>]?: Infer<D['fields'][K], M> | (M extends 'request' ? undefined : never);
   } & (M extends 'response' ? { [key: string]: unknown } : unknown)
 >;
 
-// 只含已知变体：兜底变体的 tag 是 string，会让 `e.type === 'company'` 收窄失效（§5.1）。
-// 运行时未知 tag 照常原样返回。
+// Known variants only: a fallback variant has a string tag, which would break narrowing like `e.type === 'company'`.
+// At runtime an unknown tag is still returned as is.
 type InferUnion<D extends UnionDesc, M extends InferMode> = {
   [V in keyof D['variants']]: InferObject<D['variants'][V], M>;
 }[keyof D['variants']];
@@ -96,14 +96,14 @@ function checkValue(desc: Desc, value: unknown, path: string): void {
   } else if (desc.t === 'union') {
     if (!isPlainObject(value)) return;
     const tagValue = value[desc.tag];
-    // tag 未知时没有可对照的结构，交给服务端
+    // An unknown tag has no structure to compare against; leave it to the server
     if (typeof tagValue === 'string' && Object.hasOwn(desc.variants, tagValue)) {
       checkUnknownFields(desc.variants[tagValue] as ObjectDesc, value, path);
     }
   }
 }
 
-/** 逐层拒绝描述外的键；值为 undefined 的键视为没传。只查键名，值的类型交给服务端。 */
+/** Rejects keys outside the descriptor at every level; keys whose value is undefined count as not passed. Checks key names only; value types are left to the server. */
 export function checkUnknownFields(desc: ObjectDesc, value: unknown, path?: string): void {
   if (!isPlainObject(value)) return;
   for (const key of Object.keys(value)) {
@@ -117,11 +117,11 @@ export function checkUnknownFields(desc: ObjectDesc, value: unknown, path?: stri
   }
 }
 
-/** 返回删除了 undefined 值键的副本（递归进普通对象和数组），不修改入参。 */
+/** Returns a copy with undefined-valued keys removed (recursing into plain objects and arrays); does not mutate the input. */
 export function stripUndefined<T>(value: T): T {
   if (Array.isArray(value)) return value.map((v: unknown) => stripUndefined(v)) as T;
   if (!isPlainObject(value)) return value;
-  // fromEntries 按自有属性写入，键名为 "__proto__" 时不会改原型
+  // fromEntries writes own properties, so a "__proto__" key does not change the prototype
   return Object.fromEntries(
     Object.entries(value)
       .filter(([, v]) => v !== undefined)

@@ -4,14 +4,14 @@ const MAX_DELAY_MS = 60000;
 const BASE_DELAY_MS = 1000;
 const RETRY_AFTER_STATUS: ReadonlySet<number> = new Set([429, 503]);
 const PRE_SEND_ERROR_CODES: ReadonlySet<string> = new Set(['ECONNREFUSED', 'ENOTFOUND', 'EAI_AGAIN']);
-// 只有形如 "Tue, 17 Nov 2026 00:00:10 GMT" 的字符串才交给 Date.parse（它对 "5.5"、"-1" 等会宽松地返回过去的日期）。
+// Only strings shaped like "Tue, 17 Nov 2026 00:00:10 GMT" go to Date.parse (it leniently returns past dates for "5.5", "-1", etc.).
 const HTTP_DATE_SHAPE = /^[A-Za-z]{3,9},?\s+\S.*\d{2}:\d{2}:\d{2}/;
 
 export function isRetryableStatus(status: number): boolean {
   return RETRYABLE_STATUS.has(status);
 }
 
-// 秒数（非负整数）或 HTTP 日期；过去的日期返回 0，无法解析返回 null。
+// Seconds (non-negative integer) or an HTTP date; a past date returns 0, an unparseable value returns null.
 export function parseRetryAfter(header: string | null, now: number): number | null {
   if (header === null) return null;
   const value = header.trim();
@@ -22,7 +22,7 @@ export function parseRetryAfter(header: string | null, now: number): number | nu
   return Math.max(0, at - now);
 }
 
-// attempt 从 1 开始；429/503 带 Retry-After 时以它为准，超过上限则放弃。
+// attempt starts at 1; with Retry-After on 429/503 it takes precedence, and exceeding the cap gives up.
 export function retryDelayMs(
   attempt: number,
   status: number | null,
@@ -36,7 +36,7 @@ export function retryDelayMs(
   return Math.min(MAX_DELAY_MS, backoff);
 }
 
-// 只认请求尚未发出就失败的连接错误（fetch 抛出的 TypeError，其 cause.code 在白名单内）。
+// Only connection errors that fail before the request is sent (a TypeError from fetch whose cause.code is in the allowlist).
 export function isPreSendNetworkError(err: unknown): boolean {
   if (typeof err !== 'object' || err === null || !('cause' in err)) return false;
   const cause = err.cause;

@@ -14,7 +14,7 @@ export const BroadSearchResponseDesc = {
   t: 'object',
   fields: {
     code: { t: 'integer' },
-    // 服务端返回但公开 OpenAPI 未写（known_diffs.json）
+    // Returned by the server but missing from the public OpenAPI (known_diffs.json)
     msg: { t: 'string' },
     request_id: requestId,
     data: {
