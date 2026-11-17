@@ -22,9 +22,20 @@ describe('env helpers', () => {
     expect(readApiKeyFromEnv()).toBeUndefined();
   });
 
-  test('isBrowser is false in Node and true when window.document exists', () => {
+  test('readApiKeyFromEnv treats a throwing env accessor as absent', () => {
+    vi.stubGlobal('process', {
+      get env(): never {
+        throw new Error('--allow-env required');
+      },
+    });
+    expect(readApiKeyFromEnv()).toBeUndefined();
+  });
+
+  test('isBrowser needs both window and document on globalThis', () => {
     expect(isBrowser()).toBe(false);
-    vi.stubGlobal('window', { document: {} });
+    vi.stubGlobal('window', {});
+    expect(isBrowser()).toBe(false);
+    vi.stubGlobal('document', {});
     expect(isBrowser()).toBe(true);
   });
 });

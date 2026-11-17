@@ -1,10 +1,14 @@
-// Workers 等环境没有 process，先判断再读。
+// Workers 等环境没有 process；Deno 2 未授权 --allow-env 时访问 process.env 会抛错，一律视为未设置。
 export function readApiKeyFromEnv(): string | undefined {
-  const value = globalThis.process?.env?.OCTEN_API_KEY;
-  return value ? value : undefined;
+  try {
+    const value = globalThis.process?.env?.OCTEN_API_KEY;
+    return value ? value : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 export function isBrowser(): boolean {
-  const win = (globalThis as { window?: { document?: unknown } }).window;
-  return typeof win !== 'undefined' && typeof win.document !== 'undefined';
+  const g = globalThis as { window?: unknown; document?: unknown };
+  return typeof g.window !== 'undefined' && typeof g.document !== 'undefined';
 }

@@ -377,3 +377,39 @@ describe('errors', () => {
     expect(e.name).toBe('OctenValidationError');
   });
 });
+
+describe('HttpCore.post request validation', () => {
+  test.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY, '5' as unknown as number])(
+    'per-request timeout %s is rejected before any fetch',
+    async (timeout) => {
+      const f = vi.fn(async () => json(200, {}));
+      const { core } = makeCore(f as unknown as FetchFn);
+      const err = await core.post('/x', {}, { timeout }).catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(OctenValidationError);
+      expect((err as OctenValidationError).field).toBe('timeout');
+      expect(f).not.toHaveBeenCalled();
+    },
+  );
+
+  test.each([
+    ['CR/LF', 'a\r\nx-evil: 1'],
+    ['above U+00FF', 'caf中'],
+  ])('per-request header value with %s is OctenValidationError("headers")', async (_label, value) => {
+    const f = vi.fn(async () => json(200, {}));
+    const { core } = makeCore(f as unknown as FetchFn);
+    const err = await core.post('/x', {}, { headers: { 'x-a': value } }).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(OctenValidationError);
+    expect((err as OctenValidationError).field).toBe('headers');
+    expect(f).not.toHaveBeenCalled();
+  });
+
+  test('a non-string per-request header value is OctenValidationError("headers")', async () => {
+    const f = vi.fn(async () => json(200, {}));
+    const { core } = makeCore(f as unknown as FetchFn);
+    const err = await core
+      .post('/x', {}, { headers: { 'x-a': 5 as unknown as string } })
+      .catch((e: unknown) => e);
+    expect((err as OctenValidationError).field).toBe('headers');
+    expect(f).not.toHaveBeenCalled();
+  });
+});

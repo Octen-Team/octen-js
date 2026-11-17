@@ -5,6 +5,7 @@ import {
   OctenTimeoutError,
   OctenValidationError,
 } from './errors';
+import { assertValidHeaders } from './headers';
 import { isPreSendNetworkError, isRetryableStatus, parseRetryAfter, retryDelayMs } from './retry';
 import { VERSION } from '../version';
 
@@ -99,6 +100,10 @@ export class HttpCore {
   async post<T>(path: string, body: unknown, req: RequestOptions = {}): Promise<T> {
     const url = `${this.baseURL}${path.startsWith('/') ? '' : '/'}${path}`;
     const payload = this.serialize(body);
+    if (req.timeout != null && !(Number.isFinite(req.timeout) && req.timeout > 0)) {
+      throw new OctenValidationError('timeout', 'timeout must be a finite number of milliseconds greater than 0.');
+    }
+    assertValidHeaders(req.headers, 'headers');
     const headers = this.buildHeaders(req.headers);
     const timeoutMs = req.timeout ?? this.timeoutMs;
     const callerSignal = req.signal;
