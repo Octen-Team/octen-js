@@ -40,6 +40,10 @@ const R = {
                 t: 'object',
                 fields: { type: { t: 'string', enum: ['company'], required: true }, name: { t: 'string' } },
               },
+              person: {
+                t: 'object',
+                fields: { type: { t: 'string', enum: ['person'], required: true }, title: { t: 'string' } },
+              },
             },
           },
         },
@@ -125,6 +129,8 @@ describe('checkUnknownFields', () => {
     expect(() => checkUnknownFields(U, { e: [{ type: 'company', nmae: 'x' }] })).toThrow(
       expect.objectContaining({ field: 'e[0].nmae' }),
     );
+    // 未知 tag 不在推导类型里，但运行时照常放行、原样保留
+    expect(() => checkUnknownFields(U, { e: [{ type: 'robot', anything: 1 }] })).not.toThrow();
   });
 });
 
@@ -162,7 +168,7 @@ describe('Infer', () => {
     void extra;
   });
 
-  test('response: extra keys allowed at every object level, nullable, union with fallback', () => {
+  test('response: extra keys allowed at every object level, nullable, union of known variants', () => {
     type Res = InferResponse<typeof R>;
     expectTypeOf<Res['request_id']>().toEqualTypeOf<string>();
     expectTypeOf<Res>().toHaveProperty('data');
@@ -172,8 +178,27 @@ describe('Infer', () => {
     expectTypeOf({ results: [{ title: 't', extra: true }] }).toExtend<Data>();
     type Entity = NonNullable<Data['entities']>[number];
     expectTypeOf({ type: 'company' as const, name: 'n', more: 1 }).toExtend<Entity>();
-    // 未知 type 落到兜底类型
-    expectTypeOf({ type: 'robot', anything: 1 }).toExtend<Entity>();
     expectTypeOf<{ name: string }>().not.toExtend<Entity>();
+    // 推导出的联合只含已知变体：tag 恰好是已知字面量，没有 tag 为 string 的兜底变体
+    expectTypeOf<Entity['type']>().toEqualTypeOf<'company' | 'person'>();
+    expectTypeOf<string>().not.toExtend<Entity['type']>();
+    expectTypeOf({ type: 'robot' as string, anything: 1 }).not.toExtend<Entity>();
+  });
+
+  test('response union narrows on the tag to the declared variant fields', () => {
+    type Entity = NonNullable<NonNullable<InferResponse<typeof R>['data']>['entities']>[number];
+    const narrow = (e: Entity) => {
+      if (e.type === 'company') {
+        expectTypeOf(e.name).toEqualTypeOf<string | undefined>();
+        const n: string | undefined = e.name;
+        return n;
+      }
+      expectTypeOf(e.type).toEqualTypeOf<'person'>();
+      expectTypeOf(e.title).toEqualTypeOf<string | undefined>();
+      const t: string | undefined = e.title;
+      return t;
+    };
+    expect(narrow({ type: 'company', name: 'n' })).toBe('n');
+    expect(narrow({ type: 'person', title: 'cto' })).toBe('cto');
   });
 });

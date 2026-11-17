@@ -47,9 +47,11 @@ type InferObject<D extends ObjectDesc, M extends InferMode> = Simplify<
   } & (M extends 'response' ? { [key: string]: unknown } : unknown)
 >;
 
-type InferUnion<D extends UnionDesc, M extends InferMode> =
-  | { [V in keyof D['variants']]: InferObject<D['variants'][V], M> }[keyof D['variants']]
-  | Simplify<{ [P in D['tag']]: string } & { [key: string]: unknown }>;
+// 只含已知变体：兜底变体的 tag 是 string，会让 `e.type === 'company'` 收窄失效（§5.1）。
+// 运行时未知 tag 照常原样返回。
+type InferUnion<D extends UnionDesc, M extends InferMode> = {
+  [V in keyof D['variants']]: InferObject<D['variants'][V], M>;
+}[keyof D['variants']];
 
 type InferBase<D extends Desc, M extends InferMode> = D extends ScalarDesc
   ? D['t'] extends 'string'
