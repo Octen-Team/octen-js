@@ -618,5 +618,50 @@
       "message": "bad",
       "requestId": "abc"
     }
+  },
+  {
+    "name": "empty x-request-id header falls back to body request_id",
+    "status": 500,
+    "headers": {
+      "content-type": "application/json",
+      "x-request-id": ""
+    },
+    "body": "{\"msg\":\"boom\",\"request_id\":\"body-id\"}",
+    "expect": {
+      "ok": false,
+      "class": "OctenServerError",
+      "code": null,
+      "message": "boom",
+      "requestId": "body-id"
+    }
+  },
+  {
+    "name": "empty body request_id is ignored",
+    "status": 500,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": "{\"msg\":\"boom\",\"request_id\":\"\"}",
+    "expect": {
+      "ok": false,
+      "class": "OctenServerError",
+      "code": null,
+      "message": "boom",
+      "requestId": null
+    }
+  },
+  {
+    "name": "200 non-finite code is failure",
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": "{\"code\":1e999}",
+    "expect": {
+      "ok": false,
+      "class": "OctenAPIError",
+      "code": null,
+      "message": "{\"code\":1e999}"
+    }
   }
 ]

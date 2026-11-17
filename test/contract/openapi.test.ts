@@ -6,6 +6,9 @@ import { PlaceSearchRequestDesc, PlaceSearchResponseDesc } from '../../src/schem
 import { PulseSearchRequestDesc, PulseSearchResponseDesc } from '../../src/schema/pulseSearch';
 import { SearchRequestDesc, SearchResponseDesc } from '../../src/schema/search';
 import type { ObjectDesc } from '../../src/schema/descriptor';
+import { PlaceSearchResource } from '../../src/resources/placeSearch';
+import { SearchResource } from '../../src/resources/search';
+import { BASE, makeFetch } from '../resources/helpers';
 import { compareRequest, compareResponse, loadKnownDiffs } from './compare';
 import { flattenSchema, loadSnapshot } from './flatten';
 
@@ -14,32 +17,50 @@ const spec = loadSnapshot();
 const knownDiffs = loadKnownDiffs();
 const ref = (name: string) => `#/components/schemas/${name}`;
 
-const endpoints: Array<{ name: string; request: [string, ObjectDesc]; response: [string, ObjectDesc] }> = [
-  { name: 'search', request: ['SearchRequest', SearchRequestDesc], response: ['SearchResponse', SearchResponseDesc] },
+type Core = ReturnType<typeof makeFetch>['core'];
+type Endpoint = {
+  name: string;
+  request: [string, ObjectDesc];
+  response: [string, ObjectDesc];
+  send: (core: Core) => Promise<unknown>;
+};
+
+const endpoints: Endpoint[] = [
+  {
+    name: 'search',
+    request: ['SearchRequest', SearchRequestDesc],
+    response: ['SearchResponse', SearchResponseDesc],
+    send: (core) => new SearchResource(core).search({ query: 'q' }),
+  },
   {
     name: 'broad-search',
     request: ['BroadSearchRequest', BroadSearchRequestDesc],
     response: ['BroadSearchResponse', BroadSearchResponseDesc],
+    send: (core) => new SearchResource(core).broadSearch({ query: 'q' }),
   },
   {
     name: 'news-search',
     request: ['NewsSearchRequest', NewsSearchRequestDesc],
     response: ['NewsSearchResponse', NewsSearchResponseDesc],
+    send: (core) => new SearchResource(core).newsSearch({ query: 'q' }),
   },
   {
     name: 'business-search',
     request: ['BusinessSearchRequest', BusinessSearchRequestDesc],
     response: ['BusinessSearchResponse', BusinessSearchResponseDesc],
+    send: (core) => new SearchResource(core).businessSearch({ query: 'q' }),
   },
   {
     name: 'pulse-search',
     request: ['PulseSearchRequest', PulseSearchRequestDesc],
     response: ['PulseSearchResponse', PulseSearchResponseDesc],
+    send: (core) => new SearchResource(core).pulseSearch({ query: 'q' }),
   },
   {
     name: 'place-search',
     request: ['PlaceSearchRequest', PlaceSearchRequestDesc],
     response: ['PlaceSearchResponse', PlaceSearchResponseDesc],
+    send: (core) => new PlaceSearchResource(core).search({ query: 'q' }),
   },
 ];
 
@@ -52,6 +73,23 @@ describe('OpenAPI contract', () => {
     });
     test(`${resName} matches the public spec`, () => {
       expect(compareResponse(resDesc, flattenSchema(spec, ref(resName), 'response'), knownDiffs, resName)).toEqual([]);
+    });
+  }
+
+  // Ties each compared schema pair to the path the SDK actually POSTs to, so a pair cannot drift to another endpoint.
+  type Operation = {
+    requestBody?: { content?: Record<string, { schema?: { $ref?: string } }> };
+    responses?: Record<string, { content?: Record<string, { schema?: { $ref?: string } }> }>;
+  };
+  const paths = spec.paths as Record<string, { post?: Operation }>;
+  for (const ep of endpoints) {
+    test(`/${ep.name}: snapshot refs are ${ep.request[0]} / ${ep.response[0]} and the SDK posts there`, async () => {
+      const op = paths[`/${ep.name}`]?.post;
+      expect(op?.requestBody?.content?.['application/json']?.schema?.$ref).toBe(ref(ep.request[0]));
+      expect(op?.responses?.['200']?.content?.['application/json']?.schema?.$ref).toBe(ref(ep.response[0]));
+      const { core, calls } = makeFetch();
+      await ep.send(core);
+      expect(calls.map((c) => c.url)).toEqual([`${BASE}/${ep.name}`]);
     });
   }
 

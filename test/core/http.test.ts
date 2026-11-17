@@ -1,4 +1,4 @@
-import { describe, expect, test, vi } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import {
   OctenAbortError,
   OctenAPIError,
@@ -562,5 +562,141 @@ describe('A7: error names', () => {
     const code = out.outputFiles[0]!.text;
     const mod = (await import(`data:text/javascript;base64,${Buffer.from(code).toString('base64')}`)) as typeof import('../../src/core/errors');
     for (const [name, err] of Object.entries(instances(mod))) expect(err.name, name).toBe(name);
+  });
+});
+
+function coreWithDefaultSleep(fetchImpl: FetchFn, timeoutMs = 1000): HttpCore {
+  return new HttpCore({
+    apiKey: 'sk-test',
+    baseURL: 'https://api.example.com',
+    timeoutMs,
+    maxRetries: 3,
+    defaultHeaders: {},
+    fetch: fetchImpl,
+    random: () => 0,
+  });
+}
+
+describe('C1: timers are cleaned up', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  test('no timer is left after a successful post', async () => {
+    vi.useFakeTimers();
+    const f = sequence(json(200, { ok: 1 }));
+    await expect(coreWithDefaultSleep(f as unknown as FetchFn).post('/x', {})).resolves.toEqual({ ok: 1 });
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  test('no timer is left after an abort during the default backoff sleep', async () => {
+    vi.useFakeTimers();
+    const ac = new AbortController();
+    const f = sequence(json(503, {}), json(200, { ok: 1 }));
+    const pending = coreWithDefaultSleep(f as unknown as FetchFn)
+      .post('/x', {}, { signal: ac.signal })
+      .catch((e: unknown) => e);
+    await vi.advanceTimersByTimeAsync(10); // first attempt answered, backoff timer (1000 ms) pending
+    expect(f).toHaveBeenCalledTimes(1);
+    ac.abort();
+    expect(await pending).toBeInstanceOf(OctenAbortError);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+});
+
+describe('C2: the per-attempt signal reaches fetch', () => {
+  function recordingFetch() {
+    const signals: Array<AbortSignal | null | undefined> = [];
+    const f = vi.fn((_url: string | URL | Request, init?: RequestInit) => {
+      signals.push(init?.signal);
+      return new Promise<Response>(() => {});
+    });
+    return { f, signals };
+  }
+
+  test('on timeout the signal fetch received is aborted with an OctenTimeoutError reason', async () => {
+    const { f, signals } = recordingFetch();
+    const { core } = makeCore(f as unknown as FetchFn, { timeoutMs: 20 });
+    await expect(core.post('/x', {})).rejects.toBeInstanceOf(OctenTimeoutError);
+    expect(signals).toHaveLength(1);
+    expect(signals[0]?.aborted).toBe(true);
+    expect(signals[0]?.reason).toBeInstanceOf(OctenTimeoutError);
+  });
+
+  test("on caller abort the signal fetch received is aborted with the caller's reason", async () => {
+    const { f, signals } = recordingFetch();
+    const { core } = makeCore(f as unknown as FetchFn, { timeoutMs: 60_000 });
+    const ac = new AbortController();
+    const reason = new Error('caller stopped');
+    const pending = core.post('/x', {}, { signal: ac.signal });
+    await Promise.resolve();
+    ac.abort(reason);
+    await expect(pending).rejects.toBeInstanceOf(OctenAbortError);
+    expect(signals).toHaveLength(1);
+    expect(signals[0]?.aborted).toBe(true);
+    expect(signals[0]?.reason).toBe(reason);
+  });
+});
+
+describe('C3: Retry-After through HttpCore.post', () => {
+  const NOW = Date.parse('2026-11-17T00:00:00.000Z');
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  test.each([
+    { status: 429, retryAfter: '60', sleeps: [60_000], requests: 2 },
+    { status: 503, retryAfter: '61', sleeps: [], requests: 1 },
+    { status: 429, retryAfter: new Date(NOW + 5000).toUTCString(), sleeps: [5000], requests: 2 },
+    { status: 502, retryAfter: '5', sleeps: [1000], requests: 2 },
+    { status: 429, retryAfter: '0', sleeps: [0], requests: 2 },
+  ])('$status with Retry-After $retryAfter -> sleeps $sleeps', async ({ status, retryAfter, sleeps, requests }) => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(NOW);
+    const f = sequence(json(status, { msg: 'later' }, { 'retry-after': retryAfter }), json(200, { ok: 1 }));
+    const { core, sleeps: seen } = makeCore(f as unknown as FetchFn);
+    const outcome = await core.post('/x', {}).catch((e: unknown) => e);
+    expect(seen).toEqual(sleeps);
+    expect(f).toHaveBeenCalledTimes(requests);
+    if (requests === 1) {
+      expect(outcome).toBeInstanceOf(OctenServerError);
+      expect(outcome).not.toHaveProperty('retryAfter');
+    } else {
+      expect(outcome).toEqual({ ok: 1 });
+    }
+  });
+
+  test('OctenRateLimitError.retryAfter rounds an HTTP date up to whole seconds', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(NOW + 800); // the date below is 4.2 s ahead
+    const f = sequence(json(429, { msg: 'slow' }, { 'retry-after': new Date(NOW + 5000).toUTCString() }));
+    const { core } = makeCore(f as unknown as FetchFn, { maxRetries: 0 });
+    const err = await core.post('/x', {}).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(OctenRateLimitError);
+    expect((err as OctenRateLimitError).retryAfter).toBe(5);
+  });
+});
+
+describe('C4: the timeout applies to each attempt, not the whole call', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  test('two 800 ms attempts with a 1000 ms backoff succeed under a 1000 ms timeout', async () => {
+    vi.useFakeTimers();
+    const answers = [json(503, { msg: 'busy' }), json(200, { ok: 1 })];
+    const f = vi.fn(
+      () =>
+        new Promise<Response>((resolve) => {
+          const next = answers.shift()!;
+          setTimeout(() => resolve(next), 800);
+        }),
+    );
+    const pending = coreWithDefaultSleep(f as unknown as FetchFn, 1000)
+      .post('/x', {})
+      .catch((e: unknown) => e);
+    await vi.advanceTimersByTimeAsync(2600);
+    expect(await pending).toEqual({ ok: 1 });
+    expect(f).toHaveBeenCalledTimes(2);
   });
 });

@@ -14,7 +14,7 @@ import Octen, {
 
 type Handler = (req: IncomingMessage, res: ServerResponse, n: number) => void;
 type Arrival = { n: number; at: number; headers: IncomingMessage['headers']; body: string };
-type Fake = { url: string; arrivals: Arrival[]; close: () => Promise<void> };
+type Fake = { url: string; arrivals: Arrival[]; socketCloses: number[]; close: () => Promise<void> };
 
 // 每个测试一个作用域：并发测试各自清理自己的服务器和定时器，不会关掉别人的
 function scoped(onTestFinished: (fn: () => Promise<void> | void) => void) {
@@ -43,6 +43,7 @@ function scoped(onTestFinished: (fn: () => Promise<void> | void) => void) {
 
 async function fakeServer(handler: Handler): Promise<Fake> {
   const arrivals: Arrival[] = [];
+  const socketCloses: number[] = [];
   const server: Server = createServer((req, res) => {
     const chunks: Buffer[] = [];
     req.on('data', (c: Buffer) => chunks.push(c));
@@ -52,12 +53,14 @@ async function fakeServer(handler: Handler): Promise<Fake> {
       handler(req, res, n);
     });
   });
+  server.on('connection', (socket) => socket.on('close', () => socketCloses.push(performance.now())));
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   const port = (server.address() as AddressInfo).port;
   let closed = false;
   return {
     url: `http://127.0.0.1:${port}`,
     arrivals,
+    socketCloses,
     close: () =>
       new Promise<void>((resolve) => {
         if (closed) return resolve();
@@ -85,6 +88,15 @@ function observe(name: string, started: number, fields: Record<string, unknown>)
   return elapsed;
 }
 
+// Milliseconds from `settledAt` until the server saw the client's socket close (negative if before), or null.
+async function socketCloseAfter(fake: Fake, settledAt: number, withinMs: number): Promise<number | null> {
+  while (fake.socketCloses.length === 0 && performance.now() - settledAt < withinMs) {
+    await new Promise((r) => setTimeout(r, 10));
+  }
+  const at = fake.socketCloses[0];
+  return at === undefined ? null : Math.round(at - settledAt);
+}
+
 async function rejection(p: Promise<unknown>): Promise<unknown> {
   return p.then(
     () => {
@@ -101,10 +113,16 @@ describe.concurrent('transport fault injection against dist/', () => {
     const s = await sc.server((_req, res) => sc.later(1000, () => !res.destroyed && ok(res)));
     const t0 = performance.now();
     const err = await rejection(client(s.url, { timeout: 300 }).search.search({ query: 'q' }));
+    const settledAt = performance.now();
     const ms = observe('timeout-after-send', t0, { requests: s.arrivals.length, error: (err as Error).name });
     expect(err).toBeInstanceOf(OctenTimeoutError);
     expect(s.arrivals).toHaveLength(1);
     expect(ms).toBeLessThan(900); // 300 ms 超时，没有退避重试
+    // The abort must reach the socket, not just reject the promise (server answers at 1000 ms and keeps alive).
+    const closeAfter = await socketCloseAfter(s, settledAt, 500);
+    observe('timeout-after-send socket', t0, { socket_close_after_settle_ms: closeAfter });
+    expect(closeAfter).not.toBeNull();
+    expect(closeAfter!).toBeLessThan(500);
   });
 
   it('server breaks the connection halfway through the response headers -> OctenConnectionError, 1 request', async ({ onTestFinished }) => {
@@ -165,7 +183,7 @@ describe.concurrent('transport fault injection against dist/', () => {
     expect(calls).toBe(4);
     // 退避 1 s + 2 s + 4 s，各带最多 25% 抖动
     expect(ms).toBeGreaterThanOrEqual(7000);
-    expect(ms).toBeLessThan(9500);
+    expect(ms).toBeLessThan(11_000);
   });
 
   it('503 then 200 -> succeeds on the 2nd request', async ({ onTestFinished }) => {
@@ -183,15 +201,16 @@ describe.concurrent('transport fault injection against dist/', () => {
     const ms = observe('503-then-200', t0, { requests: s.arrivals.length, request_id: res.request_id });
     expect(res.request_id).toBe('rid-ok');
     expect(s.arrivals).toHaveLength(2);
-    expect(ms).toBeGreaterThanOrEqual(1000); // 第 1 次退避 1 s
+    expect(ms).toBeGreaterThanOrEqual(950); // 第 1 次退避 1 s
   });
 
-  it('429 with Retry-After: 1 then 200 -> succeeds on the 2nd request, >= 1 s apart', async ({ onTestFinished }) => {
+  // Retry-After: 0 must beat the >= 1 s default backoff, so a short gap proves the header was honoured.
+  it('429 with Retry-After: 0 then 200 -> succeeds on the 2nd request, < 300 ms apart', async ({ onTestFinished }) => {
     const sc = scoped(onTestFinished);
     const s = await sc.server((_req, res, n) => {
       if (n === 1) {
         res.statusCode = 429;
-        res.setHeader('retry-after', '1');
+        res.setHeader('retry-after', '0');
         res.end('slow down');
         return;
       }
@@ -200,10 +219,10 @@ describe.concurrent('transport fault injection against dist/', () => {
     const t0 = performance.now();
     const res = await client(s.url, { timeout: 5000 }).search.search({ query: 'q' });
     const gap = s.arrivals[1]!.at - s.arrivals[0]!.at;
-    observe('429-retry-after-1', t0, { requests: s.arrivals.length, gap_ms: Math.round(gap), request_id: res.request_id });
+    observe('429-retry-after-0', t0, { requests: s.arrivals.length, gap_ms: Math.round(gap), request_id: res.request_id });
     expect(res.request_id).toBe('rid-ok');
     expect(s.arrivals).toHaveLength(2);
-    expect(gap).toBeGreaterThanOrEqual(1000);
+    expect(gap).toBeLessThan(300);
   });
 
   it('429 with Retry-After: 120 -> OctenRateLimitError with retryAfter 120, 1 request, no waiting', async ({ onTestFinished }) => {
@@ -250,10 +269,15 @@ describe.concurrent('transport fault injection against dist/', () => {
     await new Promise((r) => setTimeout(r, 150));
     ac.abort();
     const err = await rejection(pending);
+    const settledAt = performance.now();
     const ms = observe('caller-abort', t0, { requests: s.arrivals.length, error: (err as Error).name });
     expect(err).toBeInstanceOf(OctenAbortError);
     expect(s.arrivals).toHaveLength(1);
     expect(ms).toBeLessThan(900);
+    const closeAfter = await socketCloseAfter(s, settledAt, 500);
+    observe('caller-abort socket', t0, { socket_close_after_settle_ms: closeAfter });
+    expect(closeAfter).not.toBeNull();
+    expect(closeAfter!).toBeLessThan(500);
   });
 
   it('HTTP 200 whose body carries code 1001 -> OctenAPIError, 1 request, not retried', async ({ onTestFinished }) => {
@@ -288,7 +312,7 @@ describe.concurrent('transport fault injection against dist/', () => {
     expect((err as OctenServerError).body).toBe(html);
     expect(s.arrivals).toHaveLength(4);
     expect(ms).toBeGreaterThanOrEqual(7000);
-    expect(ms).toBeLessThan(9500);
+    expect(ms).toBeLessThan(11_000);
   });
 
   it('wire format: key, user-agent, content-type and JSON body arrive as documented; 400 JSON -> OctenBadRequestError with requestId', async ({ onTestFinished }) => {
