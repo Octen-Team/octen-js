@@ -1,6 +1,6 @@
 // Type-checked against each ai version in the matrix: the published d.ts is built against ai@7 types.
 import { generateText, stepCountIs, streamText } from 'ai';
-import { Octen, OctenAPIError } from '@octen.ai/sdk';
+import { Octen, OctenAPIError, OctenError } from '@octen.ai/sdk';
 import {
   octenBroadSearch,
   octenBusinessSearch,
@@ -32,8 +32,9 @@ export async function consume(): Promise<string> {
   }
   // Same loop as the README's tool error example.
   for (const part of result.steps.flatMap((step) => step.content)) {
-    if (part.type === 'tool-error' && part.error instanceof OctenAPIError) {
-      console.error(`${part.toolName} failed: ${part.error.status} (request ${part.error.requestId})`);
+    if (part.type === 'tool-error' && part.error instanceof OctenError) {
+      const api = part.error instanceof OctenAPIError ? ` (status ${part.error.status}, request ${part.error.requestId})` : '';
+      console.error(`${part.toolName} failed: ${part.error.name}: ${part.error.message}${api}`);
     }
   }
   const stream = streamText({ model, tools: { webSearch: octenWebSearch({ client }) }, stopWhen: stepCountIs(5), prompt: 'q' });

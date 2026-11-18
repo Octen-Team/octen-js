@@ -69,20 +69,54 @@ function mockModel() {
   return { model, prompts };
 }
 
-function fixtureFetch(status) {
+// kind: 200 replays the fixture, 401 replies with an auth error, conn throws like fetch does when
+// the connection is refused, abort hangs until the request's signal aborts.
+function fakeFetch(kind) {
   const calls = [];
-  const fetch = async (url) => {
+  let markEntered;
+  const entered = new Promise((resolve) => (markEntered = resolve));
+  const fetch = async (url, init) => {
     calls.push(String(url));
-    const body = status === 200 ? fixture : { code: 401, msg: 'invalid api key', request_id: ERROR_REQUEST_ID };
-    return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+    markEntered();
+    if (kind === 'conn') {
+      const cause = Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:443'), { code: 'ECONNREFUSED' });
+      throw new TypeError('fetch failed', { cause });
+    }
+    if (kind === 'abort') {
+      return new Promise((_resolve, reject) => {
+        const signal = init?.signal;
+        if (signal === undefined || signal === null) {
+          setTimeout(() => reject(new Error('no signal reached fetch')), 2000);
+          return;
+        }
+        const fail = () => reject(signal.reason ?? new DOMException('aborted', 'AbortError'));
+        if (signal.aborted) fail();
+        else signal.addEventListener('abort', fail, { once: true });
+      });
+    }
+    const body = kind === 200 ? fixture : { code: 401, msg: 'invalid api key', request_id: ERROR_REQUEST_ID };
+    return new Response(JSON.stringify(body), { status: kind, headers: { 'content-type': 'application/json' } });
   };
-  return { fetch, calls };
+  return { fetch, calls, entered };
 }
 
-function setup(status) {
-  const { fetch, calls } = fixtureFetch(status);
-  const client = new Octen({ apiKey: 'test-key', fetch });
-  return { tools: { webSearch: octenWebSearch({ client }) }, calls, ...mockModel() };
+function setup(kind) {
+  const { fetch, calls, entered } = fakeFetch(kind);
+  // No retries for conn: the SDK would retry a refused connection with backoff, which only slows the run.
+  const client = new Octen({ apiKey: 'test-key', fetch, ...(kind === 'conn' ? { maxRetries: 0 } : {}) });
+  const webSearch = octenWebSearch({ client });
+  // Records what the tool itself threw, which can differ from what generateText rejects with.
+  const toolThrew = [];
+  const execute = webSearch.execute;
+  webSearch.execute = async (...args) => {
+    try {
+      return await execute(...args);
+    } catch (err) {
+      toolThrew.push(className(err));
+      throw err;
+    }
+  };
+  return { tools: { webSearch }, calls, entered, toolThrew, ...mockModel() };
 }
 
 function toolResultIn(prompt) {
@@ -97,10 +131,29 @@ function check(failures, ok, message) {
   if (!ok) failures.push(message);
 }
 
+function className(err) {
+  const ctor = err?.constructor?.name ?? typeof err;
+  return typeof err?.name === 'string' && err.name !== ctor ? `${ctor}(${err.name})` : ctor;
+}
+
 function describeErr(err) {
-  const name = err?.constructor?.name ?? typeof err;
-  const auth = err instanceof OctenAuthenticationError ? `, instanceof OctenAuthenticationError, requestId=${err.requestId}` : '';
-  return `${name}${auth}`;
+  const auth = err instanceof OctenAuthenticationError ? `, requestId=${err.requestId}` : '';
+  const status = err?.status === undefined ? '' : `, status=${err.status}`;
+  return `${className(err)}${status}${auth}`;
+}
+
+// How the error text the next model call received was built from the thrown error.
+function textShape(err, fed) {
+  const value = fed?.output?.value;
+  if (value === err?.message) return 'message';
+  if (value === `${err?.name}: ${err?.message}`) return 'name-message';
+  return 'other-text';
+}
+
+function withTimeout(promise, ms, what) {
+  // unref so a finished run does not wait for the timer.
+  const timeout = new Promise((_r, reject) => setTimeout(() => reject(new Error(`${what} timed out`)), ms).unref());
+  return Promise.race([promise, timeout]);
 }
 
 async function scenarioA() {
@@ -137,14 +190,28 @@ async function scenarioB() {
   return failures;
 }
 
-// Observation only: how a tool that throws surfaces through generateText.
-async function scenarioC() {
-  const s = setup(401);
+// Observation only: how a failing search surfaces through generateText. The first token is
+// `rejects/<class>`, `tool-error/<class>/<textShape>` or `other`; scripts/matrix.sh compares it.
+async function scenarioC(kind) {
+  const s = setup(kind);
+  const controller = new AbortController();
+  const pending = ai.generateText({
+    model: s.model,
+    tools: s.tools,
+    stopWhen: stepCount(5),
+    prompt: 'q',
+    ...(kind === 'abort' ? { abortSignal: controller.signal } : {}),
+  });
+  pending.catch(() => {});
+  if (kind === 'abort') {
+    await withTimeout(s.entered, 5000, 'waiting for the search fetch');
+    controller.abort();
+  }
   let result;
   try {
-    result = await ai.generateText({ model: s.model, tools: s.tools, stopWhen: stepCount(5), prompt: 'q' });
+    result = await withTimeout(pending, 10000, 'generateText');
   } catch (err) {
-    return `rejects (${describeErr(err)}; model calls ${s.prompts.length})`;
+    return `rejects/${className(err)} (${describeErr(err)}; message ${JSON.stringify(err?.message)}; model calls ${s.prompts.length}, fetch calls ${s.calls.length}; tool threw ${s.toolThrew.join(',') || 'nothing'})`;
   }
   const part = result.steps[0]?.content?.find((p) => p.type === 'tool-error');
   const fed = toolResultIn(s.prompts[1]);
@@ -152,23 +219,52 @@ async function scenarioC() {
     return `other (no tool-error part or not fed back; model calls ${s.prompts.length})`;
   }
   const value = typeof fed.output?.value === 'string' ? fed.output.value : JSON.stringify(fed.output?.value);
-  return `tool-error (part.toolName: ${part.toolName}, part.error: ${describeErr(part.error)} status=${part.error?.status}; second call gets output ${fed.output?.type} ${JSON.stringify(value)}; final text ${JSON.stringify(result.text)})`;
+  return `tool-error/${className(part.error)}/${textShape(part.error, fed)} (part.toolName ${part.toolName}, part.error ${describeErr(part.error)}; second call gets output ${fed.output?.type} ${JSON.stringify(value)}; model calls ${s.prompts.length}; tool threw ${s.toolThrew.join(',') || 'nothing'}; final text ${JSON.stringify(result.text)})`;
 }
 
-async function scenarioCStream() {
-  const s = setup(401);
+// Same for streamText. The first token joins what fullStream showed: `tool-error/<class>`,
+// `error/<class>` and `abort` parts, `throws/<class>` if iterating threw, or `none`.
+async function scenarioCStream(kind) {
+  const s = setup(kind);
+  const controller = new AbortController();
   const seen = [];
-  try {
-    const result = ai.streamText({ model: s.model, tools: s.tools, stopWhen: stepCount(5), prompt: 'q' });
+  const details = [];
+  const consume = (async () => {
+    const result = ai.streamText({
+      model: s.model,
+      tools: s.tools,
+      stopWhen: stepCount(5),
+      prompt: 'q',
+      ...(kind === 'abort' ? { abortSignal: controller.signal } : {}),
+    });
     for await (const part of result.fullStream) {
-      if (part.type === 'tool-error') seen.push(`tool-error part (error: ${describeErr(part.error)})`);
-      if (part.type === 'error') seen.push(`error part (${describeErr(part.error)})`);
+      if (part.type === 'tool-error' || part.type === 'error' || part.type === 'abort') seen.push(part);
+      if (part.type === 'tool-error' || part.type === 'error') details.push(describeErr(part.error));
     }
+  })();
+  consume.catch(() => {});
+  if (kind === 'abort') {
+    await withTimeout(s.entered, 5000, 'waiting for the search fetch');
+    controller.abort();
+  }
+  let threw;
+  try {
+    await withTimeout(consume, 10000, 'streamText');
   } catch (err) {
-    return `throws (${describeErr(err)})`;
+    threw = err;
+    details.push(describeErr(err));
   }
   const fed = toolResultIn(s.prompts[1]);
-  return `${seen.join(', ') || 'none'}; model calls ${s.prompts.length}; second call gets output ${fed?.output?.type ?? 'nothing'}`;
+  const tokens = [];
+  for (const part of seen) {
+    const token =
+      part.type === 'tool-error' ? `tool-error/${className(part.error)}/${textShape(part.error, fed)}`
+      : part.type === 'error' ? `error/${className(part.error)}`
+      : 'abort';
+    if (!tokens.includes(token)) tokens.push(token);
+  }
+  if (threw !== undefined) tokens.push(`throws/${className(threw)}`);
+  return `${tokens.join('+') || 'none'} (${details.join('; ') || 'no error parts'}; tool threw ${s.toolThrew.join(',') || 'nothing'}; model calls ${s.prompts.length}; second call gets output ${fed?.output?.type ?? 'nothing'})`;
 }
 
 // Observation only: what generateText does after a tool-call step when stopWhen is not set.
@@ -192,7 +288,10 @@ const a = await attempt(scenarioA);
 console.log(`A generateText: ${a.length === 0 ? 'PASS' : `FAIL ${a.join('; ')}`}`);
 const b = await attempt(scenarioB);
 console.log(`B streamText: ${b.length === 0 ? 'PASS' : `FAIL ${b.join('; ')}`}`);
-console.log(`error-behavior: ${await scenarioC().catch((err) => `observe failed: ${err?.message ?? err}`)}`);
-console.log(`stream-error-behavior: ${await scenarioCStream().catch((err) => `observe failed: ${err?.message ?? err}`)}`);
-console.log(`no-stopwhen: ${await scenarioD().catch((err) => `observe failed: ${err?.message ?? err}`)}`);
+const observe = (promise) => promise.catch((err) => `observe-failed (${err?.message ?? err})`);
+for (const [kind, label] of [[401, 'error-behavior'], ['conn', 'conn-error-behavior'], ['abort', 'abort-error-behavior']]) {
+  console.log(`${label}: ${await observe(scenarioC(kind))}`);
+  console.log(`stream-${label}: ${await observe(scenarioCStream(kind))}`);
+}
+console.log(`no-stopwhen: ${await observe(scenarioD())}`);
 process.exitCode = a.length === 0 && b.length === 0 ? 0 : 1;
