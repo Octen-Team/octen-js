@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.1
+
+- Documented the Node requirement for loading the package with `require()` (CommonJS) together with `ai` 7: Node 20.19 or later, or Node 22.12 or later. The ESM build still works on Node 20 and later.
+- Added tests that type-check the published declarations against invalid options: `client` combined with a client option, and `query` in `defaults`.
+- Documentation: a malformed list in a response (a list field that is neither missing nor an array) makes the tool throw an `Error` that names the field. This was already the behavior in 0.1.0.
+
 ## 0.1.0
 
 Initial release.

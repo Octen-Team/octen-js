@@ -12,6 +12,7 @@ import {
   resolveClient,
   trimWebResult,
   trimWebResults,
+  warningOf,
 } from '../src/shared.js';
 
 function caught(fn: () => unknown): unknown {
@@ -306,5 +307,25 @@ describe('trimWebResults', () => {
     for (const value of ['x', 3, {}]) {
       expect(() => trimWebResults(value, 'data.results')).toThrow(/data\.results/);
     }
+  });
+});
+
+describe('warningOf', () => {
+  it('returns a non-empty string warning', () => {
+    expect(warningOf({ meta: { warning: 'places_unavailable' } })).toEqual({ warning: 'places_unavailable' });
+  });
+
+  it.each([
+    ['an object', { code: 'places_unavailable' }],
+    ['a number', 42],
+    ['an empty string', ''],
+    ['null', null],
+  ])('omits the warning when it is %s', (_name, warning) => {
+    expect(warningOf({ meta: { warning } })).toEqual({});
+  });
+
+  it('omits the warning when meta is missing or null', () => {
+    expect(warningOf({})).toEqual({});
+    expect(warningOf({ meta: null })).toEqual({});
   });
 });

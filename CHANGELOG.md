@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.1
+
+- Documentation: the README comparison with the Python SDK now covers `octen-py` 0.12.0, including its `retry_after_send` option and the `request_sent` field on timeout and connection errors. No code changes.
+
 ## 0.1.0
 
 Initial release.

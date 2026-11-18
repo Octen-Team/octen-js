@@ -111,6 +111,17 @@ describe('octenPlaceSearch', () => {
     ]);
   });
 
+  it('omits a number that JSON parses to Infinity', async () => {
+    // JSON.stringify turns Infinity into null, so the reply must be a raw body: 1e999 parses to Infinity.
+    const body =
+      '{"code":0,"msg":"","request_id":"r1","data":{"query":"q","places":[{"name":"A","rating":1e999,"distance":-1e999,"review_count":3}]}}';
+    const { fakeFetch } = recordingFetch(
+      () => new Response(body, { status: 200, headers: { 'content-type': 'application/json' } }),
+    );
+    const t = octenPlaceSearch({ client: clientFor(fakeFetch) });
+    expect(((await run(t, { query: 'q' })) as Out).places).toEqual([{ name: 'A', review_count: 3 }]);
+  });
+
   it('returns an empty results list when the reply has no web results', async () => {
     const { fakeFetch } = recordingFetch(() => jsonResponse(placeFixture));
     const t = octenPlaceSearch({ client: clientFor(fakeFetch) });
