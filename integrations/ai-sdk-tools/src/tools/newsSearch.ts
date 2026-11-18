@@ -2,7 +2,7 @@ import type { NewsSearchParams } from '@octen.ai/sdk';
 import { tool } from 'ai';
 import type { Tool } from 'ai';
 import type { z } from 'zod';
-import { mergeParams, modelSchema, requestOptions, resolveClient, trimWebResult } from '../shared.js';
+import { mergeParams, modelSchema, nonEmpty, requestOptions, resolveClient, trimWebResult } from '../shared.js';
 import type { ModelWebResult, OctenToolOptions } from '../shared.js';
 
 export type NewsSearchInput = { query: string; time_range?: 'day' | 'week' | 'month' | 'year' };
@@ -19,10 +19,6 @@ const TOOL_DEFAULTS: Partial<NewsSearchParams> = { count: 5, highlight: { enable
 const MODEL_FIELDS = ['query', 'time_range'] as const;
 
 type Subject = NewsSearchToolResult['subjects'][number];
-
-function nonEmpty(value: unknown): string | undefined {
-  return typeof value === 'string' && value !== '' ? value : undefined;
-}
 
 // top_news is a single object on the wire, not an array; empty and null values are left out.
 function trimSubject(s: { name?: unknown; summary?: unknown; time_latest?: unknown; top_news?: unknown }): Subject {
@@ -57,7 +53,7 @@ export function octenNewsSearch(
       return {
         request_id: res.request_id,
         results: (res.data?.results ?? []).map(trimWebResult),
-        subjects: (res.data?.subjects ?? []).map(trimSubject),
+        subjects: (res.data?.subjects ?? []).filter((s) => s != null).map(trimSubject),
       };
     },
   });

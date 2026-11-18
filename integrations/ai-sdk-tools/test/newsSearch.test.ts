@@ -94,6 +94,15 @@ describe('octenNewsSearch', () => {
     ]);
   });
 
+  it('skips a null subject', async () => {
+    const { fakeFetch } = recordingFetch(() =>
+      jsonResponse({ ...newsFixture, data: { results: [], subjects: [null, { name: 'a' }] } }),
+    );
+    const t = octenNewsSearch({ client: clientFor(fakeFetch) });
+    const out = (await run(t, { query: 'q' })) as Out;
+    expect(out.subjects).toEqual([{ name: 'a' }]);
+  });
+
   it('uses the default description and lets description override it', () => {
     const client = new Octen({ apiKey: 'test-key' });
     expect(octenNewsSearch({ client }).description).toBe(DEFAULT_DESCRIPTION);

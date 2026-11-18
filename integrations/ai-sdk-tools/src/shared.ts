@@ -97,3 +97,7 @@ export function trimWebResult(r: Partial<Record<keyof ModelWebResult, unknown>>)
   }
   return out;
 }
+
+export function nonEmpty(value: unknown): string | undefined {
+  return typeof value === 'string' && value !== '' ? value : undefined;
+}

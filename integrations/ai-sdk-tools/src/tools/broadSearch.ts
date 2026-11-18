@@ -34,7 +34,7 @@ export function octenBroadSearch(
       return {
         request_id: res.request_id,
         queries: res.data?.queries ?? [],
-        search_results: (res.data?.search_results ?? []).map((group) => ({
+        search_results: (res.data?.search_results ?? []).filter((group) => group != null).map((group) => ({
           ...(group.query ? { query: group.query } : {}),
           results: (group.results ?? []).map(trimWebResult),
         })),

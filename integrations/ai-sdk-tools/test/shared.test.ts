@@ -1,7 +1,7 @@
 import { Octen, OctenTimeoutError, OctenValidationError } from '@octen.ai/sdk';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { OctenToolOptions } from '../src/shared.js';
-import { mergeParams, modelSchema, requestOptions, resolveClient, trimWebResult } from '../src/shared.js';
+import { mergeParams, modelSchema, nonEmpty, requestOptions, resolveClient, trimWebResult } from '../src/shared.js';
 
 function caught(fn: () => unknown): unknown {
   try {
@@ -235,5 +235,12 @@ describe('trimWebResult', () => {
     const out = trimWebResult({ title: null, url: undefined, highlight: '', time_published: null } as never);
     expect(out).toEqual({});
     expect(Object.keys(out)).toEqual([]);
+  });
+});
+
+describe('nonEmpty', () => {
+  it('returns a non-empty string and undefined for everything else', () => {
+    expect(nonEmpty('a')).toBe('a');
+    for (const value of ['', null, undefined, 0, 7, {}, ['a']]) expect(nonEmpty(value)).toBeUndefined();
   });
 });

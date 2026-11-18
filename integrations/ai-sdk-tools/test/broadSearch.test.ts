@@ -81,6 +81,15 @@ describe('octenBroadSearch', () => {
     expect(out.search_results[1]).toEqual({ query: 'b', results: [] });
   });
 
+  it('skips a null entry in search_results', async () => {
+    const { fakeFetch } = recordingFetch(() =>
+      jsonResponse({ ...broadFixture, data: { queries: ['a'], search_results: [null, { query: 'b', results: [] }] } }),
+    );
+    const t = octenBroadSearch({ client: clientFor(fakeFetch) });
+    const out = (await run(t, { query: 'q' })) as { search_results: Record<string, unknown>[] };
+    expect(out.search_results).toEqual([{ query: 'b', results: [] }]);
+  });
+
   it('uses the default description and lets description override it', () => {
     const client = new Octen({ apiKey: 'test-key' });
     expect(octenBroadSearch({ client }).description).toBe(DEFAULT_DESCRIPTION);
