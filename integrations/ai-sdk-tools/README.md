@@ -40,7 +40,7 @@ const { text } = await generateText({
 console.log(text);
 ```
 
-Any AI SDK provider works the same way: only the `model` line changes. `stopWhen: stepCountIs(5)` lets the model search, read the results and answer in up to five steps; without it `generateText` stops after the first step, before the model has read the search results.
+Any AI SDK provider works the same way: only the `model` line changes. `stopWhen: stepCountIs(5)` lets the model search, read the results and answer in up to five steps. Without it, `generateText` stops after the first step in `ai` 5, 6 and 7: the search runs and its result is in `toolResults`, but the model is not called again to read it, so `text` is empty.
 
 `octenWebSearch()` reads `OCTEN_API_KEY` when it is called, not when the package is imported. If no key is set, the call throws the same error the SDK's `Octen` constructor throws.
 
@@ -203,7 +203,28 @@ const result = streamText({
 for await (const chunk of result.textStream) process.stdout.write(chunk);
 ```
 
-<!-- per-version tool error behavior: filled in after the version matrix -->
+**What the AI SDK does with the error.** A failing search does not make `generateText` or `streamText` reject, in `ai` 5, 6 and 7 alike. The AI SDK catches the error and records a `tool-error` part for that tool call, whose `error` is the original SDK error with its `requestId`. The model's next step receives the failure as an `error-text` tool result and can answer or try again. The model sees the error message (`invalid api key`) in `ai` 5 and 6, and the class name plus the message (`OctenAuthenticationError: invalid api key`) in `ai` 7; it never sees the `requestId`. `streamText` emits the same failure as a `tool-error` part in `fullStream`. This was observed with the version matrix (see [Supported versions](#supported-versions)) for a search that fails with HTTP 401.
+
+Because the call still succeeds, a problem such as a wrong API key only shows in the model's answer unless you look for it. Check the steps for tool errors:
+
+```ts
+import { generateText, stepCountIs } from 'ai';
+import { anthropic } from '@ai-sdk/anthropic';
+import { OctenAPIError } from '@octen.ai/sdk';
+import { octenWebSearch } from '@octen.ai/ai-sdk-tools';
+
+const result = await generateText({
+  model: anthropic('claude-opus-5-5'),
+  tools: { webSearch: octenWebSearch() },
+  stopWhen: stepCountIs(5),
+  prompt: 'What changed in the latest Node.js LTS release?',
+});
+for (const part of result.steps.flatMap((step) => step.content)) {
+  if (part.type === 'tool-error' && part.error instanceof OctenAPIError) {
+    console.error(`${part.toolName} failed: ${part.error.status} (request ${part.error.requestId})`);
+  }
+}
+```
 
 ## Retries and billing
 
@@ -231,13 +252,15 @@ Keep in mind that each tool call the model makes is a separate Octen request, an
 
 ## Supported versions
 
-| Package | Range |
-|---|---|
-| `ai` | `^5.0.0 \|\| ^6.0.0 \|\| ^7.0.0` |
-| `zod` | `^3.25.76 \|\| ^4.1.8` |
-| Node | 20 or newer |
+| Package | Range | Verified with |
+|---|---|---|
+| `ai` | `^5.0.0 \|\| ^6.0.0 \|\| ^7.0.0` | 5.0.291, 6.0.333, 7.0.176 |
+| `zod` | `^3.25.76 \|\| ^4.1.8` | 3.25.76, 4.1.8, 4.6.7 |
+| Node | 20 or newer | 20.20.2, 24.18.0 |
 
-The package declares these as peer dependency ranges. The public types do not mention zod, so whether you use zod 3 or 4 does not affect your type checking. `ai` 4 is not supported: it uses `parameters` where this package uses the `inputSchema` form of `tool()`.
+The package declares `ai` and `zod` as peer dependency ranges, and the ranges are verified by a version matrix (`scripts/matrix.sh` in the repository), last run on 2026-11-18. It covers each of the three `ai` versions with each of the two `zod` versions under Node 24.18.0, plus the latest releases on that date (`ai` 7.0.176 with `zod` 4.6.7) under Node 20.20.2 and 24.18.0. For every combination it drives `generateText` and `streamText` with the AI SDK's mock model through a search and an answer, and type-checks a project that uses all six tools with `strict` and `skipLibCheck: false`.
+
+The public types do not mention zod, so whether you use zod 3 or 4 does not affect your type checking. `ai` 4 is not supported: it uses `parameters` where this package uses the `inputSchema` form of `tool()`.
 
 ## License
 

@@ -9,4 +9,4 @@ Initial release.
 - Results are trimmed to the fields a model can use and carry the `request_id`. Full content is off unless you enable it.
 - SDK errors propagate unchanged, and the AI SDK `abortSignal` is passed to the SDK as `signal`.
 - Public types: `OctenToolOptions`, `ModelWebResult`, `ModelEntity`, `ModelPlace`, and the input and result type of each tool.
-- Peer dependencies: `ai` `^5.0.0 || ^6.0.0 || ^7.0.0` and `zod` `^3.25.76 || ^4.1.8`; Node 20 or newer.
+- Peer dependencies: `ai` `^5.0.0 || ^6.0.0 || ^7.0.0` and `zod` `^3.25.76 || ^4.1.8`; Node 20 or newer. Verified by the version matrix (`scripts/matrix.sh`) with `ai` 5.0.291, 6.0.333 and 7.0.176, `zod` 3.25.76, 4.1.8 and 4.6.7, on Node 20.20.2 and 24.18.0.

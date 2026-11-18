@@ -92,6 +92,20 @@ export async function streamCancellation(): Promise<void> {
   for await (const chunk of result.textStream) process.stdout.write(chunk);
 }
 
+export async function toolErrors(): Promise<void> {
+  const result = await generateText({
+    model: anthropic('claude-opus-5-5'),
+    tools: { webSearch: octenWebSearch() },
+    stopWhen: stepCountIs(5),
+    prompt: 'What changed in the latest Node.js LTS release?',
+  });
+  for (const part of result.steps.flatMap((step) => step.content)) {
+    if (part.type === 'tool-error' && part.error instanceof OctenAPIError) {
+      console.error(`${part.toolName} failed: ${part.error.status} (request ${part.error.requestId})`);
+    }
+  }
+}
+
 export async function noRetries(): Promise<void> {
   // No automatic retries: a rate limit or timeout surfaces as an error instead of a second billed request.
   const strict = octenWebSearch({ maxRetries: 0 });
