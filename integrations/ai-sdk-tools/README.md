@@ -270,7 +270,9 @@ Keep in mind that each tool call the model makes is a separate Octen request, an
 |---|---|
 | `ai` | `^5.0.0 \|\| ^6.0.0 \|\| ^7.0.0` |
 | `zod` | `^3.25.76 \|\| ^4.1.8` |
-| Node | 20 or newer |
+| Node | 20 or newer for the ESM build; 20.19+ or 22.12+ to load it with `require()` together with `ai` 7 |
+
+`ai` 7 is published as ESM only, so loading this package through `require()` (CommonJS) together with `ai` 7 needs Node 20.19 or later, or Node 22.12 or later: older Node versions cannot `require()` an ES module and fail with `ERR_REQUIRE_ESM`. Measured on 2026-11-18 with `@octen.ai/ai-sdk-tools` 0.1.0 and `ai` 7.0.176: Node 20.18.3 and 22.11.0 fail, Node 20.19.0 and 22.12.0 work. The ESM build works on Node 20 and later.
 
 The package declares `ai` and `zod` as peer dependency ranges. A version matrix (`scripts/matrix.sh` in the repository) checks them; on 2026-11-18 it passed for exactly these eight combinations:
 
