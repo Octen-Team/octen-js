@@ -2,7 +2,17 @@ import type { PlaceSearchParams } from '@octen.ai/sdk';
 import { tool } from 'ai';
 import type { Tool } from 'ai';
 import type { z } from 'zod';
-import { mergeParams, modelSchema, nonEmpty, requestOptions, resolveClient, trimWebResults } from '../shared.js';
+import {
+  asList,
+  isRecord,
+  mergeParams,
+  modelSchema,
+  nonEmpty,
+  requestOptions,
+  resolveClient,
+  trimWebResults,
+  warningOf,
+} from '../shared.js';
 import type { ModelWebResult, OctenToolOptions } from '../shared.js';
 
 export type PlaceSearchInput = { query: string };
@@ -20,7 +30,7 @@ export type ModelPlace = {
   phone?: string;
   website?: string;
 };
-export type PlaceSearchToolResult = { request_id: string; places: ModelPlace[]; results?: ModelWebResult[] };
+export type PlaceSearchToolResult = { request_id: string; warning?: string; places: ModelPlace[]; results: ModelWebResult[] };
 
 const DESCRIPTION =
   "Find places such as shops, restaurants and services, with address, coordinates, rating, opening hours and contact details. Put the area in the query, for example 'coffee near Shibuya, Tokyo', unless a location is already set.";
@@ -59,13 +69,14 @@ export function octenPlaceSearch(
     execute: async (input: PlaceSearchInput, { abortSignal }): Promise<PlaceSearchToolResult> => {
       const params = mergeParams<PlaceSearchParams>(TOOL_DEFAULTS, options.defaults, input, MODEL_FIELDS);
       const res = await client.placeSearch.search(params, requestOptions(abortSignal));
-      const places = (res.data?.places ?? []).filter((p) => p != null).map(trimPlace);
-      const web = trimWebResults(res.data?.results);
-      // results appears only when the reply carries web results.
       return {
         request_id: res.request_id,
-        places,
-        ...(web.length > 0 ? { results: web } : {}),
+        ...warningOf(res),
+        places: asList(res.data?.places, 'data.places')
+          .filter(isRecord)
+          .map(trimPlace)
+          .filter((p) => Object.keys(p).length > 0),
+        results: trimWebResults(res.data?.results, 'data.results'),
       };
     },
   });

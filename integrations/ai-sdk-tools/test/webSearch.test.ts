@@ -2,7 +2,7 @@ import { Octen, OctenAbortError, OctenAuthenticationError } from '@octen.ai/sdk'
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { octenWebSearch } from '../src/tools/webSearch.js';
-import { clientFor, jsonResponse, recordingFetch, run } from './helpers.js';
+import { clientFor, jsonResponse, modelJsonSchema, recordingFetch, run, validateInput } from './helpers.js';
 // Replies are the production envelope recorded in test/fixtures/search.json.
 import searchFixture from './fixtures/search.json';
 
@@ -118,5 +118,54 @@ describe('octenWebSearch', () => {
     const t = octenWebSearch({ client: clientFor(fakeFetch) });
     const out = await run(t, { query: 'q' });
     expect(out).toEqual({ request_id: searchFixture.request_id, results: [] });
+  });
+  it('passes a non-empty meta.warning through to the model', async () => {
+    // meta.warning is a nullable string on the response: src/schema/search.ts, SearchResponseDesc.
+    const { fakeFetch } = recordingFetch(() =>
+      jsonResponse({ ...searchFixture, meta: { ...searchFixture.meta, warning: 'Results may be incomplete.' } }),
+    );
+    const out = (await run(octenWebSearch({ client: clientFor(fakeFetch) }), { query: 'q' })) as Record<string, unknown>;
+    expect(out['warning']).toBe('Results may be incomplete.');
+  });
+
+  it('omits warning when meta.warning is empty or null', async () => {
+    // The recorded fixture carries "warning": "".
+    for (const meta of [searchFixture.meta, { ...searchFixture.meta, warning: null }, {}]) {
+      const { fakeFetch } = recordingFetch(() => jsonResponse({ ...searchFixture, meta }));
+      const out = (await run(octenWebSearch({ client: clientFor(fakeFetch) }), { query: 'q' })) as Record<string, unknown>;
+      expect('warning' in out).toBe(false);
+    }
+  });
+
+  it('rejects with an error naming data.results when it is not a list', async () => {
+    const { fakeFetch } = recordingFetch(() => jsonResponse({ ...searchFixture, data: { query: 'q', results: 'oops' } }));
+    await expect(run(octenWebSearch({ client: clientFor(fakeFetch) }), { query: 'q' })).rejects.toThrow(/data\.results/);
+  });
+
+  it('drops a result with no non-empty model field', async () => {
+    const source = searchFixture.data.results[0]!;
+    const { fakeFetch } = recordingFetch(() =>
+      jsonResponse({ ...searchFixture, data: { query: 'q', results: [{ favicon: 'f', full_content: '' }, source] } }),
+    );
+    const out = (await run(octenWebSearch({ client: clientFor(fakeFetch) }), { query: 'q' })) as { results: unknown[] };
+    expect(out.results).toEqual([
+      { title: source.title, url: source.url, highlight: source.highlight, time_published: source.time_published },
+    ]);
+  });
+
+  // Strict-mode providers send null for an optional field the model leaves out.
+  it('accepts time_range null or missing and rejects an unknown value, as the AI SDK validates it', async () => {
+    const t = octenWebSearch({ client: new Octen({ apiKey: 'test-key' }) });
+    expect(await validateInput(t, { query: 'q', time_range: null })).toBe(true);
+    expect(await validateInput(t, { query: 'q' })).toBe(true);
+    expect(await validateInput(t, { query: 'q', time_range: 'week' })).toBe(true);
+    expect(await validateInput(t, { query: 'q', time_range: 'w' })).toBe(false);
+    expect((await modelJsonSchema(t)).required).toEqual(['query']);
+  });
+
+  it('sends no time_range when the model sends null', async () => {
+    const { fakeFetch, calls } = recordingFetch(() => jsonResponse(searchFixture));
+    await run(octenWebSearch({ client: clientFor(fakeFetch) }), { query: 'q', time_range: null });
+    expect(calls[0]?.body).toEqual({ query: 'q', count: 5, highlight: { enable: true, max_tokens: 300 } });
   });
 });

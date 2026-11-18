@@ -1,4 +1,5 @@
 import { Octen } from '@octen.ai/sdk';
+import { asSchema } from 'ai';
 
 export type Recorded = { url: string; body: unknown };
 
@@ -34,4 +35,17 @@ export function hangUntilAborted(init: RequestInit | undefined): Promise<Respons
     if (signal?.aborted === true) fail();
     else signal?.addEventListener('abort', fail, { once: true });
   });
+}
+
+// Validates a model input the way the AI SDK does before it calls execute.
+export async function validateInput(t: { inputSchema: unknown }, value: unknown): Promise<boolean> {
+  const schema = asSchema(t.inputSchema as Parameters<typeof asSchema>[0]);
+  const result = await schema.validate?.(value);
+  if (result === undefined) throw new Error('schema has no validator');
+  return result.success;
+}
+
+export async function modelJsonSchema(t: { inputSchema: unknown }) {
+  const json = await asSchema(t.inputSchema as Parameters<typeof asSchema>[0]).jsonSchema;
+  return json as { properties?: Record<string, unknown>; required?: string[] };
 }

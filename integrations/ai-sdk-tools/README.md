@@ -58,7 +58,7 @@ Each factory returns an AI SDK `Tool`. Pass any of them under any name in `tools
 | `octenPulseSearch(options?)` | `POST /pulse-search` | `query` |
 
 - **Web** is general search. **Broad** splits a multi-part question into sub-queries and runs them in parallel. **News** returns recent articles plus storylines. **Business** returns company and person cards plus sources. **Place** finds shops, restaurants and services with address, rating and opening hours. **Pulse** finds the official page for a site, product or document.
-- `time_range` is `day`, `week`, `month` or `year`.
+- `time_range` is `day`, `week`, `month` or `year`. The model may also send `null` or leave it out, which means no time filter.
 - The model only ever supplies `query` (and `time_range` for Web and News). Everything else is fixed by the tool or by you through `defaults`, so the model has fewer decisions to get wrong.
 - Place does not take a location from the model. Either put the area in the query ("coffee near Shibuya, Tokyo"), or pin a location with `defaults`.
 
@@ -131,26 +131,26 @@ An explicit `undefined` in `defaults` means "not set" and does not override a bu
 
 ## What the model sees
 
-Tool results go into the model's context, so `execute` returns a trimmed copy of the response with only the fields a model can use, and every result carries the `request_id`. Empty or missing fields of results, entities, places and subjects are left out instead of being sent as `null` or `""`. There is no switch to return the raw response. If you need it, call [`@octen.ai/sdk`](https://github.com/Octen-Team/octen-js) directly.
+Tool results go into the model's context, so `execute` returns a trimmed copy of the response with only the fields a model can use, and every result carries the `request_id`. Empty or missing fields of results, entities, places and subjects are left out instead of being sent as `null` or `""`, and an item left with no fields at all is dropped. A non-empty API warning (`meta.warning`) is passed through as `warning`, so the model can tell a degraded upstream from "no results". There is no switch to return the raw response. If you need it, call [`@octen.ai/sdk`](https://github.com/Octen-Team/octen-js) directly.
 
 A "web result" below has `title`, `url`, `highlight`, `time_published` and `full_content`, each present only when the API returned a non-empty value.
 
 | Tool | Result | Built-in defaults |
 |---|---|---|
-| Web | `{ request_id, results: WebResult[] }` | `count: 5`, `highlight: { enable: true, max_tokens: 300 }` |
-| Pulse | `{ request_id, results: WebResult[] }` | `count: 5` |
-| Broad | `{ request_id, queries: string[], search_results: { query?, results: WebResult[] }[] }` | `search_options: { highlight: { enable: true, max_tokens: 300 } }`; the tool sends no `count` or `max_queries` |
-| News | `{ request_id, results: WebResult[], subjects: { name?, summary?, time_latest?, top_news?: { title?, url? } }[] }` | `count: 5`, `highlight: { enable: true, max_tokens: 300 }` |
-| Business | `{ request_id, entities: ModelEntity[], results: WebResult[] }` | `count: 5`, `highlight: { enable: true, max_tokens: 300 }` |
-| Place | `{ request_id, places: ModelPlace[], results?: WebResult[] }` | `places: { count: 5 }` |
+| Web | `{ request_id, warning?, results: WebResult[] }` | `count: 5`, `highlight: { enable: true, max_tokens: 300 }` |
+| Pulse | `{ request_id, warning?, results: WebResult[] }` | `count: 5` |
+| Broad | `{ request_id, warning?, queries: string[], search_results: { query?, results: WebResult[] }[] }` | `search_options: { highlight: { enable: true, max_tokens: 300 } }`; the tool sends no `count` or `max_queries` |
+| News | `{ request_id, warning?, results: WebResult[], subjects: { name?, summary?, time_latest?, top_news?: { title?, url? } }[] }` | `count: 5`, `highlight: { enable: true, max_tokens: 300 }` |
+| Business | `{ request_id, warning?, entities: ModelEntity[], results: WebResult[] }` | `count: 5`, `highlight: { enable: true, max_tokens: 300 }` |
+| Place | `{ request_id, warning?, places: ModelPlace[], results: WebResult[] }` | `places: { count: 5 }` |
 
 - **Business entities.** A company keeps `type`, `name`, `summary` and `website` (taken from `identifiers.website`). A person keeps `type`, `name`, `summary`, `current_position` and `linkedin_url`. An entity type the SDK does not know yet keeps only `type`, `name` and `summary`. An entity without a `type` is dropped.
-- **Places** keep `name`, `category`, `address`, `latitude`, `longitude`, `distance`, `rating`, `review_count`, `opening_hours`, `status`, `phone` and `website`. A value of `0` is kept; only missing values are dropped. `results` is present only when the response includes web results, which you turn on with `defaults: { web_search: { enable: true } }`.
+- **Places** keep `name`, `category`, `address`, `latitude`, `longitude`, `distance`, `rating`, `review_count`, `opening_hours`, `status`, `phone` and `website`. A value of `0` is kept; only missing values are dropped. `results` is empty unless you turn on web results with `defaults: { web_search: { enable: true } }`.
 - **Full content is off by default.** A web result carries `full_content` only if you turn it on, for example `defaults: { full_content: { enable: true, max_tokens: 1000 } }`. Full content beyond the free allowance is billed separately, and it is a lot of text for the model to read, so the tools leave it off unless you ask for it. Web, News, Business and Pulse take `full_content` at the top level of `defaults`; Broad takes it under `search_options` and Place under `web_search`.
 
 ## Errors and cancellation
 
-When a search fails, the tool throws the SDK's error as it is. It is not caught, wrapped or turned into a plain object. These are the classes from `@octen.ai/sdk`: every one extends `OctenError`, and API errors (`OctenAPIError` and its subclasses such as `OctenAuthenticationError` and `OctenRateLimitError`) carry `status` and `requestId`. Quote `requestId` when you contact support.
+When a search fails, the tool throws the SDK's error as it is. It is not caught, wrapped or turned into a plain object. These are the classes from `@octen.ai/sdk`: every one extends `OctenError`, and API errors (`OctenAPIError` and its subclasses such as `OctenAuthenticationError` and `OctenRateLimitError`) carry `status` and `requestId`. Quote `requestId` when you contact support. The one error that does not come from the SDK is a plain `Error` naming the field, thrown when a list in the response is neither an array nor missing, so a malformed reply never looks like "no results".
 
 ```ts
 import { OctenAPIError, OctenError } from '@octen.ai/sdk';

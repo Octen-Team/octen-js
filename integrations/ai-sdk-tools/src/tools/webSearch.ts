@@ -2,11 +2,11 @@ import type { SearchParams } from '@octen.ai/sdk';
 import { tool } from 'ai';
 import type { Tool } from 'ai';
 import type { z } from 'zod';
-import { mergeParams, modelSchema, requestOptions, resolveClient, trimWebResults } from '../shared.js';
+import { mergeParams, modelSchema, requestOptions, resolveClient, trimWebResults, warningOf } from '../shared.js';
 import type { ModelWebResult, OctenToolOptions } from '../shared.js';
 
-export type WebSearchInput = { query: string; time_range?: 'day' | 'week' | 'month' | 'year' };
-export type WebSearchToolResult = { request_id: string; results: ModelWebResult[] };
+export type WebSearchInput = { query: string; time_range?: 'day' | 'week' | 'month' | 'year' | null };
+export type WebSearchToolResult = { request_id: string; warning?: string; results: ModelWebResult[] };
 
 const DESCRIPTION =
   'Search the web for current information. Returns ranked pages with title, URL, a query-relevant excerpt and publish time. Use it when the answer depends on recent events or on facts you are unsure about.';
@@ -24,7 +24,7 @@ export function octenWebSearch(options: OctenToolOptions<SearchParams> = {}): To
     execute: async (input: WebSearchInput, { abortSignal }): Promise<WebSearchToolResult> => {
       const params = mergeParams<SearchParams>(TOOL_DEFAULTS, options.defaults, input, MODEL_FIELDS);
       const res = await client.search.search(params, requestOptions(abortSignal));
-      return { request_id: res.request_id, results: trimWebResults(res.data?.results) };
+      return { request_id: res.request_id, ...warningOf(res), results: trimWebResults(res.data?.results, 'data.results') };
     },
   });
 }

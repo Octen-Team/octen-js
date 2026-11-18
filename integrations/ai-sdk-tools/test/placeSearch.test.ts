@@ -9,7 +9,7 @@ import placeFixture from './fixtures/place-search.json';
 const DEFAULT_DESCRIPTION =
   "Find places such as shops, restaurants and services, with address, coordinates, rating, opening hours and contact details. Put the area in the query, for example 'coffee near Shibuya, Tokyo', unless a location is already set.";
 
-type Out = { request_id: string; places: Record<string, unknown>[]; results?: Record<string, unknown>[] };
+type Out = { request_id: string; places: Record<string, unknown>[]; results: Record<string, unknown>[] };
 
 describe('octenPlaceSearch', () => {
   it('sends the tool defaults plus the model query', async () => {
@@ -111,11 +111,12 @@ describe('octenPlaceSearch', () => {
     ]);
   });
 
-  it('has no results key when the reply has no web results', async () => {
+  it('returns an empty results list when the reply has no web results', async () => {
     const { fakeFetch } = recordingFetch(() => jsonResponse(placeFixture));
     const t = octenPlaceSearch({ client: clientFor(fakeFetch) });
     const out = (await run(t, { query: 'q' })) as Out;
-    expect(Object.keys(out)).toEqual(['request_id', 'places']);
+    expect(Object.keys(out).sort()).toEqual(['places', 'request_id', 'results']);
+    expect(out.results).toEqual([]);
   });
 
   it('includes trimmed results when the reply has web results', async () => {
@@ -145,11 +146,11 @@ describe('octenPlaceSearch', () => {
     ]);
   });
 
-  it('omits results when the reply carries an empty or null results list', async () => {
+  it('returns an empty results list when the reply carries an empty or null results list', async () => {
     for (const results of [[], null]) {
       const { fakeFetch } = recordingFetch(() => jsonResponse({ ...placeFixture, data: { ...placeFixture.data, results } }));
       const t = octenPlaceSearch({ client: clientFor(fakeFetch) });
-      expect(Object.keys((await run(t, { query: 'q' })) as Out)).toEqual(['request_id', 'places']);
+      expect(((await run(t, { query: 'q' })) as Out).results).toEqual([]);
     }
   });
 
@@ -188,7 +189,42 @@ describe('octenPlaceSearch', () => {
     for (const data of [{ query: 'q', places: null }, { query: 'q' }]) {
       const { fakeFetch } = recordingFetch(() => jsonResponse({ ...placeFixture, data }));
       const t = octenPlaceSearch({ client: clientFor(fakeFetch) });
-      expect(await run(t, { query: 'q' })).toEqual({ request_id: placeFixture.request_id, places: [] });
+      expect(await run(t, { query: 'q' })).toEqual({ request_id: placeFixture.request_id, places: [], results: [] });
     }
+  });
+  it('passes a non-empty meta.warning through and omits an empty or null one', async () => {
+    // meta.warning is a nullable string on the response: src/schema/placeSearch.ts; the fixture carries "".
+    const cases: [unknown, string | undefined][] = [
+      ['places_unavailable', 'places_unavailable'],
+      [placeFixture.meta.warning, undefined],
+      [null, undefined],
+    ];
+    for (const [warning, want] of cases) {
+      const { fakeFetch } = recordingFetch(() => jsonResponse({ ...placeFixture, meta: { ...placeFixture.meta, warning } }));
+      const out = (await run(octenPlaceSearch({ client: clientFor(fakeFetch) }), { query: 'q' })) as Record<string, unknown>;
+      expect(out['warning']).toBe(want);
+      expect('warning' in out).toBe(want !== undefined);
+    }
+  });
+
+  it.each([
+    ['data.places', { places: 'x' }],
+    ['data.results', { places: [], results: { title: 'x' } }],
+  ])('rejects with an error naming %s when it is not a list', async (label, data) => {
+    const { fakeFetch } = recordingFetch(() => jsonResponse({ ...placeFixture, data }));
+    const err = await run(octenPlaceSearch({ client: clientFor(fakeFetch) }), { query: 'q' }).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect((err as Error).message).toContain(label);
+  });
+
+  it('drops non-object places and places with no non-empty field', async () => {
+    const { fakeFetch } = recordingFetch(() =>
+      jsonResponse({
+        ...placeFixture,
+        data: { places: ['x', 7, ['y'], { name: '', rating: null, opening_hours: [] }, { attributes: { wifi: true } }, { name: 'A' }] },
+      }),
+    );
+    const out = (await run(octenPlaceSearch({ client: clientFor(fakeFetch) }), { query: 'q' })) as Out;
+    expect(out.places).toEqual([{ name: 'A' }]);
   });
 });

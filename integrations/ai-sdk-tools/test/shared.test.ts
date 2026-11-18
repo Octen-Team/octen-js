@@ -1,7 +1,17 @@
 import { Octen, OctenTimeoutError, OctenValidationError } from '@octen.ai/sdk';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { OctenToolOptions } from '../src/shared.js';
-import { mergeParams, modelSchema, nonEmpty, requestOptions, resolveClient, trimWebResult, trimWebResults } from '../src/shared.js';
+import {
+  asList,
+  isRecord,
+  mergeParams,
+  modelSchema,
+  nonEmpty,
+  requestOptions,
+  resolveClient,
+  trimWebResult,
+  trimWebResults,
+} from '../src/shared.js';
 
 function caught(fn: () => unknown): unknown {
   try {
@@ -245,13 +255,51 @@ describe('nonEmpty', () => {
   });
 });
 
+describe('isRecord', () => {
+  it('accepts plain objects only', () => {
+    expect(isRecord({})).toBe(true);
+    expect(isRecord({ a: 1 })).toBe(true);
+    for (const value of [null, undefined, [], ['x'], 'x', 3, true]) expect(isRecord(value)).toBe(false);
+  });
+});
+
+describe('asList', () => {
+  it('treats null and undefined as an empty list', () => {
+    expect(asList(null, 'data.results')).toEqual([]);
+    expect(asList(undefined, 'data.results')).toEqual([]);
+  });
+
+  it('returns an array as is', () => {
+    const list = [1, 'a', null];
+    expect(asList(list, 'data.results')).toBe(list);
+  });
+
+  it.each([['x'], [3], [{}], [true]])('throws a plain Error naming the field for %j', (value) => {
+    const err = caught(() => asList(value, 'data.places'));
+    expect(err).toBeInstanceOf(Error);
+    expect(err).not.toBeInstanceOf(OctenValidationError);
+    expect((err as Error).message).toContain('data.places');
+  });
+});
+
 describe('trimWebResults', () => {
   it('trims each result and skips null and non-object items', () => {
     const list = [{ title: 'A', favicon: 'f' }, null, 'text', 7, undefined, ['x'], { url: 'https://b.example' }];
-    expect(trimWebResults(list)).toEqual([{ title: 'A' }, { url: 'https://b.example' }]);
+    expect(trimWebResults(list, 'data.results')).toEqual([{ title: 'A' }, { url: 'https://b.example' }]);
   });
 
-  it('returns an empty list for a non-array', () => {
-    for (const value of [null, undefined, 'x', 3, {}]) expect(trimWebResults(value)).toEqual([]);
+  it('drops a result that has no non-empty model field', () => {
+    const list = [{ favicon: 'f', full_content: '' }, { title: '' }, { title: 'kept' }];
+    expect(trimWebResults(list, 'data.results')).toEqual([{ title: 'kept' }]);
+  });
+
+  it('returns an empty list for null or undefined', () => {
+    for (const value of [null, undefined]) expect(trimWebResults(value, 'data.results')).toEqual([]);
+  });
+
+  it('throws naming the field for a non-array list', () => {
+    for (const value of ['x', 3, {}]) {
+      expect(() => trimWebResults(value, 'data.results')).toThrow(/data\.results/);
+    }
   });
 });

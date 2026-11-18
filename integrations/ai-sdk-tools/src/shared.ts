@@ -77,6 +77,8 @@ export function modelSchema(
   if (fields.time_range === true && pinned?.['time_range'] === undefined) {
     shape['time_range'] = z
       .enum(['day', 'week', 'month', 'year'])
+      // Strict-mode providers send null for an optional field; mergeParams drops it.
+      .nullable()
       .optional()
       .describe('Only return results from this recent window. Omit for no time filter.');
   }
@@ -102,10 +104,27 @@ export function nonEmpty(value: unknown): string | undefined {
   return typeof value === 'string' && value !== '' ? value : undefined;
 }
 
-// Lists come from the wire, so a non-array is treated as empty and null or non-object items are skipped.
-export function trimWebResults(list: unknown): ModelWebResult[] {
-  if (!Array.isArray(list)) return [];
-  return list
-    .filter((item): item is Record<string, unknown> => typeof item === 'object' && item !== null && !Array.isArray(item))
-    .map(trimWebResult);
+export function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+// A missing list means "nothing found"; any other non-array is a malformed reply and must not look empty.
+export function asList(value: unknown, label: string): unknown[] {
+  if (value === null || value === undefined) return [];
+  if (Array.isArray(value)) return value;
+  throw new Error(`Expected ${label} in the Octen response to be an array, got ${typeof value}.`);
+}
+
+// Non-object items and items with no non-empty field are skipped, so the model never sees {}.
+export function trimWebResults(list: unknown, label: string): ModelWebResult[] {
+  return asList(list, label)
+    .filter(isRecord)
+    .map(trimWebResult)
+    .filter((r) => Object.keys(r).length > 0);
+}
+
+// A non-empty warning tells the model the upstream was degraded, not that nothing matched.
+export function warningOf(res: { meta?: { warning?: unknown } | null }): { warning?: string } {
+  const warning = nonEmpty(res.meta?.warning);
+  return warning === undefined ? {} : { warning };
 }

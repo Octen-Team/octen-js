@@ -191,4 +191,47 @@ describe('octenBusinessSearch', () => {
     const t2 = octenBusinessSearch({ client: clientFor(missing.fakeFetch) });
     expect(await run(t2, { query: 'q' })).toEqual({ request_id: businessFixture.request_id, entities: [], results: [] });
   });
+  it('passes a non-empty meta.warning through and omits an empty one', async () => {
+    // meta.warning is a string on the response: src/schema/businessSearch.ts; the fixture carries "".
+    const cases: [unknown, string | undefined][] = [
+      ['Entity cards unavailable.', 'Entity cards unavailable.'],
+      [businessFixture.meta.warning, undefined],
+      [null, undefined],
+    ];
+    for (const [warning, want] of cases) {
+      const { fakeFetch } = recordingFetch(() =>
+        jsonResponse({ ...businessFixture, meta: { ...businessFixture.meta, warning } }),
+      );
+      const out = (await run(octenBusinessSearch({ client: clientFor(fakeFetch) }), { query: 'q' })) as Record<string, unknown>;
+      expect(out['warning']).toBe(want);
+      expect('warning' in out).toBe(want !== undefined);
+    }
+  });
+
+  it.each([
+    ['data.entities', { entities: 'x', results: [] }],
+    ['data.results', { entities: [], results: 7 }],
+  ])('rejects with an error naming %s when it is not a list', async (label, data) => {
+    const { fakeFetch } = recordingFetch(() => jsonResponse({ ...businessFixture, data }));
+    const err = await run(octenBusinessSearch({ client: clientFor(fakeFetch) }), { query: 'q' }).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect((err as Error).message).toContain(label);
+  });
+
+  it('skips array entities and ignores identifiers that are not an object', async () => {
+    const { fakeFetch } = recordingFetch(() =>
+      jsonResponse({
+        ...businessFixture,
+        data: {
+          results: [],
+          entities: [['company'], { type: 'company', name: 'A', identifiers: 'a.com' }, { type: 'company', name: 'B', identifiers: ['b.com'] }],
+        },
+      }),
+    );
+    const out = (await run(octenBusinessSearch({ client: clientFor(fakeFetch) }), { query: 'q' })) as Out;
+    expect(out.entities).toEqual([
+      { type: 'company', name: 'A' },
+      { type: 'company', name: 'B' },
+    ]);
+  });
 });

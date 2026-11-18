@@ -74,4 +74,23 @@ describe('octenPulseSearch', () => {
     const out = await run(t, { query: 'q' });
     expect(out).toEqual({ request_id: pulseFixture.request_id, results: [] });
   });
+  it('passes a non-empty meta.warning through and omits an empty or null one', async () => {
+    // meta.warning is a nullable string on the response: src/schema/pulseSearch.ts; the fixture carries "".
+    const cases: [unknown, string | undefined][] = [
+      ['Lite results only.', 'Lite results only.'],
+      [pulseFixture.meta.warning, undefined],
+      [null, undefined],
+    ];
+    for (const [warning, want] of cases) {
+      const { fakeFetch } = recordingFetch(() => jsonResponse({ ...pulseFixture, meta: { ...pulseFixture.meta, warning } }));
+      const out = (await run(octenPulseSearch({ client: clientFor(fakeFetch) }), { query: 'q' })) as Record<string, unknown>;
+      expect(out['warning']).toBe(want);
+      expect('warning' in out).toBe(want !== undefined);
+    }
+  });
+
+  it('rejects with an error naming data.results when it is not a list', async () => {
+    const { fakeFetch } = recordingFetch(() => jsonResponse({ ...pulseFixture, data: { query: 'q', results: { title: 'x' } } }));
+    await expect(run(octenPulseSearch({ client: clientFor(fakeFetch) }), { query: 'q' })).rejects.toThrow(/data\.results/);
+  });
 });

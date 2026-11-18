@@ -2,12 +2,23 @@ import type { NewsSearchParams } from '@octen.ai/sdk';
 import { tool } from 'ai';
 import type { Tool } from 'ai';
 import type { z } from 'zod';
-import { mergeParams, modelSchema, nonEmpty, requestOptions, resolveClient, trimWebResults } from '../shared.js';
+import {
+  asList,
+  isRecord,
+  mergeParams,
+  modelSchema,
+  nonEmpty,
+  requestOptions,
+  resolveClient,
+  trimWebResults,
+  warningOf,
+} from '../shared.js';
 import type { ModelWebResult, OctenToolOptions } from '../shared.js';
 
-export type NewsSearchInput = { query: string; time_range?: 'day' | 'week' | 'month' | 'year' };
+export type NewsSearchInput = { query: string; time_range?: 'day' | 'week' | 'month' | 'year' | null };
 export type NewsSearchToolResult = {
   request_id: string;
+  warning?: string;
   results: ModelWebResult[];
   subjects: { name?: string; summary?: string; time_latest?: string; top_news?: { title?: string; url?: string } }[];
 };
@@ -21,17 +32,17 @@ const MODEL_FIELDS = ['query', 'time_range'] as const;
 type Subject = NewsSearchToolResult['subjects'][number];
 
 // top_news is a single object on the wire, not an array; empty and null values are left out.
-function trimSubject(s: { name?: unknown; summary?: unknown; time_latest?: unknown; top_news?: unknown }): Subject {
+function trimSubject(s: Record<string, unknown>): Subject {
   const out: Subject = {};
-  const name = nonEmpty(s.name);
-  const summary = nonEmpty(s.summary);
-  const timeLatest = nonEmpty(s.time_latest);
+  const name = nonEmpty(s['name']);
+  const summary = nonEmpty(s['summary']);
+  const timeLatest = nonEmpty(s['time_latest']);
   if (name !== undefined) out.name = name;
   if (summary !== undefined) out.summary = summary;
   if (timeLatest !== undefined) out.time_latest = timeLatest;
-  const top = (s.top_news ?? {}) as { title?: unknown; url?: unknown };
-  const title = nonEmpty(top.title);
-  const url = nonEmpty(top.url);
+  const top = isRecord(s['top_news']) ? s['top_news'] : {};
+  const title = nonEmpty(top['title']);
+  const url = nonEmpty(top['url']);
   if (title !== undefined || url !== undefined) {
     out.top_news = { ...(title !== undefined ? { title } : {}), ...(url !== undefined ? { url } : {}) };
   }
@@ -52,8 +63,12 @@ export function octenNewsSearch(
       const res = await client.search.newsSearch(params, requestOptions(abortSignal));
       return {
         request_id: res.request_id,
-        results: trimWebResults(res.data?.results),
-        subjects: (res.data?.subjects ?? []).filter((s) => s != null).map(trimSubject),
+        ...warningOf(res),
+        results: trimWebResults(res.data?.results, 'data.results'),
+        subjects: asList(res.data?.subjects, 'data.subjects')
+          .filter(isRecord)
+          .map(trimSubject)
+          .filter((s) => Object.keys(s).length > 0),
       };
     },
   });

@@ -2,12 +2,23 @@ import type { BroadSearchParams } from '@octen.ai/sdk';
 import { tool } from 'ai';
 import type { Tool } from 'ai';
 import type { z } from 'zod';
-import { mergeParams, modelSchema, requestOptions, resolveClient, trimWebResults } from '../shared.js';
+import {
+  asList,
+  isRecord,
+  mergeParams,
+  modelSchema,
+  nonEmpty,
+  requestOptions,
+  resolveClient,
+  trimWebResults,
+  warningOf,
+} from '../shared.js';
 import type { ModelWebResult, OctenToolOptions } from '../shared.js';
 
 export type BroadSearchInput = { query: string };
 export type BroadSearchToolResult = {
   request_id: string;
+  warning?: string;
   queries: string[];
   search_results: { query?: string; results: ModelWebResult[] }[];
 };
@@ -31,13 +42,19 @@ export function octenBroadSearch(
     execute: async (input: BroadSearchInput, { abortSignal }): Promise<BroadSearchToolResult> => {
       const params = mergeParams<BroadSearchParams>(TOOL_DEFAULTS, options.defaults, input, MODEL_FIELDS);
       const res = await client.search.broadSearch(params, requestOptions(abortSignal));
+      const queries = asList(res.data?.queries, 'data.queries').filter((q): q is string => nonEmpty(q) !== undefined);
+      const groups = asList(res.data?.search_results, 'data.search_results').filter(isRecord);
       return {
         request_id: res.request_id,
-        queries: res.data?.queries ?? [],
-        search_results: (res.data?.search_results ?? []).filter((group) => group != null).map((group) => ({
-          ...(group.query ? { query: group.query } : {}),
-          results: trimWebResults(group.results),
-        })),
+        ...warningOf(res),
+        queries,
+        search_results: groups.map((group) => {
+          const query = nonEmpty(group['query']);
+          return {
+            ...(query !== undefined ? { query } : {}),
+            results: trimWebResults(group['results'], 'data.search_results[].results'),
+          };
+        }),
       };
     },
   });

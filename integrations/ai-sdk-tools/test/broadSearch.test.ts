@@ -138,4 +138,46 @@ describe('octenBroadSearch', () => {
     const t = octenBroadSearch({ client: clientFor(fakeFetch) });
     expect(await run(t, { query: 'q' })).toEqual({ request_id: 'r1', queries: [], search_results: [] });
   });
+  it('passes a non-empty meta.warning through and omits an empty or null one', async () => {
+    // meta.warning is a nullable string on the response: src/schema/broadSearch.ts (the fixture has no warning key).
+    const cases: [unknown, string | undefined][] = [
+      ['One sub-query failed.', 'One sub-query failed.'],
+      ['', undefined],
+      [null, undefined],
+    ];
+    for (const [warning, want] of cases) {
+      const { fakeFetch } = recordingFetch(() => jsonResponse({ ...broadFixture, meta: { ...broadFixture.meta, warning } }));
+      const out = (await run(octenBroadSearch({ client: clientFor(fakeFetch) }), { query: 'q' })) as Record<string, unknown>;
+      expect(out['warning']).toBe(want);
+      expect('warning' in out).toBe(want !== undefined);
+    }
+    const { fakeFetch } = recordingFetch(() => jsonResponse(broadFixture));
+    expect('warning' in ((await run(octenBroadSearch({ client: clientFor(fakeFetch) }), { query: 'q' })) as object)).toBe(false);
+  });
+
+  it.each([
+    ['data.queries', { queries: 'a', search_results: [] }],
+    ['data.search_results', { queries: [], search_results: { query: 'a' } }],
+    ['data.search_results[].results', { queries: [], search_results: [{ query: 'a', results: 'x' }] }],
+  ])('rejects with an error naming %s when it is not a list', async (label, data) => {
+    const { fakeFetch } = recordingFetch(() => jsonResponse({ ...broadFixture, data }));
+    const err = await run(octenBroadSearch({ client: clientFor(fakeFetch) }), { query: 'q' }).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect((err as Error).message).toContain(label);
+  });
+
+  it('keeps only non-empty string queries and object groups', async () => {
+    const { fakeFetch } = recordingFetch(() =>
+      jsonResponse({
+        ...broadFixture,
+        data: { queries: ['a', '', null, 3, 'b'], search_results: ['x', 7, ['y'], { query: 'b', results: [] }] },
+      }),
+    );
+    const out = await run(octenBroadSearch({ client: clientFor(fakeFetch) }), { query: 'q' });
+    expect(out).toEqual({
+      request_id: broadFixture.request_id,
+      queries: ['a', 'b'],
+      search_results: [{ query: 'b', results: [] }],
+    });
+  });
 });

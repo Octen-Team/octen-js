@@ -2,7 +2,7 @@ import { Octen, OctenAbortError, OctenAuthenticationError } from '@octen.ai/sdk'
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { octenNewsSearch } from '../src/tools/newsSearch.js';
-import { clientFor, jsonResponse, recordingFetch, run } from './helpers.js';
+import { clientFor, jsonResponse, modelJsonSchema, recordingFetch, run, validateInput } from './helpers.js';
 // Replies are the production envelope recorded in test/fixtures/news-search.json.
 import newsFixture from './fixtures/news-search.json';
 
@@ -69,7 +69,7 @@ describe('octenNewsSearch', () => {
     });
   });
 
-  it('omits empty values at every level of a subject', async () => {
+  it('omits empty values at every level of a subject and drops a subject left empty', async () => {
     const { fakeFetch } = recordingFetch(() =>
       jsonResponse({
         ...newsFixture,
@@ -89,7 +89,6 @@ describe('octenNewsSearch', () => {
     expect(out.subjects).toEqual([
       { name: 'a', top_news: { url: 'https://example.com/a' } },
       { name: 'b' },
-      {},
       { name: 'c', top_news: { title: 't' } },
     ]);
   });
@@ -156,5 +155,49 @@ describe('octenNewsSearch', () => {
     const { fakeFetch } = recordingFetch(() => jsonResponse({ ...newsFixture, data: { query: 'q', results: [] } }));
     const t = octenNewsSearch({ client: clientFor(fakeFetch) });
     expect(await run(t, { query: 'q' })).toEqual({ request_id: newsFixture.request_id, results: [], subjects: [] });
+  });
+  it('passes a non-empty meta.warning through and omits an empty or null one', async () => {
+    // meta.warning is a nullable string on the response: src/schema/newsSearch.ts; the fixture carries "".
+    const cases: [unknown, string | undefined][] = [
+      ['Storylines unavailable.', 'Storylines unavailable.'],
+      [newsFixture.meta.warning, undefined],
+      [null, undefined],
+    ];
+    for (const [warning, want] of cases) {
+      const { fakeFetch } = recordingFetch(() => jsonResponse({ ...newsFixture, meta: { ...newsFixture.meta, warning } }));
+      const out = (await run(octenNewsSearch({ client: clientFor(fakeFetch) }), { query: 'q' })) as Record<string, unknown>;
+      expect(out['warning']).toBe(want);
+      expect('warning' in out).toBe(want !== undefined);
+    }
+  });
+
+  it.each([
+    ['data.results', { results: 'x', subjects: [] }],
+    ['data.subjects', { results: [], subjects: { name: 'a' } }],
+  ])('rejects with an error naming %s when it is not a list', async (label, data) => {
+    const { fakeFetch } = recordingFetch(() => jsonResponse({ ...newsFixture, data }));
+    const err = await run(octenNewsSearch({ client: clientFor(fakeFetch) }), { query: 'q' }).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect((err as Error).message).toContain(label);
+  });
+
+  it('drops non-object subjects and subjects with no non-empty field', async () => {
+    const { fakeFetch } = recordingFetch(() =>
+      jsonResponse({
+        ...newsFixture,
+        data: { results: [], subjects: ['x', 7, ['y'], { name: '', top_news: { title: '' } }, { top_news: 'z' }, { name: 'a' }] },
+      }),
+    );
+    const out = (await run(octenNewsSearch({ client: clientFor(fakeFetch) }), { query: 'q' })) as Out;
+    expect(out.subjects).toEqual([{ name: 'a' }]);
+  });
+
+  // Strict-mode providers send null for an optional field the model leaves out.
+  it('accepts time_range null or missing and rejects an unknown value, as the AI SDK validates it', async () => {
+    const t = octenNewsSearch({ client: new Octen({ apiKey: 'test-key' }) });
+    expect(await validateInput(t, { query: 'q', time_range: null })).toBe(true);
+    expect(await validateInput(t, { query: 'q' })).toBe(true);
+    expect(await validateInput(t, { query: 'q', time_range: 'w' })).toBe(false);
+    expect((await modelJsonSchema(t)).required).toEqual(['query']);
   });
 });
