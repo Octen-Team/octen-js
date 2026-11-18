@@ -41,3 +41,16 @@ export async function consume(): Promise<string> {
   for await (const part of stream.fullStream) if (part.type === 'tool-error') console.log(part.error);
   return result.text;
 }
+
+// An unused @ts-expect-error is itself a type error, so these fail if the packed declarations stop rejecting the options.
+export function optionTypes() {
+  return [
+    octenWebSearch(),
+    octenWebSearch({}),
+    octenWebSearch({ apiKey: 'k' }),
+    // @ts-expect-error `client` cannot be combined with a client option such as `apiKey`.
+    octenWebSearch({ client, apiKey: 'k' }),
+    // @ts-expect-error `query` is chosen by the model, so it cannot be pinned through `defaults`.
+    octenWebSearch({ defaults: { query: 'x' } }),
+  ];
+}

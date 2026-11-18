@@ -54,7 +54,14 @@ describe('factory-time validation', () => {
 
   it.each(Object.entries(FACTORIES))('%s throws when no apiKey is passed and OCTEN_API_KEY is unset', (_name, factory) => {
     vi.stubEnv('OCTEN_API_KEY', '');
-    expect(() => factory()).toThrow(OctenValidationError);
+    let err: unknown;
+    try {
+      factory();
+    } catch (e) {
+      err = e;
+    }
+    expect(err).toBeInstanceOf(OctenValidationError);
+    expect((err as OctenValidationError).field).toBe('apiKey');
   });
 });
 
