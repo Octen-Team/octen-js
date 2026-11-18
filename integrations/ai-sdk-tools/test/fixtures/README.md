@@ -1,0 +1,12 @@
+# Recorded production responses
+
+JSON responses recorded on 2026-11-18 from the production API with `@octen.ai/sdk@0.1.0`.
+
+Long free-text values (highlights, content, summaries) were replaced with placeholders; structure, field names, and other values are as recorded, except that one place address was shortened, an e-mail address was removed from an author field, and query strings were stripped from signed or tokenized image URLs.
+
+- `search.json`: `POST /search` with `{"query":"solid-state battery breakthroughs","count":3,"time_range":"month","highlight":{"enable":true,"max_tokens":300}}`, recorded 2026-11-18.
+- `broad-search.json`: `POST /broad-search` with `{"query":"compare cloud GPU pricing across providers","max_queries":3}`, recorded 2026-11-18.
+- `news-search.json`: `POST /news-search` with `{"query":"EU AI Act enforcement","count":3,"time_range":"week"}`, recorded 2026-11-18.
+- `business-search.json`: `POST /business-search` with `{"query":"compare Stripe and Adyen","entities":{"count":2}}`, recorded 2026-11-18.
+- `place-search.json`: `POST /place-search` with `{"query":"coffee shops","latitude":35.6812,"longitude":139.7671,"radius":1000,"places":{"count":3}}`, recorded 2026-11-18.
+- `pulse-search.json`: `POST /pulse-search` with `{"query":"github docs","count":3}`, recorded 2026-11-18.
