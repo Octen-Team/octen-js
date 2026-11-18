@@ -13,6 +13,7 @@ It covers six endpoints: Web Search, Broad Search, News Search, Business Search,
 - [Retries and timeouts](#retries-and-timeouts)
 - [Runtimes and browsers](#runtimes-and-browsers)
 - [Differences from the Python SDK](#differences-from-the-python-sdk)
+- [Integrations](#integrations)
 - [Development and releasing](#development-and-releasing)
 
 ## Install
@@ -259,6 +260,10 @@ Compared with `octen-py` 0.11.1:
 | Auth headers | `x-api-key` and `Authorization: Bearer` | `x-api-key` only |
 | Deprecated `topic` parameter | Still present | Not exposed |
 | Broad Search timeout | 30 s like every endpoint | 120 s, separate default, unless a client `timeout` is set explicitly |
+
+## Integrations
+
+- [`@octen.ai/ai-sdk-tools`](integrations/ai-sdk-tools): Octen search tools for the Vercel AI SDK (`generateText` and `streamText`), built on this SDK.
 
 ## Development and releasing
 
