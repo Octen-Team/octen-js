@@ -63,6 +63,10 @@ jobs:
       - name: Build the SDK at the repository root
         working-directory: .
         run: npm ci && npm run build
+      # The matrix installs this tarball in place of the published SDK, so it tests this commit.
+      - name: Pack the SDK from this commit
+        working-directory: .
+        run: echo "MATRIX_SDK=$RUNNER_TEMP/$(npm pack --pack-destination "$RUNNER_TEMP" --silent)" >> "$GITHUB_ENV"
       - run: npm ci
       # Overrides the published SDK from the lockfile with this commit's source; --no-save keeps the lockfile clean.
       - name: Link the SDK from this commit

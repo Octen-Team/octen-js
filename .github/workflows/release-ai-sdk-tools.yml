@@ -4,49 +4,29 @@ on:
   push:
     tags: ["ai-sdk-tools-v*"]
 
-permissions:
-  contents: read
-  id-token: write # npm OIDC trusted publishing and provenance; no token needed
+# No workflow-level grants: only the publish job gets id-token.
+permissions: {}
 
 jobs:
-  publish:
+  # Runs the unpinned matrix installs. It holds no publish rights.
+  verify:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     defaults:
       run:
         working-directory: integrations/ai-sdk-tools
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # the main-branch check below needs history
+          fetch-depth: 0 # the main-branch check needs history
       - uses: actions/setup-node@v4
         with:
-          # npm 12.2.1 declares engines.node ^22.22.2 || ^24.15.0 || >=26; a bare "22" can resolve to an older cached 22.x
           node-version: 22.22.2
           cache: npm
           cache-dependency-path: integrations/ai-sdk-tools/package-lock.json
-          registry-url: "https://registry.npmjs.org"
-      - name: Verify tag matches package.json and src/version.ts
-        run: |
-          PKG="$(node -p "require('./package.json').version")"
-          SRC="$(node -p "require('fs').readFileSync('src/version.ts', 'utf8').match(/TOOLS_VERSION = '([^']+)'/)?.[1] ?? ''")"
-          if [ "$GITHUB_REF_NAME" != "ai-sdk-tools-v$PKG" ] || [ "$PKG" != "$SRC" ]; then
-            echo "Tag '$GITHUB_REF_NAME', package.json '$PKG' and src/version.ts '$SRC' must all match (tag = ai-sdk-tools-v<version>)"
-            exit 1
-          fi
-          # npm would publish a prerelease under the latest dist-tag without --tag, so refuse it
-          case "$PKG" in
-            *-*)
-              echo "Version '$PKG' is a prerelease; this workflow publishes stable versions only (it would land on the latest dist-tag)"
-              exit 1
-              ;;
-          esac
-      - name: Verify the tagged commit is on main
-        run: |
-          git fetch --no-tags origin main:refs/remotes/origin/main
-          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
-            echo "Commit $GITHUB_SHA is not on main; releases must be tagged from main"
-            exit 1
-          fi
+      - name: Release guards
+        run: bash scripts/release-guard.sh
       - run: npm ci
       - name: Type-check
         run: npm run typecheck
@@ -55,6 +35,31 @@ jobs:
       # Runs every ai/zod pair against the packed package; Node 20 comes from `npx -y node@20`.
       - name: Version matrix
         run: bash scripts/matrix.sh
+      - name: Build
+        run: npm run build
+
+  # Installs from the lockfile only and never runs matrix.sh.
+  publish:
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # npm OIDC trusted publishing and provenance; no token needed
+    defaults:
+      run:
+        working-directory: integrations/ai-sdk-tools
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          # npm 12.2.1 declares engines.node ^22.22.2 || ^24.15.0 || >=26; a bare "22" can resolve to an older cached 22.x
+          node-version: 22.22.2
+          registry-url: "https://registry.npmjs.org"
+      - name: Release guards
+        run: bash scripts/release-guard.sh
+      - run: npm ci
       - name: Build
         run: npm run build
       # Pinned on purpose: `npm@latest` would let an unreviewed npm release run with our publish rights.
