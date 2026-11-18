@@ -1,9 +1,13 @@
 import { OctenAbortError } from '@octen.ai/sdk';
 import type { Octen } from '@octen.ai/sdk';
 import { describe, expect, it } from 'vitest';
+import { octenBroadSearch } from '../src/tools/broadSearch.js';
+import { octenNewsSearch } from '../src/tools/newsSearch.js';
 import { octenPulseSearch } from '../src/tools/pulseSearch.js';
 import { octenWebSearch } from '../src/tools/webSearch.js';
 import { clientFor, hangUntilAborted, jsonResponse, recordingFetch, run } from './helpers.js';
+import broadFixture from './fixtures/broad-search.json';
+import newsFixture from './fixtures/news-search.json';
 import pulseFixture from './fixtures/pulse-search.json';
 import searchFixture from './fixtures/search.json';
 
@@ -20,6 +24,8 @@ type Entry = {
 const ENTRIES: Entry[] = [
   { name: 'web search', make: (client) => octenWebSearch({ client }), input: { query: 'q' }, path: '/search', fixture: searchFixture },
   { name: 'pulse search', make: (client) => octenPulseSearch({ client }), input: { query: 'q' }, path: '/pulse-search', fixture: pulseFixture },
+  { name: 'broad search', make: (client) => octenBroadSearch({ client }), input: { query: 'q' }, path: '/broad-search', fixture: broadFixture },
+  { name: 'news search', make: (client) => octenNewsSearch({ client }), input: { query: 'q' }, path: '/news-search', fixture: newsFixture },
 ];
 
 const PAIRS = ENTRIES.flatMap((aborted) => ENTRIES.filter((other) => other !== aborted).map((other) => ({ aborted, other })));
