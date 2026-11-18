@@ -1,7 +1,7 @@
 import { Octen, OctenTimeoutError, OctenValidationError } from '@octen.ai/sdk';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { OctenToolOptions } from '../src/shared.js';
-import { mergeParams, modelSchema, nonEmpty, requestOptions, resolveClient, trimWebResult } from '../src/shared.js';
+import { mergeParams, modelSchema, nonEmpty, requestOptions, resolveClient, trimWebResult, trimWebResults } from '../src/shared.js';
 
 function caught(fn: () => unknown): unknown {
   try {
@@ -242,5 +242,16 @@ describe('nonEmpty', () => {
   it('returns a non-empty string and undefined for everything else', () => {
     expect(nonEmpty('a')).toBe('a');
     for (const value of ['', null, undefined, 0, 7, {}, ['a']]) expect(nonEmpty(value)).toBeUndefined();
+  });
+});
+
+describe('trimWebResults', () => {
+  it('trims each result and skips null and non-object items', () => {
+    const list = [{ title: 'A', favicon: 'f' }, null, 'text', 7, undefined, ['x'], { url: 'https://b.example' }];
+    expect(trimWebResults(list)).toEqual([{ title: 'A' }, { url: 'https://b.example' }]);
+  });
+
+  it('returns an empty list for a non-array', () => {
+    for (const value of [null, undefined, 'x', 3, {}]) expect(trimWebResults(value)).toEqual([]);
   });
 });

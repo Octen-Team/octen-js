@@ -2,7 +2,7 @@ import type { BusinessSearchParams } from '@octen.ai/sdk';
 import { tool } from 'ai';
 import type { Tool } from 'ai';
 import type { z } from 'zod';
-import { mergeParams, modelSchema, nonEmpty, requestOptions, resolveClient, trimWebResult } from '../shared.js';
+import { mergeParams, modelSchema, nonEmpty, requestOptions, resolveClient, trimWebResults } from '../shared.js';
 import type { ModelWebResult, OctenToolOptions } from '../shared.js';
 
 export type BusinessSearchInput = { query: string };
@@ -59,7 +59,7 @@ export function octenBusinessSearch(
       return {
         request_id: res.request_id,
         entities: (res.data?.entities ?? []).map(trimEntity).filter((e): e is ModelEntity => e !== undefined),
-        results: (res.data?.results ?? []).map(trimWebResult),
+        results: trimWebResults(res.data?.results),
       };
     },
   });

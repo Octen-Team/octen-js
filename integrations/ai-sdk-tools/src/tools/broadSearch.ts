@@ -2,7 +2,7 @@ import type { BroadSearchParams } from '@octen.ai/sdk';
 import { tool } from 'ai';
 import type { Tool } from 'ai';
 import type { z } from 'zod';
-import { mergeParams, modelSchema, requestOptions, resolveClient, trimWebResult } from '../shared.js';
+import { mergeParams, modelSchema, requestOptions, resolveClient, trimWebResults } from '../shared.js';
 import type { ModelWebResult, OctenToolOptions } from '../shared.js';
 
 export type BroadSearchInput = { query: string };
@@ -36,7 +36,7 @@ export function octenBroadSearch(
         queries: res.data?.queries ?? [],
         search_results: (res.data?.search_results ?? []).filter((group) => group != null).map((group) => ({
           ...(group.query ? { query: group.query } : {}),
-          results: (group.results ?? []).map(trimWebResult),
+          results: trimWebResults(group.results),
         })),
       };
     },

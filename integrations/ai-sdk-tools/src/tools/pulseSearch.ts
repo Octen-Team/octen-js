@@ -2,7 +2,7 @@ import type { PulseSearchParams } from '@octen.ai/sdk';
 import { tool } from 'ai';
 import type { Tool } from 'ai';
 import type { z } from 'zod';
-import { mergeParams, modelSchema, requestOptions, resolveClient, trimWebResult } from '../shared.js';
+import { mergeParams, modelSchema, requestOptions, resolveClient, trimWebResults } from '../shared.js';
 import type { ModelWebResult, OctenToolOptions } from '../shared.js';
 
 export type PulseSearchInput = { query: string };
@@ -26,7 +26,7 @@ export function octenPulseSearch(
     execute: async (input: PulseSearchInput, { abortSignal }): Promise<PulseSearchToolResult> => {
       const params = mergeParams<PulseSearchParams>(TOOL_DEFAULTS, options.defaults, input, MODEL_FIELDS);
       const res = await client.search.pulseSearch(params, requestOptions(abortSignal));
-      return { request_id: res.request_id, results: (res.data?.results ?? []).map(trimWebResult) };
+      return { request_id: res.request_id, results: trimWebResults(res.data?.results) };
     },
   });
 }

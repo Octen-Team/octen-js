@@ -100,6 +100,17 @@ describe('octenWebSearch', () => {
     expect((err as OctenAuthenticationError).requestId).toBe('req-401-web');
   });
 
+  it('skips a null item in data.results instead of throwing', async () => {
+    const source = searchFixture.data.results[0]!;
+    const { fakeFetch } = recordingFetch(() =>
+      jsonResponse({ ...searchFixture, data: { query: 'q', results: [null, source] } }),
+    );
+    const t = octenWebSearch({ client: clientFor(fakeFetch) });
+    const out = (await run(t, { query: 'q' })) as { results: Record<string, unknown>[] };
+    expect(out.results).toHaveLength(1);
+    expect(out.results[0]?.['url']).toBe(source.url);
+  });
+
   it('returns an empty list when data.results is null', async () => {
     const { fakeFetch } = recordingFetch(() =>
       jsonResponse({ ...searchFixture, data: { query: 'q', results: null } }),

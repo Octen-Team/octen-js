@@ -2,7 +2,7 @@ import type { SearchParams } from '@octen.ai/sdk';
 import { tool } from 'ai';
 import type { Tool } from 'ai';
 import type { z } from 'zod';
-import { mergeParams, modelSchema, requestOptions, resolveClient, trimWebResult } from '../shared.js';
+import { mergeParams, modelSchema, requestOptions, resolveClient, trimWebResults } from '../shared.js';
 import type { ModelWebResult, OctenToolOptions } from '../shared.js';
 
 export type WebSearchInput = { query: string; time_range?: 'day' | 'week' | 'month' | 'year' };
@@ -24,7 +24,7 @@ export function octenWebSearch(options: OctenToolOptions<SearchParams> = {}): To
     execute: async (input: WebSearchInput, { abortSignal }): Promise<WebSearchToolResult> => {
       const params = mergeParams<SearchParams>(TOOL_DEFAULTS, options.defaults, input, MODEL_FIELDS);
       const res = await client.search.search(params, requestOptions(abortSignal));
-      return { request_id: res.request_id, results: (res.data?.results ?? []).map(trimWebResult) };
+      return { request_id: res.request_id, results: trimWebResults(res.data?.results) };
     },
   });
 }

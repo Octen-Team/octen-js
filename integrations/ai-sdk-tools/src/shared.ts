@@ -101,3 +101,11 @@ export function trimWebResult(r: Partial<Record<keyof ModelWebResult, unknown>>)
 export function nonEmpty(value: unknown): string | undefined {
   return typeof value === 'string' && value !== '' ? value : undefined;
 }
+
+// Lists come from the wire, so a non-array is treated as empty and null or non-object items are skipped.
+export function trimWebResults(list: unknown): ModelWebResult[] {
+  if (!Array.isArray(list)) return [];
+  return list
+    .filter((item): item is Record<string, unknown> => typeof item === 'object' && item !== null && !Array.isArray(item))
+    .map(trimWebResult);
+}

@@ -2,7 +2,7 @@ import type { NewsSearchParams } from '@octen.ai/sdk';
 import { tool } from 'ai';
 import type { Tool } from 'ai';
 import type { z } from 'zod';
-import { mergeParams, modelSchema, nonEmpty, requestOptions, resolveClient, trimWebResult } from '../shared.js';
+import { mergeParams, modelSchema, nonEmpty, requestOptions, resolveClient, trimWebResults } from '../shared.js';
 import type { ModelWebResult, OctenToolOptions } from '../shared.js';
 
 export type NewsSearchInput = { query: string; time_range?: 'day' | 'week' | 'month' | 'year' };
@@ -52,7 +52,7 @@ export function octenNewsSearch(
       const res = await client.search.newsSearch(params, requestOptions(abortSignal));
       return {
         request_id: res.request_id,
-        results: (res.data?.results ?? []).map(trimWebResult),
+        results: trimWebResults(res.data?.results),
         subjects: (res.data?.subjects ?? []).filter((s) => s != null).map(trimSubject),
       };
     },

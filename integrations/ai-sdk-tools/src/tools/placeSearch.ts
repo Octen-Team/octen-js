@@ -2,7 +2,7 @@ import type { PlaceSearchParams } from '@octen.ai/sdk';
 import { tool } from 'ai';
 import type { Tool } from 'ai';
 import type { z } from 'zod';
-import { mergeParams, modelSchema, nonEmpty, requestOptions, resolveClient, trimWebResult } from '../shared.js';
+import { mergeParams, modelSchema, nonEmpty, requestOptions, resolveClient, trimWebResults } from '../shared.js';
 import type { ModelWebResult, OctenToolOptions } from '../shared.js';
 
 export type PlaceSearchInput = { query: string };
@@ -60,12 +60,12 @@ export function octenPlaceSearch(
       const params = mergeParams<PlaceSearchParams>(TOOL_DEFAULTS, options.defaults, input, MODEL_FIELDS);
       const res = await client.placeSearch.search(params, requestOptions(abortSignal));
       const places = (res.data?.places ?? []).filter((p) => p != null).map(trimPlace);
-      const web = res.data?.results ?? [];
+      const web = trimWebResults(res.data?.results);
       // results appears only when the reply carries web results.
       return {
         request_id: res.request_id,
         places,
-        ...(web.length > 0 ? { results: web.map(trimWebResult) } : {}),
+        ...(web.length > 0 ? { results: web } : {}),
       };
     },
   });
