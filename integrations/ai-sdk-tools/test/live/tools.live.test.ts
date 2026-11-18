@@ -11,9 +11,8 @@ import {
   octenWebSearch,
 } from '../../src/index.js';
 
-// Billed calls against production. Skipped unless OCTEN_API_KEY is set.
+// Billed calls against production; test/live/setup.ts fails the run when OCTEN_API_KEY is unset.
 const apiKey = process.env['OCTEN_API_KEY'];
-const live = apiKey ? describe : describe.skip;
 const TIMEOUT = 60_000;
 
 // Inputs are the ones recorded in test/fixtures/README.md.
@@ -32,6 +31,18 @@ async function runTool(t: { execute?: unknown }, input: unknown): Promise<Out> {
 }
 
 const count = (value: unknown): number => (Array.isArray(value) ? value.length : 0);
+
+// A trimmed item must still identify something, so an all-empty item cannot pass as a result.
+function first(out: Out, key: string): Record<string, unknown> {
+  const list = out[key];
+  expect(Array.isArray(list) && list.length > 0, `${key} is a non-empty list`).toBe(true);
+  return (list as Record<string, unknown>[])[0]!;
+}
+
+function expectNamed(item: Record<string, unknown>, keys: string[]) {
+  const named = keys.filter((k) => typeof item[k] === 'string' && item[k] !== '');
+  expect(named.length, `one of ${keys.join(', ')} is a non-empty string`).toBeGreaterThan(0);
+}
 
 // A chat model served by Octen's gateway (not OpenAI's own endpoint); .chat because the Responses path is not served.
 function gatewayModel() {
@@ -60,10 +71,10 @@ function checkSteps(steps: StepLike[], text: string) {
   console.log(`model run: ${steps.length} step(s), ${calls.length} tool call(s)`);
 }
 
-live('live: tools against production', () => {
+describe('live: tools against production', () => {
   it('octenWebSearch execute', { timeout: TIMEOUT }, async () => {
     const out = await runTool(octenWebSearch(), { query: 'solid-state battery breakthroughs', time_range: 'month' });
-    expect(count(out['results'])).toBeGreaterThan(0);
+    expectNamed(first(out, 'results'), ['url', 'title']);
     console.log(`web results ${count(out['results'])}`);
   });
 
@@ -71,12 +82,14 @@ live('live: tools against production', () => {
     const out = await runTool(octenBroadSearch(), { query: 'compare cloud GPU pricing across providers' });
     const groups = out['search_results'] as { results?: unknown[] }[];
     expect(groups.reduce((n, g) => n + count(g.results), 0)).toBeGreaterThan(0);
+    const group = groups.find((g) => count(g.results) > 0)!;
+    expectNamed((group.results as Record<string, unknown>[])[0]!, ['url', 'title']);
     console.log(`broad queries ${count(out['queries'])}, groups ${count(groups)}`);
   });
 
   it('octenNewsSearch execute', { timeout: TIMEOUT }, async () => {
     const out = await runTool(octenNewsSearch(), { query: 'EU AI Act enforcement', time_range: 'week' });
-    expect(count(out['results'])).toBeGreaterThan(0);
+    expectNamed(first(out, 'results'), ['url', 'title']);
     console.log(`news results ${count(out['results'])}, subjects ${count(out['subjects'])}`);
   });
 
@@ -84,7 +97,9 @@ live('live: tools against production', () => {
     const out = await runTool(octenBusinessSearch({ defaults: { entities: { count: 2 } } }), {
       query: 'compare Stripe and Adyen',
     });
-    expect(count(out['entities']) + count(out['results'])).toBeGreaterThan(0);
+    const entity = first(out, 'entities');
+    expectNamed(entity, ['type']);
+    expectNamed(entity, ['name']);
     console.log(`business entities ${count(out['entities'])}, results ${count(out['results'])}`);
   });
 
@@ -92,13 +107,13 @@ live('live: tools against production', () => {
     const out = await runTool(octenPlaceSearch({ defaults: { latitude: 35.6812, longitude: 139.7671, radius: 1000 } }), {
       query: 'coffee shops',
     });
-    expect(count(out['places'])).toBeGreaterThan(0);
+    expectNamed(first(out, 'places'), ['name']);
     console.log(`places ${count(out['places'])}`);
   });
 
   it('octenPulseSearch execute', { timeout: TIMEOUT }, async () => {
     const out = await runTool(octenPulseSearch(), { query: 'github docs' });
-    expect(count(out['results'])).toBeGreaterThan(0);
+    expectNamed(first(out, 'results'), ['url', 'title']);
     console.log(`pulse results ${count(out['results'])}`);
   });
 

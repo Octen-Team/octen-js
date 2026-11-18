@@ -168,4 +168,10 @@ describe('octenWebSearch', () => {
     await run(octenWebSearch({ client: clientFor(fakeFetch) }), { query: 'q', time_range: null });
     expect(calls[0]?.body).toEqual({ query: 'q', count: 5, highlight: { enable: true, max_tokens: 300 } });
   });
+  // The tool default has enable: true, so a body without it proves the developer object replaced it whole.
+  it('replaces the highlight default whole when the developer object omits a key the default has', async () => {
+    const { fakeFetch, calls } = recordingFetch(() => jsonResponse(searchFixture));
+    await run(octenWebSearch({ client: clientFor(fakeFetch), defaults: { highlight: { max_tokens: 600 } } }), { query: 'q' });
+    expect((calls[0]?.body as { highlight?: unknown }).highlight).toEqual({ max_tokens: 600 });
+  });
 });

@@ -36,28 +36,48 @@ const ENTRIES: Entry[] = [
 
 const PAIRS = ENTRIES.flatMap((aborted) => ENTRIES.filter((other) => other !== aborted).map((other) => ({ aborted, other })));
 
+function deferred(): { promise: Promise<void>; resolve: () => void } {
+  let resolve!: () => void;
+  const promise = new Promise<void>((r) => {
+    resolve = r;
+  });
+  return { promise, resolve };
+}
+
+// The same tool on its own client: what the concurrent call must return in full.
+async function soloResult(entry: Entry): Promise<unknown> {
+  const { fakeFetch } = recordingFetch(() => jsonResponse(entry.fixture));
+  return await run(entry.make(clientFor(fakeFetch)), entry.input);
+}
+
 describe('tools sharing one client', () => {
   it.each(PAIRS)('aborting $aborted.name in flight leaves a concurrent $other.name call resolving', async ({ aborted, other }) => {
-    let enteredHang!: () => void;
-    const entered = new Promise<void>((resolve) => {
-      enteredHang = resolve;
-    });
+    const abortedEntered = deferred();
+    const otherEntered = deferred();
+    const releaseOther = deferred();
     const { fakeFetch } = recordingFetch(async (url, init) => {
       if (url.endsWith(aborted.path)) {
         const pending = hangUntilAborted(init);
-        enteredHang();
+        abortedEntered.resolve();
         return await pending;
       }
+      otherEntered.resolve();
+      await releaseOther.promise;
       return jsonResponse(other.fixture);
     });
     const client = clientFor(fakeFetch);
     const controller = new AbortController();
     const abortedCall = run(aborted.make(client), aborted.input, controller.signal).catch((e: unknown) => e);
-    const otherCall = run(other.make(client), other.input);
-    // Abort only after the request is in flight, not before it is sent.
-    await entered;
+    let otherSettled = false;
+    const otherCall = run(other.make(client), other.input).finally(() => {
+      otherSettled = true;
+    });
+    // Both requests are in flight when the abort lands.
+    await Promise.all([abortedEntered.promise, otherEntered.promise]);
     controller.abort();
     expect(await abortedCall).toBeInstanceOf(OctenAbortError);
-    expect(await otherCall).toMatchObject({ request_id: other.fixture.request_id });
+    expect(otherSettled).toBe(false);
+    releaseOther.resolve();
+    expect(await otherCall).toEqual(await soloResult(other));
   });
 });

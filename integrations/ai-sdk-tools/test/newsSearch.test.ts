@@ -200,4 +200,10 @@ describe('octenNewsSearch', () => {
     expect(await validateInput(t, { query: 'q', time_range: 'w' })).toBe(false);
     expect((await modelJsonSchema(t)).required).toEqual(['query']);
   });
+  // The tool default has enable: true, so a body without it proves the developer object replaced it whole.
+  it('replaces the highlight default whole when the developer object omits a key the default has', async () => {
+    const { fakeFetch, calls } = recordingFetch(() => jsonResponse(newsFixture));
+    await run(octenNewsSearch({ client: clientFor(fakeFetch), defaults: { highlight: { max_tokens: 600 } } }), { query: 'q' });
+    expect((calls[0]?.body as { highlight?: unknown }).highlight).toEqual({ max_tokens: 600 });
+  });
 });

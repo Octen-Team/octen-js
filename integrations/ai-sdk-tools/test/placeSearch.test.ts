@@ -227,4 +227,10 @@ describe('octenPlaceSearch', () => {
     const out = (await run(octenPlaceSearch({ client: clientFor(fakeFetch) }), { query: 'q' })) as Out;
     expect(out.places).toEqual([{ name: 'A' }]);
   });
+  // Backs the README claim: the tool default has count: 5, so a body without count proves a whole replace.
+  it('replaces the places default whole when the developer object omits count', async () => {
+    const { fakeFetch, calls } = recordingFetch(() => jsonResponse(placeFixture));
+    await run(octenPlaceSearch({ client: clientFor(fakeFetch), defaults: { places: { max_reviews: 2 } } }), { query: 'q' });
+    expect((calls[0]?.body as { places?: unknown }).places).toEqual({ max_reviews: 2 });
+  });
 });
