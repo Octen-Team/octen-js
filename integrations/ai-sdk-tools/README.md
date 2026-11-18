@@ -94,7 +94,7 @@ const lowLevel = octenWebSearch({ apiKey: 'sk-...', baseURL: 'https://api.octen.
 
 | Option | Meaning |
 |---|---|
-| `client` | An existing `Octen` client to reuse. Passing it together with `apiKey`, `baseURL`, `timeout` or `maxRetries` throws `OctenValidationError`, with `field` naming the conflicting option. |
+| `client` | An existing `Octen` client to reuse. Passing it together with `apiKey`, `baseURL`, `timeout` or `maxRetries` is a type error, and at runtime throws `OctenValidationError`, with `field` naming the conflicting option. |
 | `apiKey`, `baseURL`, `timeout`, `maxRetries` | Same meaning as the SDK's client options. Omitted values fall back to the SDK defaults, including the `OCTEN_API_KEY` lookup. |
 | `description` | Replaces the default tool description that the model reads when it decides whether to call the tool. |
 | `defaults` | Request parameters you fix for every call. The type is the SDK's parameter type for that endpoint (`SearchParams`, `NewsSearchParams` and so on) without `query`. |
@@ -144,7 +144,7 @@ A "web result" below has `title`, `url`, `highlight`, `time_published` and `full
 | Business | `{ request_id, warning?, entities: ModelEntity[], results: WebResult[] }` | `count: 5`, `highlight: { enable: true, max_tokens: 300 }` |
 | Place | `{ request_id, warning?, places: ModelPlace[], results: WebResult[] }` | `places: { count: 5 }` |
 
-- **Business entities.** A company keeps `type`, `name`, `summary` and `website` (taken from `identifiers.website`). A person keeps `type`, `name`, `summary`, `current_position` and `linkedin_url`. An entity type the SDK does not know yet keeps only `type`, `name` and `summary`. An entity without a `type` is dropped.
+- **Business entities.** A company keeps `type`, `name`, `summary` and `website` (taken from `identifiers.website`). A person keeps `type`, `name`, `summary`, `current_position` and `linkedin_url`. An entity type the SDK does not know yet keeps only `type`, `name` and `summary`. An entity without a `type` is dropped. Because an unknown `type` comes through as its own string, checking `e.type === 'company'` alone does not narrow the type: add a key check such as `'website' in e`, or cast to the exported `ModelCompany` or `ModelPerson`.
 - **Places** keep `name`, `category`, `address`, `latitude`, `longitude`, `distance`, `rating`, `review_count`, `opening_hours`, `status`, `phone` and `website`. A value of `0` is kept; only missing values are dropped. `results` is empty unless you turn on web results with `defaults: { web_search: { enable: true } }`.
 - **Full content is off by default.** A web result carries `full_content` only if you turn it on, for example `defaults: { full_content: { enable: true, max_tokens: 1000 } }`. Full content beyond the free allowance is billed separately, and it is a lot of text for the model to read, so the tools leave it off unless you ask for it. Web, News, Business and Pulse take `full_content` at the top level of `defaults`; Broad takes it under `search_options` and Place under `web_search`.
 

@@ -2,15 +2,16 @@ import { Octen, OctenValidationError } from '@octen.ai/sdk';
 import type { RequestOptions } from '@octen.ai/sdk';
 import { z } from 'zod';
 
+export const TIME_RANGES = ['day', 'week', 'month', 'year'] as const;
+export type TimeRange = (typeof TIME_RANGES)[number];
+
+type ClientConfig = { apiKey?: string; baseURL?: string; timeout?: number; maxRetries?: number };
+
+// A union so that passing client with any client option is a compile error; resolveClient checks it at runtime too.
 export type OctenToolOptions<P> = {
-  client?: Octen;
-  apiKey?: string;
-  baseURL?: string;
-  timeout?: number;
-  maxRetries?: number;
   description?: string;
   defaults?: Partial<Omit<P, 'query'>>;
-};
+} & ({ client: Octen } & { [K in keyof ClientConfig]?: never } | { client?: undefined } & ClientConfig);
 
 export type ModelWebResult = {
   title?: string;
@@ -76,7 +77,7 @@ export function modelSchema(
   };
   if (fields.time_range === true && pinned?.['time_range'] === undefined) {
     shape['time_range'] = z
-      .enum(['day', 'week', 'month', 'year'])
+      .enum(TIME_RANGES)
       // Strict-mode providers send null for an optional field; mergeParams drops it.
       .nullable()
       .optional()

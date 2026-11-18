@@ -42,7 +42,8 @@ describe('resolveClient', () => {
     ['maxRetries', { maxRetries: 1 }],
   ] as const)('throws OctenValidationError for client plus %s', (field, extra) => {
     const client = new Octen({ apiKey: 'k' });
-    const err = caught(() => resolveClient({ client, ...extra }));
+    // The type forbids this combination, so a JS caller is simulated with a cast.
+    const err = caught(() => resolveClient({ client, ...extra } as unknown as OctenToolOptions<unknown>));
     expect(err).toBeInstanceOf(OctenValidationError);
     expect((err as OctenValidationError).field).toBe(field);
     expect((err as Error).message).toBe(
@@ -52,7 +53,9 @@ describe('resolveClient', () => {
 
   it('reports the first conflicting key in the order apiKey, baseURL, timeout, maxRetries', () => {
     const client = new Octen({ apiKey: 'k' });
-    const err = caught(() => resolveClient({ client, maxRetries: 1, timeout: 5, baseURL: 'https://example.com' }));
+    const err = caught(() =>
+      resolveClient({ client, maxRetries: 1, timeout: 5, baseURL: 'https://example.com' } as unknown as OctenToolOptions<unknown>),
+    );
     expect((err as OctenValidationError).field).toBe('baseURL');
   });
 

@@ -16,10 +16,10 @@ import {
 import type { ModelWebResult, OctenToolOptions } from '../shared.js';
 
 export type BusinessSearchInput = { query: string };
-export type ModelEntity =
-  | { type: 'company'; name?: string; summary?: string; website?: string }
-  | { type: 'person'; name?: string; summary?: string; current_position?: string; linkedin_url?: string }
-  | { type: string; name?: string; summary?: string };
+export type ModelCompany = { type: 'company'; name?: string; summary?: string; website?: string };
+export type ModelPerson = { type: 'person'; name?: string; summary?: string; current_position?: string; linkedin_url?: string };
+// Unknown types pass through with their real name, so narrowing on type alone is partial.
+export type ModelEntity = ModelCompany | ModelPerson | { type: string; name?: string; summary?: string };
 export type BusinessSearchToolResult = {
   request_id: string;
   warning?: string;

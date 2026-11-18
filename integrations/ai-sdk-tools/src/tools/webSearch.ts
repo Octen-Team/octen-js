@@ -3,9 +3,9 @@ import { tool } from 'ai';
 import type { Tool } from 'ai';
 import type { z } from 'zod';
 import { mergeParams, modelSchema, requestOptions, resolveClient, trimWebResults, warningOf } from '../shared.js';
-import type { ModelWebResult, OctenToolOptions } from '../shared.js';
+import type { ModelWebResult, OctenToolOptions, TimeRange } from '../shared.js';
 
-export type WebSearchInput = { query: string; time_range?: 'day' | 'week' | 'month' | 'year' | null };
+export type WebSearchInput = { query: string; time_range?: TimeRange | null };
 export type WebSearchToolResult = { request_id: string; warning?: string; results: ModelWebResult[] };
 
 const DESCRIPTION =

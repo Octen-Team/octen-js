@@ -13,9 +13,9 @@ import {
   trimWebResults,
   warningOf,
 } from '../shared.js';
-import type { ModelWebResult, OctenToolOptions } from '../shared.js';
+import type { ModelWebResult, OctenToolOptions, TimeRange } from '../shared.js';
 
-export type NewsSearchInput = { query: string; time_range?: 'day' | 'week' | 'month' | 'year' | null };
+export type NewsSearchInput = { query: string; time_range?: TimeRange | null };
 export type NewsSearchToolResult = {
   request_id: string;
   warning?: string;
