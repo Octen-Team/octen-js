@@ -1,7 +1,6 @@
 import type { NewsSearchParams } from '@octen.ai/sdk';
 import { tool } from 'ai';
 import type { Tool } from 'ai';
-import type { z } from 'zod';
 import {
   asList,
   isRecord,
@@ -13,7 +12,7 @@ import {
   trimWebResults,
   warningOf,
 } from '../shared.js';
-import type { ModelWebResult, OctenToolOptions, TimeRange } from '../shared.js';
+import type { ModelField, ModelWebResult, OctenToolOptions, TimeRange } from '../shared.js';
 
 export type NewsSearchInput = { query: string; time_range?: TimeRange | null };
 export type NewsSearchToolResult = {
@@ -27,7 +26,7 @@ const DESCRIPTION =
   'Search recent news. Returns ranked articles with excerpts and publish time, plus storylines that group related coverage. Use it for current events and news monitoring.';
 
 const TOOL_DEFAULTS: Partial<NewsSearchParams> = { count: 5, highlight: { enable: true, max_tokens: 300 } };
-const MODEL_FIELDS = ['query', 'time_range'] as const;
+const MODEL_FIELDS = ['query', 'time_range'] as const satisfies readonly ModelField[];
 
 type Subject = NewsSearchToolResult['subjects'][number];
 
@@ -56,8 +55,7 @@ export function octenNewsSearch(
   const client = resolveClient(options);
   return tool({
     description: options.description ?? DESCRIPTION,
-    // modelSchema is typed loosely, so the input type is stated once here.
-    inputSchema: modelSchema({ query: true, time_range: true }, options.defaults) as unknown as z.ZodType<NewsSearchInput>,
+    inputSchema: modelSchema<NewsSearchInput>(MODEL_FIELDS, options.defaults),
     execute: async (input: NewsSearchInput, { abortSignal }): Promise<NewsSearchToolResult> => {
       const params = mergeParams<NewsSearchParams>(TOOL_DEFAULTS, options.defaults, input, MODEL_FIELDS);
       const res = await client.search.newsSearch(params, requestOptions(abortSignal));

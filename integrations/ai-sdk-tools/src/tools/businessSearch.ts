@@ -1,7 +1,6 @@
 import type { BusinessSearchParams } from '@octen.ai/sdk';
 import { tool } from 'ai';
 import type { Tool } from 'ai';
-import type { z } from 'zod';
 import {
   asList,
   isRecord,
@@ -13,7 +12,7 @@ import {
   trimWebResults,
   warningOf,
 } from '../shared.js';
-import type { ModelWebResult, OctenToolOptions } from '../shared.js';
+import type { ModelField, ModelWebResult, OctenToolOptions } from '../shared.js';
 
 export type BusinessSearchInput = { query: string };
 export type ModelCompany = { type: 'company'; name?: string; summary?: string; website?: string };
@@ -31,7 +30,7 @@ const DESCRIPTION =
   'Look up companies and people. Returns entity cards for companies or people with a summary and key identifiers, plus ranked sources. Use it for company research, people lookup and competitor comparison.';
 
 const TOOL_DEFAULTS: Partial<BusinessSearchParams> = { count: 5, highlight: { enable: true, max_tokens: 300 } };
-const MODEL_FIELDS = ['query'] as const;
+const MODEL_FIELDS = ['query'] as const satisfies readonly ModelField[];
 
 type RawEntity = Record<string, unknown>;
 
@@ -64,8 +63,7 @@ export function octenBusinessSearch(
   const client = resolveClient(options);
   return tool({
     description: options.description ?? DESCRIPTION,
-    // modelSchema is typed loosely, so the input type is stated once here.
-    inputSchema: modelSchema({ query: true }, options.defaults) as unknown as z.ZodType<BusinessSearchInput>,
+    inputSchema: modelSchema<BusinessSearchInput>(MODEL_FIELDS, options.defaults),
     execute: async (input: BusinessSearchInput, { abortSignal }): Promise<BusinessSearchToolResult> => {
       const params = mergeParams<BusinessSearchParams>(TOOL_DEFAULTS, options.defaults, input, MODEL_FIELDS);
       const res = await client.search.businessSearch(params, requestOptions(abortSignal));

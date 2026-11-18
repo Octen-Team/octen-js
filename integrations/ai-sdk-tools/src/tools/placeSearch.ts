@@ -1,7 +1,6 @@
 import type { PlaceSearchParams } from '@octen.ai/sdk';
 import { tool } from 'ai';
 import type { Tool } from 'ai';
-import type { z } from 'zod';
 import {
   asList,
   isRecord,
@@ -13,7 +12,7 @@ import {
   trimWebResults,
   warningOf,
 } from '../shared.js';
-import type { ModelWebResult, OctenToolOptions } from '../shared.js';
+import type { ModelField, ModelWebResult, OctenToolOptions } from '../shared.js';
 
 export type PlaceSearchInput = { query: string };
 export type ModelPlace = {
@@ -36,7 +35,7 @@ const DESCRIPTION =
   "Find places such as shops, restaurants and services, with address, coordinates, rating, opening hours and contact details. Put the area in the query, for example 'coffee near Shibuya, Tokyo', unless a location is already set.";
 
 const TOOL_DEFAULTS: Partial<PlaceSearchParams> = { places: { count: 5 } };
-const MODEL_FIELDS = ['query'] as const;
+const MODEL_FIELDS = ['query'] as const satisfies readonly ModelField[];
 
 const STRING_FIELDS = ['name', 'category', 'address', 'status', 'phone', 'website'] as const;
 const NUMBER_FIELDS = ['latitude', 'longitude', 'distance', 'rating', 'review_count'] as const;
@@ -64,8 +63,7 @@ export function octenPlaceSearch(
   const client = resolveClient(options);
   return tool({
     description: options.description ?? DESCRIPTION,
-    // modelSchema is typed loosely, so the input type is stated once here.
-    inputSchema: modelSchema({ query: true }, options.defaults) as unknown as z.ZodType<PlaceSearchInput>,
+    inputSchema: modelSchema<PlaceSearchInput>(MODEL_FIELDS, options.defaults),
     execute: async (input: PlaceSearchInput, { abortSignal }): Promise<PlaceSearchToolResult> => {
       const params = mergeParams<PlaceSearchParams>(TOOL_DEFAULTS, options.defaults, input, MODEL_FIELDS);
       const res = await client.placeSearch.search(params, requestOptions(abortSignal));

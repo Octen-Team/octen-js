@@ -1,5 +1,6 @@
 import { Octen, OctenTimeoutError, OctenValidationError } from '@octen.ai/sdk';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { z } from 'zod';
 import type { OctenToolOptions } from '../src/shared.js';
 import {
   asList,
@@ -161,44 +162,45 @@ describe('mergeParams', () => {
 });
 
 describe('modelSchema', () => {
+  type Json = { properties: Record<string, { description?: string }>; required?: string[] };
+  const props = (schema: unknown) => Object.keys((z.toJSONSchema(schema as z.ZodType) as Json).properties).sort();
+
   it('accepts query and a valid time_range', () => {
-    const schema = modelSchema({ query: true, time_range: true }, undefined);
+    const schema = modelSchema(['query', 'time_range'], undefined);
     expect(schema.parse({ query: 'a', time_range: 'week' })).toEqual({ query: 'a', time_range: 'week' });
   });
 
   it('accepts a query without time_range', () => {
-    expect(modelSchema({ query: true, time_range: true }, undefined).parse({ query: 'a' })).toEqual({ query: 'a' });
+    expect(modelSchema(['query', 'time_range'], undefined).parse({ query: 'a' })).toEqual({ query: 'a' });
   });
 
   it('rejects the short time_range spelling (spec 4.3: only day|week|month|year)', () => {
-    const schema = modelSchema({ query: true, time_range: true }, undefined);
+    const schema = modelSchema(['query', 'time_range'], undefined);
     expect(schema.safeParse({ query: 'a', time_range: 'w' }).success).toBe(false);
   });
 
   it('rejects a missing query', () => {
-    expect(modelSchema({ query: true }, undefined).safeParse({}).success).toBe(false);
+    expect(modelSchema(['query'], undefined).safeParse({}).success).toBe(false);
   });
 
-  it('omits time_range from the shape when the developer pinned it', () => {
-    const schema = modelSchema({ query: true, time_range: true }, { time_range: 'day' });
-    expect('time_range' in schema.shape).toBe(false);
-    expect('query' in schema.shape).toBe(true);
+  it('omits time_range when the developer pinned it', () => {
+    expect(props(modelSchema(['query', 'time_range'], { time_range: 'day' }))).toEqual(['query']);
   });
 
   it('keeps time_range when the pinned value is undefined', () => {
-    const schema = modelSchema({ query: true, time_range: true }, { time_range: undefined });
-    expect('time_range' in schema.shape).toBe(true);
+    expect(props(modelSchema(['query', 'time_range'], { time_range: undefined }))).toEqual(['query', 'time_range']);
   });
 
   it('has no time_range for query-only tools', () => {
-    expect('time_range' in modelSchema({ query: true }, undefined).shape).toBe(false);
+    expect(props(modelSchema(['query'], undefined))).toEqual(['query']);
   });
 
   it('carries the exact field descriptions', () => {
-    const { shape } = modelSchema({ query: true, time_range: true }, undefined);
-    const description = (field: unknown) => (field as { description?: string } | undefined)?.description;
-    expect(description(shape['query'])).toBe('The search query');
-    expect(description(shape['time_range'])).toBe('Only return results from this recent window. Omit for no time filter.');
+    const json = z.toJSONSchema(modelSchema(['query', 'time_range'], undefined)) as Json;
+    expect(json.properties['query']?.description).toBe('The search query');
+    expect(json.properties['time_range']?.description).toBe(
+      'Only return results from this recent window. Omit for no time filter.',
+    );
   });
 });
 

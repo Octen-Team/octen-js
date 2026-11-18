@@ -21,7 +21,8 @@ export type ModelWebResult = {
   full_content?: string;
 };
 
-export type ModelFieldSpec = { query: true; time_range?: true };
+// The fields a model may send; each tool lists its own once and both its schema and its merge read that list.
+export type ModelField = 'query' | 'time_range';
 
 const CLIENT_KEYS = ['apiKey', 'baseURL', 'timeout', 'maxRetries'] as const;
 
@@ -50,7 +51,7 @@ export function mergeParams<P>(
   toolDefaults: Partial<P>,
   devDefaults: Partial<P> | undefined,
   modelInput: Record<string, unknown>,
-  modelFields: readonly string[],
+  modelFields: readonly ModelField[],
 ): P {
   // An explicit undefined means "not set", so it must not overwrite a tool default.
   const dev: Record<string, unknown> = Object.fromEntries(
@@ -62,20 +63,20 @@ export function mergeParams<P>(
     const value = modelInput[field];
     if (value === undefined || value === null) continue;
     // A field the developer pinned is not in the model schema, so a model value is never honored.
-    if (field !== 'query' && dev[field] !== undefined) continue;
+    if (dev[field] !== undefined) continue;
     fromModel[field] = value;
   }
   return { ...toolDefaults, ...dev, ...fromModel } as P;
 }
 
-export function modelSchema(
-  fields: ModelFieldSpec,
+export function modelSchema<I>(
+  fields: readonly ModelField[],
   pinned: Partial<Record<string, unknown>> | undefined,
-): z.ZodObject<z.ZodRawShape> {
+): z.ZodType<I> {
   const shape: Record<string, z.ZodType> = {
     query: z.string().describe('The search query'),
   };
-  if (fields.time_range === true && pinned?.['time_range'] === undefined) {
+  if (fields.includes('time_range') && pinned?.['time_range'] === undefined) {
     shape['time_range'] = z
       .enum(TIME_RANGES)
       // Strict-mode providers send null for an optional field; mergeParams drops it.
@@ -83,7 +84,8 @@ export function modelSchema(
       .optional()
       .describe('Only return results from this recent window. Omit for no time filter.');
   }
-  return z.object(shape);
+  // The shape is built at runtime, so the tool's declared input type is asserted here, once.
+  return z.object(shape) as unknown as z.ZodType<I>;
 }
 
 export function requestOptions(abortSignal: AbortSignal | undefined): RequestOptions {

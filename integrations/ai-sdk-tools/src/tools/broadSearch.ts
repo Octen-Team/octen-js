@@ -1,7 +1,6 @@
 import type { BroadSearchParams } from '@octen.ai/sdk';
 import { tool } from 'ai';
 import type { Tool } from 'ai';
-import type { z } from 'zod';
 import {
   asList,
   isRecord,
@@ -13,7 +12,7 @@ import {
   trimWebResults,
   warningOf,
 } from '../shared.js';
-import type { ModelWebResult, OctenToolOptions } from '../shared.js';
+import type { ModelField, ModelWebResult, OctenToolOptions } from '../shared.js';
 
 export type BroadSearchInput = { query: string };
 export type BroadSearchToolResult = {
@@ -28,7 +27,7 @@ const DESCRIPTION =
 
 // Broad takes its highlight option under search_options; count and max_queries use the API defaults.
 const TOOL_DEFAULTS: Partial<BroadSearchParams> = { search_options: { highlight: { enable: true, max_tokens: 300 } } };
-const MODEL_FIELDS = ['query'] as const;
+const MODEL_FIELDS = ['query'] as const satisfies readonly ModelField[];
 
 export function octenBroadSearch(
   options: OctenToolOptions<BroadSearchParams> = {},
@@ -37,8 +36,7 @@ export function octenBroadSearch(
   const client = resolveClient(options);
   return tool({
     description: options.description ?? DESCRIPTION,
-    // modelSchema is typed loosely, so the input type is stated once here.
-    inputSchema: modelSchema({ query: true }, options.defaults) as unknown as z.ZodType<BroadSearchInput>,
+    inputSchema: modelSchema<BroadSearchInput>(MODEL_FIELDS, options.defaults),
     execute: async (input: BroadSearchInput, { abortSignal }): Promise<BroadSearchToolResult> => {
       const params = mergeParams<BroadSearchParams>(TOOL_DEFAULTS, options.defaults, input, MODEL_FIELDS);
       const res = await client.search.broadSearch(params, requestOptions(abortSignal));
