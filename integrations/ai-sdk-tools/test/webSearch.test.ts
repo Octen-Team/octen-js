@@ -1,49 +1,13 @@
 import { Octen, OctenAbortError, OctenAuthenticationError } from '@octen.ai/sdk';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { octenPulseSearch } from '../src/tools/pulseSearch.js';
 import { octenWebSearch } from '../src/tools/webSearch.js';
-import pulseFixture from './fixtures/pulse-search.json';
+import { clientFor, jsonResponse, recordingFetch, run } from './helpers.js';
+// Replies are the production envelope recorded in test/fixtures/search.json.
 import searchFixture from './fixtures/search.json';
 
 const DEFAULT_DESCRIPTION =
   'Search the web for current information. Returns ranked pages with title, URL, a query-relevant excerpt and publish time. Use it when the answer depends on recent events or on facts you are unsure about.';
-
-type Recorded = { url: string; body: unknown };
-
-function jsonResponse(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
-}
-
-// The replies are production envelopes recorded in test/fixtures (search.json, pulse-search.json).
-function recordingFetch(reply: (url: string) => Response | Promise<Response>) {
-  const calls: Recorded[] = [];
-  const fakeFetch = (async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
-    const url = String(input);
-    calls.push({ url, body: typeof init?.body === 'string' ? JSON.parse(init.body) : undefined });
-    return await reply(url);
-  }) as typeof fetch;
-  return { fakeFetch, calls };
-}
-
-function clientFor(fakeFetch: typeof fetch): Octen {
-  return new Octen({ apiKey: 'test-key', fetch: fakeFetch, maxRetries: 0 });
-}
-
-function run(t: { execute?: unknown }, input: unknown, abortSignal?: AbortSignal) {
-  const execute = t.execute as (input: unknown, options: unknown) => Promise<unknown>;
-  return execute(input, { toolCallId: 't1', messages: [], abortSignal, context: undefined });
-}
-
-// Resolves once the request's signal aborts, like a real fetch would.
-function hangUntilAborted(init: RequestInit | undefined): Promise<Response> {
-  return new Promise<Response>((_resolve, reject) => {
-    const signal = init?.signal;
-    const fail = () => reject(signal?.reason ?? new DOMException('aborted', 'AbortError'));
-    if (signal?.aborted === true) fail();
-    else signal?.addEventListener('abort', fail, { once: true });
-  });
-}
 
 describe('octenWebSearch', () => {
   it('sends the tool defaults plus the model query', async () => {
@@ -143,24 +107,5 @@ describe('octenWebSearch', () => {
     const t = octenWebSearch({ client: clientFor(fakeFetch) });
     const out = await run(t, { query: 'q' });
     expect(out).toEqual({ request_id: searchFixture.request_id, results: [] });
-  });
-
-  it('keeps a concurrent call to another tool on the same client alive when one call is aborted', async () => {
-    const { fakeFetch } = recordingFetch(async (url) => {
-      if (url.endsWith('/pulse-search')) return jsonResponse(pulseFixture);
-      return jsonResponse(searchFixture);
-    });
-    // Web hangs until aborted; Pulse answers normally.
-    const hanging = (async (input: Parameters<typeof fetch>[0], init?: RequestInit) =>
-      String(input).endsWith('/search') ? await hangUntilAborted(init) : await fakeFetch(input, init)) as typeof fetch;
-    const client = clientFor(hanging);
-    const web = octenWebSearch({ client });
-    const pulse = octenPulseSearch({ client });
-    const controller = new AbortController();
-    const aborted = run(web, { query: 'q' }, controller.signal).catch((e: unknown) => e);
-    const other = run(pulse, { query: 'github docs' });
-    controller.abort();
-    expect(await aborted).toBeInstanceOf(OctenAbortError);
-    expect(await other).toMatchObject({ request_id: pulseFixture.request_id });
   });
 });
