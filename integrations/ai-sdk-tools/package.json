@@ -50,7 +50,7 @@
     "access": "public"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.types.json --noEmit",
     "test": "vitest run",
     "test:live": "vitest run --config vitest.live.config.ts",
     "build": "tsup",

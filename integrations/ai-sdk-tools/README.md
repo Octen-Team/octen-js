@@ -10,6 +10,7 @@
 - [Errors and cancellation](#errors-and-cancellation)
 - [Retries and billing](#retries-and-billing)
 - [Supported versions](#supported-versions)
+- [License](#license)
 
 ## Install
 
@@ -102,7 +103,7 @@ The factory builds one client and every call of that tool reuses it.
 
 **Precedence.** For each request parameter, the first of these that sets it wins:
 
-1. what the model sends (only `query` and `time_range`);
+1. what the model sends (only `query` and `time_range`; a field you pinned in `defaults` is not in its schema, and a value for it is ignored);
 2. your `defaults`;
 3. the tool's built-in defaults, listed under [What the model sees](#what-the-model-sees).
 
@@ -113,11 +114,11 @@ The factory builds one client and every call of that tool reuses it.
 ```ts
 import { octenBroadSearch, octenPlaceSearch, octenWebSearch } from '@octen.ai/ai-sdk-tools';
 
-// The built-in default is highlight: { enable: true, max_tokens: 300 }.
-// This replaces it as a whole, so highlights stay on only because enable is set again.
+// The tool's default is highlight: { enable: true, max_tokens: 300 }.
+// Your object replaces it entirely, so the request carries only the fields you set here.
 const longerHighlights = octenWebSearch({ defaults: { highlight: { enable: true, max_tokens: 600 } } });
 
-// The built-in default is places: { count: 5 }. This replaces it, so count falls back to the API default.
+// The tool's default is places: { count: 5 }. Your object replaces it entirely, so the request carries no count.
 const withReviews = octenPlaceSearch({ defaults: { places: { max_reviews: 2 } } });
 
 // Broad Search takes its highlight option under search_options, which is replaced as a whole too.
@@ -130,7 +131,7 @@ An explicit `undefined` in `defaults` means "not set" and does not override a bu
 
 ## What the model sees
 
-Tool results go into the model's context, so `execute` returns a trimmed copy of the response with only the fields a model can use, and every result carries the `request_id`. Fields that are empty or missing are left out; the model never sees `null` or `""`. There is no switch to return the raw response. If you need it, call [`@octen.ai/sdk`](https://github.com/Octen-Team/octen-js) directly.
+Tool results go into the model's context, so `execute` returns a trimmed copy of the response with only the fields a model can use, and every result carries the `request_id`. Empty or missing fields of results, entities, places and subjects are left out instead of being sent as `null` or `""`. There is no switch to return the raw response. If you need it, call [`@octen.ai/sdk`](https://github.com/Octen-Team/octen-js) directly.
 
 A "web result" below has `title`, `url`, `highlight`, `time_published` and `full_content`, each present only when the API returned a non-empty value.
 
@@ -138,15 +139,14 @@ A "web result" below has `title`, `url`, `highlight`, `time_published` and `full
 |---|---|---|
 | Web | `{ request_id, results: WebResult[] }` | `count: 5`, `highlight: { enable: true, max_tokens: 300 }` |
 | Pulse | `{ request_id, results: WebResult[] }` | `count: 5` |
-| Broad | `{ request_id, queries: string[], search_results: { query?, results: WebResult[] }[] }` | `search_options: { highlight: { enable: true, max_tokens: 300 } }`; `count` and `max_queries` use the API defaults |
+| Broad | `{ request_id, queries: string[], search_results: { query?, results: WebResult[] }[] }` | `search_options: { highlight: { enable: true, max_tokens: 300 } }`; the tool sends no `count` or `max_queries` |
 | News | `{ request_id, results: WebResult[], subjects: { name?, summary?, time_latest?, top_news?: { title?, url? } }[] }` | `count: 5`, `highlight: { enable: true, max_tokens: 300 }` |
 | Business | `{ request_id, entities: ModelEntity[], results: WebResult[] }` | `count: 5`, `highlight: { enable: true, max_tokens: 300 }` |
 | Place | `{ request_id, places: ModelPlace[], results?: WebResult[] }` | `places: { count: 5 }` |
 
-- **Business entities.** A company keeps `type`, `name`, `summary` and `website` (taken from `identifiers.website`). A person keeps `type`, `name`, `summary`, `current_position` and `linkedin_url`. An entity type the SDK does not know yet keeps only `type`, `name` and `summary`.
+- **Business entities.** A company keeps `type`, `name`, `summary` and `website` (taken from `identifiers.website`). A person keeps `type`, `name`, `summary`, `current_position` and `linkedin_url`. An entity type the SDK does not know yet keeps only `type`, `name` and `summary`. An entity without a `type` is dropped.
 - **Places** keep `name`, `category`, `address`, `latitude`, `longitude`, `distance`, `rating`, `review_count`, `opening_hours`, `status`, `phone` and `website`. A value of `0` is kept; only missing values are dropped. `results` is present only when the response includes web results, which you turn on with `defaults: { web_search: { enable: true } }`.
 - **Full content is off by default.** A web result carries `full_content` only if you turn it on, for example `defaults: { full_content: { enable: true, max_tokens: 1000 } }`. Full content beyond the free allowance is billed separately, and it is a lot of text for the model to read, so the tools leave it off unless you ask for it. Web, News, Business and Pulse take `full_content` at the top level of `defaults`; Broad takes it under `search_options` and Place under `web_search`.
-- **What is exposed to the model.** Only `query`, plus `time_range` on Web and News, and only while you have not pinned `time_range` in `defaults`. Each field has a short description the model reads together with the tool description.
 
 ## Errors and cancellation
 
@@ -167,7 +167,7 @@ function describeError(err: unknown): string {
 }
 ```
 
-**Cancellation.** Each tool forwards the `abortSignal` it receives from the AI SDK to the SDK as `signal`. Aborting that signal cancels the in-flight search request, the SDK stops retrying, and the tool throws `OctenAbortError`. In `generateText` and `streamText` you set it through their own `abortSignal` option:
+**Cancellation.** Each tool forwards the `abortSignal` it receives from the AI SDK to the SDK as `signal`. Aborting that signal cancels the in-flight search request, the SDK stops retrying, and the tool throws `OctenAbortError`. `generateText` and `streamText` both take an `abortSignal` option:
 
 ```ts
 import { generateText, stepCountIs } from 'ai';
@@ -184,6 +184,23 @@ await generateText({
   abortSignal: controller.signal,
   prompt: 'Summarize this week in open-source AI.',
 });
+```
+
+```ts
+import { streamText, stepCountIs } from 'ai';
+import { anthropic } from '@ai-sdk/anthropic';
+import { octenWebSearch } from '@octen.ai/ai-sdk-tools';
+
+const streamController = new AbortController();
+
+const result = streamText({
+  model: anthropic('claude-opus-5-5'),
+  tools: { webSearch: octenWebSearch() },
+  stopWhen: stepCountIs(5),
+  abortSignal: streamController.signal,
+  prompt: 'Summarize this week in open-source AI.',
+});
+for await (const chunk of result.textStream) process.stdout.write(chunk);
 ```
 
 <!-- per-version tool error behavior: filled in after the version matrix -->
@@ -210,7 +227,7 @@ import { octenWebSearch } from '@octen.ai/ai-sdk-tools';
 const strict = octenWebSearch({ maxRetries: 0 });
 ```
 
-Keep in mind that each tool call the model makes is a separate Octen request. `stopWhen` bounds how many steps one `generateText` call can take.
+Keep in mind that each tool call the model makes is a separate Octen request, and a single step can contain several tool calls. `stopWhen` limits the number of steps, not the number of billed searches.
 
 ## Supported versions
 

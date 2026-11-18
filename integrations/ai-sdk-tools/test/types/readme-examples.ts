@@ -1,7 +1,7 @@
 // Every TypeScript block in README.md, one function per block so names do not clash.
 // test/readmeExamples.test.ts checks that the README and this file stay in step.
 
-import { generateText, stepCountIs } from 'ai';
+import { generateText, stepCountIs, streamText } from 'ai';
 import { anthropic } from '@ai-sdk/anthropic';
 import { octenBroadSearch, octenNewsSearch, octenPlaceSearch, octenWebSearch } from '@octen.ai/ai-sdk-tools';
 import { Octen, OctenAPIError, OctenError } from '@octen.ai/sdk';
@@ -40,11 +40,11 @@ export async function optionsAndPrecedence(): Promise<void> {
 }
 
 export async function topLevelMerge(): Promise<void> {
-  // The built-in default is highlight: { enable: true, max_tokens: 300 }.
-  // This replaces it as a whole, so highlights stay on only because enable is set again.
+  // The tool's default is highlight: { enable: true, max_tokens: 300 }.
+  // Your object replaces it entirely, so the request carries only the fields you set here.
   const longerHighlights = octenWebSearch({ defaults: { highlight: { enable: true, max_tokens: 600 } } });
 
-  // The built-in default is places: { count: 5 }. This replaces it, so count falls back to the API default.
+  // The tool's default is places: { count: 5 }. Your object replaces it entirely, so the request carries no count.
   const withReviews = octenPlaceSearch({ defaults: { places: { max_reviews: 2 } } });
 
   // Broad Search takes its highlight option under search_options, which is replaced as a whole too.
@@ -77,6 +77,19 @@ export async function cancellation(): Promise<void> {
     abortSignal: controller.signal,
     prompt: 'Summarize this week in open-source AI.',
   });
+}
+
+export async function streamCancellation(): Promise<void> {
+  const streamController = new AbortController();
+
+  const result = streamText({
+    model: anthropic('claude-opus-5-5'),
+    tools: { webSearch: octenWebSearch() },
+    stopWhen: stepCountIs(5),
+    abortSignal: streamController.signal,
+    prompt: 'Summarize this week in open-source AI.',
+  });
+  for await (const chunk of result.textStream) process.stdout.write(chunk);
 }
 
 export async function noRetries(): Promise<void> {
