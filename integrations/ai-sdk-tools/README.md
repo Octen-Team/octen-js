@@ -167,7 +167,7 @@ function describeError(err: unknown): string {
 }
 ```
 
-**Cancellation.** Each tool forwards the `abortSignal` it receives from the AI SDK to the SDK as `signal`. Aborting that signal cancels the in-flight search request, the SDK stops retrying, and the tool throws `OctenAbortError`. `generateText` and `streamText` both take an `abortSignal` option:
+**Cancellation.** Each tool forwards the `abortSignal` it receives from the AI SDK to the SDK as `signal`. Aborting that signal cancels the in-flight search request, the SDK stops retrying, and the tool throws `OctenAbortError`. `generateText` and `streamText` both take an `abortSignal` option. An abort makes `generateText` reject (see [What the AI SDK does with the error](#what-the-ai-sdk-does-with-the-error)), so catch it:
 
 ```ts
 import { generateText, stepCountIs } from 'ai';
@@ -177,13 +177,19 @@ import { octenWebSearch } from '@octen.ai/ai-sdk-tools';
 const controller = new AbortController();
 setTimeout(() => controller.abort(), 20_000);
 
-await generateText({
-  model: anthropic('claude-opus-5-5'),
-  tools: { webSearch: octenWebSearch() },
-  stopWhen: stepCountIs(5),
-  abortSignal: controller.signal,
-  prompt: 'Summarize this week in open-source AI.',
-});
+try {
+  await generateText({
+    model: anthropic('claude-opus-5-5'),
+    tools: { webSearch: octenWebSearch() },
+    stopWhen: stepCountIs(5),
+    abortSignal: controller.signal,
+    prompt: 'Summarize this week in open-source AI.',
+  });
+} catch (err) {
+  // The rejection is the signal's AbortError, not the tool's OctenAbortError.
+  if (err instanceof Error && err.name === 'AbortError') console.log('Cancelled.');
+  else throw err;
+}
 ```
 
 ```ts
@@ -203,14 +209,21 @@ const result = streamText({
 for await (const chunk of result.textStream) process.stdout.write(chunk);
 ```
 
-**What the AI SDK does with the error.** A failing search does not make `generateText` or `streamText` reject, in `ai` 5, 6 and 7 alike. The AI SDK catches the error and records a `tool-error` part for that tool call, whose `error` is the original SDK error with its `requestId`. The model's next step receives the failure as an `error-text` tool result and can answer or try again. The model sees the error message (`invalid api key`) in `ai` 5 and 6, and the class name plus the message (`OctenAuthenticationError: invalid api key`) in `ai` 7; it never sees the `requestId`. `streamText` emits the same failure as a `tool-error` part in `fullStream`. This was observed with the version matrix (see [Supported versions](#supported-versions)) for a search that fails with HTTP 401.
+### What the AI SDK does with the error
 
-Because the call still succeeds, a problem such as a wrong API key only shows in the model's answer unless you look for it. Check the steps for tool errors:
+The version matrix (see [Supported versions](#supported-versions)) ran three kinds of failing search through `generateText` and `streamText` in `ai` 5, 6 and 7. All three majors behaved the same, except for the error text noted below.
+
+- **API error (HTTP 401) or connection error (connection refused).** `generateText` does not reject. It records a `tool-error` part for that tool call, whose `error` is the SDK error: `OctenAuthenticationError` with its `status` and `requestId`, or `OctenConnectionError`. The next model call receives the error text as an `error-text` tool result. That text is the error message (`invalid api key`) in `ai` 5 and 6, and the class name followed by the message (`OctenAuthenticationError: invalid api key`) in `ai` 7. It does not include the `requestId`. `streamText` emits the same `tool-error` part in `fullStream` and then calls the model again.
+- **Abort while the search is in flight** (`controller.abort()` called without a reason). The tool throws `OctenAbortError`, but `generateText` rejects with a `DOMException` named `AbortError` instead, and the model is not called again. `streamText` does not throw: `fullStream` emits an `abort` part and no `tool-error` part, then ends.
+
+Other failures, such as a client timeout, were not part of the matrix.
+
+Because API and connection errors do not reject the call, a problem such as a wrong API key only shows in the model's answer unless you look for it. Check the steps for tool errors:
 
 ```ts
 import { generateText, stepCountIs } from 'ai';
 import { anthropic } from '@ai-sdk/anthropic';
-import { OctenAPIError } from '@octen.ai/sdk';
+import { OctenAPIError, OctenError } from '@octen.ai/sdk';
 import { octenWebSearch } from '@octen.ai/ai-sdk-tools';
 
 const result = await generateText({
@@ -220,8 +233,9 @@ const result = await generateText({
   prompt: 'What changed in the latest Node.js LTS release?',
 });
 for (const part of result.steps.flatMap((step) => step.content)) {
-  if (part.type === 'tool-error' && part.error instanceof OctenAPIError) {
-    console.error(`${part.toolName} failed: ${part.error.status} (request ${part.error.requestId})`);
+  if (part.type === 'tool-error' && part.error instanceof OctenError) {
+    const api = part.error instanceof OctenAPIError ? ` (status ${part.error.status}, request ${part.error.requestId})` : '';
+    console.error(`${part.toolName} failed: ${part.error.name}: ${part.error.message}${api}`);
   }
 }
 ```
@@ -252,13 +266,22 @@ Keep in mind that each tool call the model makes is a separate Octen request, an
 
 ## Supported versions
 
-| Package | Range | Verified with |
-|---|---|---|
-| `ai` | `^5.0.0 \|\| ^6.0.0 \|\| ^7.0.0` | 5.0.291, 6.0.333, 7.0.176 |
-| `zod` | `^3.25.76 \|\| ^4.1.8` | 3.25.76, 4.1.8, 4.6.7 |
-| Node | 20 or newer | 20.20.2, 24.18.0 |
+| Package | Range |
+|---|---|
+| `ai` | `^5.0.0 \|\| ^6.0.0 \|\| ^7.0.0` |
+| `zod` | `^3.25.76 \|\| ^4.1.8` |
+| Node | 20 or newer |
 
-The package declares `ai` and `zod` as peer dependency ranges, and the ranges are verified by a version matrix (`scripts/matrix.sh` in the repository), last run on 2026-11-18. It covers each of the three `ai` versions with each of the two `zod` versions under Node 24.18.0, plus the latest releases on that date (`ai` 7.0.176 with `zod` 4.6.7) under Node 20.20.2 and 24.18.0. For every combination it drives `generateText` and `streamText` with the AI SDK's mock model through a search and an answer, and type-checks a project that uses all six tools with `strict` and `skipLibCheck: false`.
+The package declares `ai` and `zod` as peer dependency ranges. A version matrix (`scripts/matrix.sh` in the repository) checks them; on 2026-11-18 it passed for exactly these eight combinations:
+
+| `ai` | `zod` | Node |
+|---|---|---|
+| 5.0.291 | 3.25.76, 4.1.8 | 24.18.0 |
+| 6.0.333 | 3.25.76, 4.1.8 | 24.18.0 |
+| 7.0.176 | 3.25.76, 4.1.8 | 24.18.0 |
+| 7.0.176 | 4.6.7 | 20.20.2, 24.18.0 |
+
+`ai` 5 and 6 were run on Node 24 only, `zod` 4.6.7 only with `ai` 7.0.176, and Node 20 only with `ai` 7.0.176 and `zod` 4.6.7. For each combination the matrix drives `generateText` and `streamText` with the AI SDK's mock model through a search and an answer, records how the failures described under [What the AI SDK does with the error](#what-the-ai-sdk-does-with-the-error) surface, and type-checks a project that uses all six tools with TypeScript 6.0.3, `strict` and `skipLibCheck: false`. With `skipLibCheck: false` you also need `@types/json-schema`, because the AI SDK's own declarations import `json-schema`.
 
 The public types do not mention zod, so whether you use zod 3 or 4 does not affect your type checking. `ai` 4 is not supported: it uses `parameters` where this package uses the `inputSchema` form of `tool()`.
 

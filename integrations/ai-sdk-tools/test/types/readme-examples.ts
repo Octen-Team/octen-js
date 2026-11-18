@@ -70,13 +70,19 @@ export async function cancellation(): Promise<void> {
   const controller = new AbortController();
   setTimeout(() => controller.abort(), 20_000);
 
-  await generateText({
-    model: anthropic('claude-opus-5-5'),
-    tools: { webSearch: octenWebSearch() },
-    stopWhen: stepCountIs(5),
-    abortSignal: controller.signal,
-    prompt: 'Summarize this week in open-source AI.',
-  });
+  try {
+    await generateText({
+      model: anthropic('claude-opus-5-5'),
+      tools: { webSearch: octenWebSearch() },
+      stopWhen: stepCountIs(5),
+      abortSignal: controller.signal,
+      prompt: 'Summarize this week in open-source AI.',
+    });
+  } catch (err) {
+    // The rejection is the signal's AbortError, not the tool's OctenAbortError.
+    if (err instanceof Error && err.name === 'AbortError') console.log('Cancelled.');
+    else throw err;
+  }
 }
 
 export async function streamCancellation(): Promise<void> {
@@ -100,8 +106,9 @@ export async function toolErrors(): Promise<void> {
     prompt: 'What changed in the latest Node.js LTS release?',
   });
   for (const part of result.steps.flatMap((step) => step.content)) {
-    if (part.type === 'tool-error' && part.error instanceof OctenAPIError) {
-      console.error(`${part.toolName} failed: ${part.error.status} (request ${part.error.requestId})`);
+    if (part.type === 'tool-error' && part.error instanceof OctenError) {
+      const api = part.error instanceof OctenAPIError ? ` (status ${part.error.status}, request ${part.error.requestId})` : '';
+      console.error(`${part.toolName} failed: ${part.error.name}: ${part.error.message}${api}`);
     }
   }
 }
