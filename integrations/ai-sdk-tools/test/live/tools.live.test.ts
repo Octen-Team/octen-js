@@ -1,3 +1,4 @@
+import { createAnthropic } from '@ai-sdk/anthropic';
 import { createOpenAI } from '@ai-sdk/openai';
 import { generateText, stepCountIs, streamText } from 'ai';
 import { describe, expect, it } from 'vitest';
@@ -37,6 +38,12 @@ function gatewayModel() {
   return createOpenAI({ baseURL: 'https://api.octen.ai/v1', apiKey: apiKey ?? '' }).chat(MODEL_ID);
 }
 
+const STREAM_MODEL_ID = 'anthropic/claude-sonnet-5.5';
+
+function messagesModel() {
+  return createAnthropic({ baseURL: 'https://api.octen.ai/v1', apiKey: apiKey ?? '' })(STREAM_MODEL_ID);
+}
+
 type StepLike = { toolCalls: unknown[]; toolResults: { toolName: string; output: unknown }[] };
 
 function checkSteps(steps: StepLike[], text: string) {
@@ -50,7 +57,7 @@ function checkSteps(steps: StepLike[], text: string) {
     expect(id).toBeTruthy();
   }
   expect(text.trim().length).toBeGreaterThan(0);
-  console.log(`model run: ${steps.length} step(s), ${calls.length} tool call(s), model ${MODEL_ID}`);
+  console.log(`model run: ${steps.length} step(s), ${calls.length} tool call(s)`);
 }
 
 live('live: tools against production', () => {
@@ -105,9 +112,11 @@ live('live: tools against production', () => {
     checkSteps(result.steps as unknown as StepLike[], result.text);
   });
 
-  it('streamText calls octenWebSearch through the gateway model', { timeout: TIMEOUT }, async () => {
+  // Uses the messages endpoint: the chat-completions stream currently ends with a usage chunk
+  // that @ai-sdk/openai rejects.
+  it('streamText calls octenWebSearch through the gateway messages endpoint', { timeout: TIMEOUT }, async () => {
     const result = streamText({
-      model: gatewayModel(),
+      model: messagesModel(),
       tools: { webSearch: octenWebSearch() },
       stopWhen: stepCountIs(3),
       prompt: PROMPT,
