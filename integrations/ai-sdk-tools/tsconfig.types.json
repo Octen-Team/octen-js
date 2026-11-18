@@ -1,0 +1,8 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "paths": { "@octen.ai/ai-sdk-tools": ["./src/index.ts"] }
+  },
+  "include": ["test/types"],
+  "exclude": []
+}
