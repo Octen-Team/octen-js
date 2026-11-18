@@ -66,7 +66,9 @@ jobs:
       # The matrix installs this tarball in place of the published SDK, so it tests this commit.
       - name: Pack the SDK from this commit
         working-directory: .
-        run: echo "MATRIX_SDK=$RUNNER_TEMP/$(npm pack --pack-destination "$RUNNER_TEMP" --silent)" >> "$GITHUB_ENV"
+        run: |
+          f=$(npm pack --pack-destination "$RUNNER_TEMP" --silent)
+          echo "MATRIX_SDK=$RUNNER_TEMP/$f" >> "$GITHUB_ENV"
       - run: npm ci
       # Overrides the published SDK from the lockfile with this commit's source; --no-save keeps the lockfile clean.
       - name: Link the SDK from this commit
@@ -75,6 +77,17 @@ jobs:
         run: npm run typecheck
       - run: npm test
       - run: npm run build
+      - name: Check packed artifacts (ESM, CJS, d.ts)
+        run: |
+          npm pack --dry-run --json | node -e "
+            const files = JSON.parse(require('fs').readFileSync(0, 'utf8'))[0].files.map((f) => f.path);
+            const need = ['dist/index.js', 'dist/index.cjs', 'dist/index.d.ts', 'dist/index.d.cts'];
+            const missing = need.filter((n) => !files.includes(n));
+            if (missing.length) { console.error('missing from package:', missing); process.exit(1); }
+            console.log('package contains', need.join(', '));
+          "
+      - name: Build a tool from the CommonJS bundle
+        run: node -e "const t=require('./dist/index.cjs').octenWebSearch({apiKey:'k'}); if (typeof t.execute!=='function') process.exit(1)"
       # Newest and oldest ai/zod pairs only; the full matrix runs locally and in the release workflow.
       - name: Version matrix, newest pair
         if: matrix.node-version == 24

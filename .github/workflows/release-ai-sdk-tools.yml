@@ -71,5 +71,6 @@ jobs:
           echo "npm $(npm --version)"
       # No NODE_AUTH_TOKEN: with id-token: write and a trusted publisher configured on npmjs.com
       # (repo Octen-Team/octen-js, workflow release-ai-sdk-tools.yml), npm authenticates via OIDC.
+      # --ignore-scripts: the verify job already ran the checks, and the Build step above made dist.
       - name: Publish to npm (OIDC, provenance)
-        run: npm publish --provenance --access public
+        run: npm publish --provenance --access public --ignore-scripts
