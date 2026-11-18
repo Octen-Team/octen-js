@@ -1,0 +1,75 @@
+{
+  "name": "@octen.ai/ai-sdk-tools",
+  "version": "0.1.0",
+  "description": "Octen search tools for the Vercel AI SDK",
+  "keywords": [
+    "octen",
+    "ai-sdk",
+    "vercel",
+    "tools",
+    "web-search"
+  ],
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Octen-Team/octen-js.git",
+    "directory": "integrations/ai-sdk-tools"
+  },
+  "homepage": "https://github.com/Octen-Team/octen-js/tree/main/integrations/ai-sdk-tools#readme",
+  "bugs": {
+    "url": "https://github.com/Octen-Team/octen-js/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:live": "vitest run --config vitest.live.config.ts",
+    "build": "tsup",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build"
+  },
+  "dependencies": {
+    "@octen.ai/sdk": "^0.1.0"
+  },
+  "peerDependencies": {
+    "ai": "^5.0.0 || ^6.0.0 || ^7.0.0",
+    "zod": "^3.25.76 || ^4.1.8"
+  },
+  "devDependencies": {
+    "@octen.ai/sdk": "0.1.0",
+    "@types/node": "20.19.43",
+    "ai": "7.0.176",
+    "tsup": "8.5.1",
+    "typescript": "6.0.3",
+    "vitest": "4.1.12",
+    "zod": "4.6.7"
+  }
+}
