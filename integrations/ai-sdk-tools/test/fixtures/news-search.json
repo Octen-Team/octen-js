@@ -1,0 +1,235 @@
+{
+  "data": {
+    "query": "EU AI Act enforcement",
+    "results": [
+      {
+        "title": "What the EU AI Act and the AI Omnibus Package Tell Us About the EU’s Regulatory Learning Curve",
+        "url": "https://www.americanbar.org/groups/intellectual_property_law/resources/landslide/2026-fall/what-eu-ai-act-ai-omnibus-package-tell-us-about-eus-regulatory-learning-curve/",
+        "highlight": "Placeholder highlight text.",
+        "time_published": "2026-11-13T00:00:00Z",
+        "time_last_crawled": "2026-11-13T13:35:55Z",
+        "favicon": "https://www.americanbar.org/etc/designs/aba-cms-dotorg/favicon.ico",
+        "cover_image": {
+          "url": "https://www.americanbar.org/content/dam/aba/images/aba-stock/16x9/16x9-stairs-1461524068.jpg",
+          "description": ""
+        }
+      },
+      {
+        "title": "Between Obligations and Evidence: A Participatory Study of Translating the EU AI Act into Technical Requirements",
+        "url": "https://arxiv.org/html/2611.18439v1",
+        "highlight": "Placeholder highlight text.",
+        "time_published": "2026-11-13T00:00:00Z",
+        "time_last_crawled": "2026-11-16T10:08:46Z",
+        "favicon": "https://arxiv.org/static/browse/0.3.4/images/icons/apple-touch-icon.png",
+        "images": [
+          {
+            "url": "https://arxiv.org/html/2611.18439v1/method_1.png",
+            "description": "Placeholder description."
+          },
+          {
+            "url": "https://arxiv.org/html/2611.18439v1/tensions.png",
+            "description": "Placeholder description."
+          }
+        ]
+      },
+      {
+        "title": "Commission seeks feedback on draft template for the fundamental rights impact assessment under the AI Act | Shaping Europe’s digital future",
+        "url": "https://digital-strategy.ec.europa.eu/en/news/commission-seeks-feedback-draft-template-fundamental-rights-impact-assessment-under-ai-act",
+        "highlight": "Placeholder highlight text.",
+        "time_published": "2026-11-16T00:00:00Z",
+        "time_last_crawled": "2026-11-17T14:46:39Z",
+        "favicon": "https://digital-strategy.ec.europa.eu/themes/custom/cnt_theme/images/favicons/ec/favicon.png",
+        "images": [
+          {
+            "url": "https://digital-strategy.ec.europa.eu/sites/default/files/styles/newsroom_large/public/newsroom/items/GettyImages1126234690__berya113__iStock_Getty_Images_Plus_1920px_UXaqcf6BUJakuEK10zuzXvkNj50_2034571_rmJkBWmqduw1W2t5xvAv7MIjxgQ_252385.jpg",
+            "description": "Placeholder description."
+          }
+        ]
+      }
+    ],
+    "subjects": [
+      {
+        "name": "EU leaders hold first dedicated AI summit in Dublin, failing to agree on Ukraine negotiator",
+        "summary": "Placeholder summary.",
+        "time_start": "2026-11-08T15:00:00Z",
+        "time_latest": "2026-11-14T01:49:34Z",
+        "top_news": {
+          "title": "EU leaders seek to tackle challenges at first ever AI summit",
+          "url": "https://www.reuters.com/world/china/eu-leaders-seek-tackle-challenges-first-ever-ai-summit-2026-11-13/",
+          "highlight": "Placeholder highlight text.",
+          "time_published": "2026-11-13T06:06:44Z",
+          "time_last_crawled": "2026-11-13T06:10:02Z",
+          "favicon": "https://www.reuters.com/pf/resources/images/reuters/favicon/tr_fvcn_kinesis_180x180_v2.png?d=394&mxId=00000000",
+          "cover_image": {
+            "url": "https://www.reuters.com/resizer/v2/466BJJQ7PVGY5O53NZ3KL65MHM.png",
+            "description": "Placeholder description."
+          },
+          "summary": "Placeholder summary."
+        },
+        "sub_news": [
+          {
+            "title": "Block Destruction: Europe split over Ukraine talks",
+            "url": "https://iz.ru/en/node/2201307",
+            "highlight": "Placeholder highlight text.",
+            "time_published": "2026-11-13T21:01:00Z",
+            "time_last_crawled": "2026-11-13T21:16:48Z",
+            "favicon": "https://cdn.iz.ru/profiles/portal/themes/purple/images/favicons/apple-icon.png",
+            "cover_image": {
+              "url": "http://cdn.iz.ru/sites/default/files/styles/900x506/public/article-2026-11/2026-11-13T142642Z_387727537_RC22NOABT22U_RTRMADP_3_EU-SUMMIT%20%D0%BA%D0%BE%D0%BF%D0%B8%D1%8F_0.jpg",
+              "description": ""
+            },
+            "images": [
+              {
+                "url": "https://cdn.iz.ru/sites/default/files/styles/1065xh/public/photo_item-2026-11/2026-11-12T134705Z_1770788452_RC2DMOA3K7BH_RTRMADP_3_UKRAINE-CRISIS-TALKS-MOSCOW%20copy.jpg",
+                "description": "Placeholder description."
+              },
+              {
+                "url": "https://cdn.iz.ru/sites/default/files/styles/1065xh/public/photo_item-2026-11/20230820_gaf_rb38_003%20copy.jpg",
+                "description": "Placeholder description."
+              },
+              {
+                "url": "https://cdn.iz.ru/sites/default/files/styles/1065xh/public/photo_item-2026-11/2026-11-12T112643Z_1325353663_RC21ZKAH349C_RTRMADP_3_EUROPE-BANKS-REGULATION%20%281%29%20copy.jpg",
+                "description": "Placeholder description."
+              },
+              {
+                "url": "https://cdn.iz.ru/sites/default/files/styles/1065xh/public/photo_item-2026-11/2026-11-03T141618Z_531410788_RC2WIMA923GB_RTRMADP_3_HUNGARY-POLITICS-ORBAN-ARCHIVES%20copy.jpg",
+                "description": "Placeholder description."
+              },
+              {
+                "url": "https://cdn.iz.ru/sites/default/files/styles/1065xh/public/photo_item-2026-11/RIA_9323880.HR%20copy.jpg",
+                "description": "Placeholder description."
+              }
+            ]
+          },
+          {
+            "title": "Leaders meet in Dublin amid search for lead EU negotiator for peace talks with Russia - Europe live",
+            "url": "https://www.theguardian.com/world/live/2026/nov/13/eu-leaders-negotiations-ukraine-russia-dublin-ai-summit-kushner-witkoff-latest-news-updates",
+            "highlight": "Placeholder highlight text.",
+            "time_published": "2026-11-13T08:53:53Z",
+            "time_last_crawled": "2026-11-13T08:55:53Z",
+            "favicon": "https://assets.guim.co.uk/static/frontend/icons/homescreen/apple-touch-icon.svg",
+            "cover_image": {
+              "url": "https://i.guim.co.uk/img/media/03c39749638fd1dfd3b4d706660f7e0e3923c2c3/1129_0_4972_3979/master/4972.jpg",
+              "description": ""
+            },
+            "images": [
+              {
+                "url": "https://i.guim.co.uk/img/uploads/2017/12/26/Jennifer_Rankin,_L.png",
+                "description": "Placeholder description."
+              },
+              {
+                "url": "https://i.guim.co.uk/img/media/c0fcd0e7cc7429c7ebf35e177655aedb769d2dc7/1001_17_3338_2672/master/3338.jpg",
+                "description": "Placeholder description."
+              }
+            ]
+          },
+          {
+            "title": "EU splits into three camps over candidate to negotiate with Russia — newspaper",
+            "url": "https://tass.com/world/2217569",
+            "highlight": "Placeholder highlight text.",
+            "time_published": "2026-11-13T06:29:41Z",
+            "time_last_crawled": "2026-11-13T06:31:10Z",
+            "favicon": "https://tass.com/img/blocks/common/apple-touch-icon.png",
+            "cover_image": {
+              "url": "https://tass.com/img/blocks/common/tass_logo_share_eng.png",
+              "description": ""
+            }
+          }
+        ]
+      },
+      {
+        "name": "EU Targets Addictive Social Media, AI Chatbot Features in Draft Law",
+        "summary": "Placeholder summary.",
+        "time_start": "2026-11-09T15:05:54Z",
+        "time_latest": "2026-11-12T17:19:46Z",
+        "top_news": {
+          "title": "EU Targets Addictive Social Media, AI Chatbot Features in Draft Law",
+          "url": "https://www.bloomberg.com/news/articles/2026-11-09/eu-plans-crackdown-on-addictive-social-media-and-ai-bot-features",
+          "highlight": "Placeholder highlight text.",
+          "time_published": "2026-11-09T15:10:16Z",
+          "time_last_crawled": "2026-11-09T15:28:27Z",
+          "favicon": "https://www.bloomberg.com/favicon-black.png",
+          "cover_image": {
+            "url": "https://assets.bwbx.io/images/users/iqjWHBFdfxIU/ikkDGDmPBtI4/v1/1200x800.jpg",
+            "description": ""
+          },
+          "images": [
+            {
+              "url": "https://assets.bwbx.io/images/users/iqjWHBFdfxIU/ikkDGDmPBtI4/v1/-1x-1.webp",
+              "description": "Placeholder description."
+            }
+          ],
+          "summary": "Placeholder summary."
+        },
+        "sub_news": [
+          {
+            "title": "Can the EU make it harder to trick consumers online?",
+            "url": "https://www.dw.com/en/can-the-eu-make-it-harder-to-trick-consumers-online/a-79933447?maca=en-rss-en-world-4025-rdf",
+            "highlight": "Placeholder highlight text.",
+            "time_published": "2026-11-12T17:19:46Z",
+            "time_last_crawled": "2026-11-12T18:21:20Z",
+            "favicon": "https://www.dw.com/images/icons/favicon-120x120.png",
+            "cover_image": {
+              "url": "https://static.dw.com/image/68243087_6.jpg",
+              "description": "Placeholder description."
+            },
+            "images": [
+              {
+                "url": "https://static.dw.com/image/68243087_605.jpg",
+                "description": "Placeholder description."
+              }
+            ]
+          },
+          {
+            "title": "Breakingviews - Brussels puts a price on Big Tech digital trickery",
+            "url": "https://www.reuters.com/5f374b32b07b/commentary/breakingviews/brussels-puts-price-big-tech-digital-trickery-2026-11-12/",
+            "highlight": "Placeholder highlight text.",
+            "time_published": "2026-11-12T11:18:10Z",
+            "time_last_crawled": "2026-11-12T11:24:13Z",
+            "favicon": "https://www.reuters.com/pf/resources/images/reuters/favicon/tr_fvcn_kinesis_180x180_v2.png?d=394&mxId=00000000",
+            "cover_image": {
+              "url": "https://www.reuters.com/resizer/v2/3T5AA6ETOVGZDM2CW3AWFUWBHI.png",
+              "description": "Placeholder description."
+            },
+            "images": [
+              {
+                "url": "https://www.reuters.com/resizer/v2/https%3A%2F%2Fauthor-service-images-prod-us-east-1.publishing.aws.arc.pub%2Freuters%2F38bac993-d1da-469a-80ca-4e2134d708cc.png",
+                "description": "Placeholder description."
+              }
+            ]
+          },
+          {
+            "title": "Digital Fairness Act: What the EU draft means for loot boxes in games",
+            "url": "https://www.heise.de/en/news/Digital-Fairness-Act-What-the-EU-draft-means-for-loot-boxes-in-games-11521109.html",
+            "highlight": "Placeholder highlight text.",
+            "time_published": "2026-11-11T14:11:00Z",
+            "time_last_crawled": "2026-11-11T14:16:14Z",
+            "favicon": "https://www.heise.de/icons/ho/touch-icons/apple-touch-icon-180x180.png",
+            "cover_image": {
+              "url": "https://heise.cloudimg.io/v7/_www-heise-de_/imgs/18/5/1/9/9/5/5/4/Screenshot_2026-11-11_135150-496b8d34a219c12c.png?func=bound&height=1200&org_if_sml=1&q=85&width=1200",
+              "description": ""
+            },
+            "images": [
+              {
+                "url": "https://heise.cloudimg.io/v7/_www-heise-de_/imgs/18/5/1/9/9/5/5/4/Screenshot_2026-11-11_135150-29a33e63d0d27eae.png?org_if_sml=1&q=50&width=696",
+                "description": "Placeholder description."
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "request_id": "2026111804122211223ETN0DNXZ",
+  "meta": {
+    "usage": {
+      "num_search_queries": 1,
+      "num_subject_search_queries": 1,
+      "full_content_extra_count": 0
+    },
+    "latency": 247,
+    "warning": ""
+  },
+  "code": 0,
+  "msg": "success"
+}

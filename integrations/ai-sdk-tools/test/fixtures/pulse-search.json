@@ -1,0 +1,31 @@
+{
+  "request_id": "202611180412253915D62TP4XUE",
+  "code": 0,
+  "msg": "success",
+  "data": {
+    "query": "github docs",
+    "results": [
+      {
+        "title": "GitHub Docs",
+        "url": "docs.github.com"
+      },
+      {
+        "title": "GitHub Docs",
+        "url": "docs.github.com/en"
+      },
+      {
+        "title": "Get started with GitHub documentation - GitHub Docs",
+        "url": "docs.github.com/en/get-started"
+      }
+    ]
+  },
+  "meta": {
+    "latency": 3,
+    "warning": "",
+    "usage": {
+      "num_search_queries": 1,
+      "full_content_extra_count": 0,
+      "billed_mode": "lite"
+    }
+  }
+}

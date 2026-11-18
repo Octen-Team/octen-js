@@ -1,0 +1,76 @@
+name: Release ai-sdk-tools
+
+on:
+  push:
+    tags: ["ai-sdk-tools-v*"]
+
+# No workflow-level grants: only the publish job gets id-token.
+permissions: {}
+
+jobs:
+  # Runs the unpinned matrix installs. It holds no publish rights.
+  verify:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: integrations/ai-sdk-tools
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the main-branch check needs history
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.22.2
+          cache: npm
+          cache-dependency-path: integrations/ai-sdk-tools/package-lock.json
+      - name: Release guards
+        run: bash scripts/release-guard.sh
+      - run: npm ci
+      - name: Type-check
+        run: npm run typecheck
+      - name: Test
+        run: npm test
+      # Runs every ai/zod pair against the packed package; Node 20 comes from `npx -y node@20`.
+      - name: Version matrix
+        run: bash scripts/matrix.sh
+      - name: Build
+        run: npm run build
+
+  # Installs from the lockfile only and never runs matrix.sh.
+  publish:
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # npm OIDC trusted publishing and provenance; no token needed
+    defaults:
+      run:
+        working-directory: integrations/ai-sdk-tools
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          # npm 12.2.1 declares engines.node ^22.22.2 || ^24.15.0 || >=26; a bare "22" can resolve to an older cached 22.x
+          node-version: 22.22.2
+          registry-url: "https://registry.npmjs.org"
+      - name: Release guards
+        run: bash scripts/release-guard.sh
+      - run: npm ci
+      - name: Build
+        run: npm run build
+      # Pinned on purpose: `npm@latest` would let an unreviewed npm release run with our publish rights.
+      - name: Install npm 12.2.1 for OIDC
+        run: npm install -g npm@12.2.1
+      - name: Print toolchain versions
+        run: |
+          echo "node $(node --version)"
+          echo "npm $(npm --version)"
+      # No NODE_AUTH_TOKEN: with id-token: write and a trusted publisher configured on npmjs.com
+      # (repo Octen-Team/octen-js, workflow release-ai-sdk-tools.yml), npm authenticates via OIDC.
+      # --ignore-scripts: the verify job already ran the checks, and the Build step above made dist.
+      - name: Publish to npm (OIDC, provenance)
+        run: npm publish --provenance --access public --ignore-scripts

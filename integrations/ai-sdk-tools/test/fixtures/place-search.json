@@ -1,0 +1,69 @@
+{
+  "data": {
+    "query": "coffee shops",
+    "location": {
+      "latitude": 35.6812,
+      "longitude": 139.7671
+    },
+    "places": [
+      {
+        "name": "Hoshino Coffee Yaesu Underground Shopping Mall",
+        "category": "Coffee shop",
+        "address": "Japan, 〒104-0028 Tokyo, Chuo City, Yaesu, 2 Chome−1−1 Underground Shopping Mall 1",
+        "latitude": 35.6799404,
+        "longitude": 139.7690424,
+        "distance": 224,
+        "phone": "03-6262-1688",
+        "website": "http://www.hoshinocoffee.com/",
+        "opening_hours": [
+          "Open · Closes 9:30 pm"
+        ],
+        "status": "open",
+        "rating": 3.8,
+        "review_count": 367
+      },
+      {
+        "name": "TORIBA COFFEE boutique coffee roaster",
+        "category": "Coffee shop",
+        "address": "Japan, 〒104-0028 Tokyo, Chuo City, Yaesu, 2 Chome−1−1 YANMAR TOKYO B1F",
+        "latitude": 35.6800415,
+        "longitude": 139.7693334,
+        "distance": 239,
+        "phone": "050-1882-2107",
+        "website": "https://www.toribacoffee-online.com/?utm_source=Google-Map&utm_medium=MEO_Adtag2",
+        "opening_hours": [
+          "Open · Closes 7 pm"
+        ],
+        "status": "open",
+        "rating": 4.2,
+        "review_count": 454
+      },
+      {
+        "name": "Aroma Coffee Yaesu",
+        "category": "Coffee shop",
+        "address": "2 Chome-1 Yaesu, Chuo City, Tokyo 103-0028, Japan",
+        "latitude": 35.6796077,
+        "longitude": 139.770923,
+        "distance": 388,
+        "phone": "03-3275-3531",
+        "website": "http://www.aromacoffee.co.jp/yaesu.html",
+        "opening_hours": [
+          "Open · Closes 9:15 pm"
+        ],
+        "status": "open",
+        "rating": 4.1,
+        "review_count": 1023
+      }
+    ]
+  },
+  "request_id": "202611180412239256MHX8JFQW7",
+  "meta": {
+    "usage": {
+      "num_search_queries": 1
+    },
+    "latency": 1148,
+    "warning": ""
+  },
+  "code": 0,
+  "msg": "success"
+}

@@ -1,0 +1,629 @@
+{
+  "data": {
+    "query": "compare Stripe and Adyen",
+    "results": [
+      {
+        "title": "Adyen vs. Stripe 2026 Comparison - NerdWallet",
+        "url": "https://www.nerdwallet.com/business/software/learn/adyen-vs-stripe",
+        "highlight": "Placeholder highlight text.",
+        "authors": "Hillary Crawford; Randa Kriss",
+        "time_published": "2022-06-07T20:28:31Z",
+        "time_last_crawled": "2026-08-20T14:07:33Z",
+        "favicon": "https://www.nerdwallet.com/cdn/apps/prod/global-markup/images/apple-touch-icon-precomposed.png",
+        "cover_image": {
+          "url": "https://www.nerdwallet.com/assets/blog/wp-content/uploads/2022/06/GettyImages-1325299071-2400x1440.jpg",
+          "description": ""
+        }
+      },
+      {
+        "title": "Adyen vs Stripe: 2026 Guide For Singapore Businesses | Airwallex SG",
+        "url": "https://airwallex.com/en-sg/blog/comparison-adyen-vs-stripe",
+        "highlight": "Placeholder highlight text.",
+        "authors": "Cherie Foo",
+        "time_published": "2026-03-30T00:00:00Z",
+        "time_last_crawled": "2026-06-18T01:15:08Z",
+        "favicon": "https://blog.airwallex.com/favicon.ico",
+        "cover_image": {
+          "url": "https://images.ctfassets.net/sxag7u4cz1re/3vYfd2eEede5hxDuUEooVc/e34644fa4bb59cc86dff3b0dc37dc470/awxblog-graphic-bubbles-black.svg?w=1200&h=630",
+          "description": ""
+        },
+        "images": [
+          {
+            "url": "http://images.ctfassets.net/sxag7u4cz1re/6zw6Sc346AmgrqUXA9KUFO/8bfae38cfdef8829e44639621a53c9df/PXL_20240910_080211244__1_.jpg?q=70&w=112&h=112&fit=fill&fm=jpg",
+            "description": ""
+          }
+        ]
+      },
+      {
+        "title": "Adyen: Detailed Comparison and Best Choice - Hyperswitch Blog | Juspay Hyperswitch",
+        "url": "https://translate.google.com/translate?client=srp&hl=id&sl=en&tl=id&u=https://hyperswitch.io/blog/stripe-vs-adyen-a-detailed-comparison-and-recommendation",
+        "highlight": "Placeholder highlight text.",
+        "time_last_crawled": "2026-07-24T14:50:24Z",
+        "favicon": "https://translate.google.com/favicon.png",
+        "cover_image": {
+          "url": "https://cdn.sanity.io/images/9sed75bn/production/5d0b8450f196374d2b279e38afb2f84be9689842-800x472.jpg",
+          "description": ""
+        },
+        "images": [
+          {
+            "url": "https://cdn.sanity.io/images/9sed75bn/production/f3a1eccd6c43ef6574f00a3a2090e6d689bc54ec-800x498.jpg",
+            "description": ""
+          }
+        ]
+      },
+      {
+        "title": "Deep Dive: Stripe vs. Adyen – Comparing Product Stacks and Pricing: By Sam Boboev",
+        "url": "https://www.finextra.com/blogposting/28836/deep-dive-stripe-vs-adyen--comparing-product-stacks-and-pricing",
+        "highlight": "Placeholder highlight text.",
+        "authors": "Editorial Team",
+        "time_published": "2025-08-15T10:46:42Z",
+        "time_last_crawled": "2026-04-27T05:19:19Z"
+      },
+      {
+        "title": "Stripe vs Adyen: Payment Platforms Compared for Business",
+        "url": "https://www.lilachbullock.com/stripe-vs-adyen/",
+        "highlight": "Placeholder highlight text.",
+        "authors": "https://www.facebook.com/lilachbullockbiz",
+        "time_published": "2026-10-23T09:04:10Z",
+        "time_last_crawled": "2026-10-23T19:07:45Z",
+        "favicon": "https://www.lilachbullock.com/wp-content/uploads/2023/02/Asset-1-8-4.png",
+        "cover_image": {
+          "url": "https://www.lilachbullock.com/wp-content/uploads/2026/10/stripe-vs-adyen.png",
+          "description": ""
+        }
+      }
+    ],
+    "entities": [
+      {
+        "type": "company",
+        "name": "Stripe",
+        "summary": "Placeholder summary.",
+        "aliases": [
+          "stripe",
+          "stripe, inc.",
+          "stripe, llc."
+        ],
+        "identifiers": {
+          "website": "stripe.com",
+          "linkedin_url": "https://www.linkedin.com/company/stripe"
+        },
+        "attributes": {
+          "industry": "Technology, Information and Internet",
+          "hq_location": "354 Oyster Point Blvd, South San Francisco, California 94080, US",
+          "founded_year": 2010
+        },
+        "metrics": {
+          "financials": [
+            {
+              "revenue": 14000000000,
+              "currency": "USD",
+              "period": "Y, 2022"
+            },
+            {
+              "revenue": 12000000000,
+              "currency": "USD",
+              "period": "Y, 2021"
+            },
+            {
+              "revenue": 7400000000,
+              "currency": "USD",
+              "period": "Y, 2020"
+            }
+          ],
+          "funding": [
+            {
+              "round": "Secondary Market",
+              "date": "2026-03-09",
+              "lead_investors": "Robinhood Ventures"
+            },
+            {
+              "round": "Secondary Market",
+              "date": "2026-02-24"
+            },
+            {
+              "round": "Secondary Market",
+              "date": "2025-12-17"
+            },
+            {
+              "round": "Secondary Market",
+              "date": "2025-02-27"
+            },
+            {
+              "round": "Secondary Market",
+              "amount": 694159778,
+              "date": "2024-04-12",
+              "currency": "USD"
+            },
+            {
+              "round": "Venture Round",
+              "date": "2024-03-01"
+            },
+            {
+              "round": "Grant",
+              "amount": 10100000,
+              "date": "2023-04-25",
+              "currency": "EUR"
+            },
+            {
+              "round": "Series I",
+              "amount": 6500000000,
+              "date": "2023-03-15",
+              "currency": "USD",
+              "lead_investors": "Andreessen Horowitz;Baillie Gifford;Founders Fund;General Catalyst;MSD Partners;Thrive Capital"
+            },
+            {
+              "round": "Secondary Market",
+              "amount": 1000000000,
+              "date": "2021-06-14",
+              "currency": "USD"
+            },
+            {
+              "round": "Series H",
+              "amount": 600000000,
+              "date": "2021-03-14",
+              "currency": "USD",
+              "lead_investors": "Allianz X;AXA Group;Baillie Gifford;Fidelity;National Treasury Management Agency (NTMA);Sequoia Capital"
+            }
+          ]
+        },
+        "key_people": [
+          {
+            "name": "Steffan Tomlinson",
+            "title": "CFO"
+          },
+          {
+            "name": "John Collison",
+            "title": "President & Co-Founder"
+          },
+          {
+            "name": "Jeff Titterton",
+            "title": "CMO"
+          },
+          {
+            "name": "David Singleton",
+            "title": "CTO"
+          },
+          {
+            "name": "Eileen O'Mara",
+            "title": "CRO"
+          },
+          {
+            "name": "Patricia J Walsh",
+            "title": "CLO & Corporate Secretary"
+          },
+          {
+            "name": "Joshua Alawode",
+            "title": "Senior Software Engineer"
+          },
+          {
+            "name": "Sam King",
+            "title": "Fraud and Payments Performance"
+          },
+          {
+            "name": "Edouard de la Jonquiere",
+            "title": "MENA Financial Partnerships"
+          },
+          {
+            "name": "Matthew Kemelhar",
+            "title": "Lifecycle Security Manager"
+          }
+        ],
+        "logo": {
+          "url": "https://media.licdn.com/dms/image/v2/D560BAQE2ZfJyfn-VCg/company-logo_200_200/B56ZlyKwpUKIAI-/0/1758557047806/stripe_logo"
+        },
+        "activities": [
+          {
+            "title": "Stablecoins in Treasury | Stripe Documentation",
+            "url": "https://docs.stripe.com/treasury/stablecoins",
+            "highlight": "Placeholder highlight text.",
+            "time_published": "2026-11-17T05:33:45Z",
+            "favicon": "https://b.stripecdn.com/docs-statics-srv/assets/6909bb6ca283faf323890c12a6d38161.png",
+            "cover_image": {
+              "url": "https://d37ugbyn3rpeym.cloudfront.net/docs/og-image/treasury.stablecoins.ogimage.png",
+              "description": ""
+            }
+          },
+          {
+            "title": "Parafin is officially joining Stripe.",
+            "url": "https://www.linkedin.com/posts/stripe_parafin-is-officially-joining-stripe-we-activity-7526315986183045120-Xw3W",
+            "highlight": "Placeholder highlight text.",
+            "authors": "Stripe",
+            "time_published": "2026-11-11T16:12:43Z",
+            "images": [
+              {
+                "url": "https://media.licdn.com/dms/image/v2/D5622AQHuMOM9Qi7obA/feedshare-shrink_800/B56aHLYgjiJEAg-/0/1794413562855",
+                "description": "Placeholder description."
+              }
+            ]
+          },
+          {
+            "title": "Revolut cofounder and CEO Nik Storonsky joins John Collison for a pint to discuss building a global bank and the",
+            "url": "https://www.linkedin.com/posts/stripe_revolut-cofounder-and-ceo-nik-storonsky-joins-activity-7526036144594190336-zTB2",
+            "highlight": "Placeholder highlight text.",
+            "authors": "Stripe",
+            "time_published": "2026-11-10T21:40:43Z"
+          },
+          {
+            "title": "OpenRouter is now part of Stripe.",
+            "url": "https://www.linkedin.com/posts/stripe_openrouter-is-now-part-of-stripe-stripe-activity-7526007227665711105-QHwY",
+            "highlight": "Placeholder highlight text.",
+            "authors": "Stripe",
+            "time_published": "2026-11-10T19:45:49Z",
+            "images": [
+              {
+                "url": "https://media.licdn.com/dms/image/v2/D5622AQERmRfOc3nijg/feedshare-shrink_800/B56aHG_sVvLMAg-/0/1794339948164",
+                "description": "Placeholder description."
+              }
+            ]
+          },
+          {
+            "title": "Stripe and HSBC power Tap to Pay for UK small businesses",
+            "url": "https://stripe.com/newsroom/news/stripehsbc-power-tap-to-pay-for-uk-small-businesses",
+            "highlight": "Placeholder highlight text.",
+            "time_published": "2026-11-10T05:00:00Z",
+            "favicon": "https://images.stripeassets.com/fzn2n1nzq965/4vVgZi0ZMoEzOhkcv7EVwK/8cce6fdcf2733b2ec8e99548908847ed/favicon.png?w=180&h=180",
+            "cover_image": {
+              "url": "https://images.stripeassets.com/fzn2n1nzq965/3KeByBoJ2WbglfMbxmuPHP/bf9c18cf6ecdc5ab63c311f036042031/HSBC_Stripe_4000x2000_4.png?q=80",
+              "description": ""
+            },
+            "images": [
+              {
+                "url": "https://images.stripeassets.com/fzn2n1nzq965/3KeByBoJ2WbglfMbxmuPHP/bf9c18cf6ecdc5ab63c311f036042031/HSBC_Stripe_4000x2000_4.png?w=4000&q=80",
+                "description": "Placeholder description."
+              }
+            ]
+          }
+        ],
+        "news": [
+          {
+            "title": "Exclusive | AI Bots Are Using Credit Cards. Banks Are Racing to Keep Up.",
+            "url": "https://www.wsj.com/finance/ai-bots-are-using-credit-cards-banks-are-racing-to-keep-up-c30dda30",
+            "highlight": "Placeholder highlight text.",
+            "time_published": "2026-11-13T01:00:00Z",
+            "time_last_crawled": "2026-11-13T01:08:46Z",
+            "favicon": "https://s.wsj.net/media/wsj_apple-touch-icon-180x180.png",
+            "cover_image": {
+              "url": "https://images.wsj.net/im-97804399/social",
+              "description": "Placeholder description."
+            },
+            "images": [
+              {
+                "url": "https://images.wsj.net/im-97804399?width=700&height=467",
+                "description": "Placeholder description."
+              }
+            ]
+          },
+          {
+            "title": "Stripe sees bigger role for S'pore in developing new payments technology for the world",
+            "url": "https://www.businesstimes.com.sg/companies-markets/singapore-fintech-festival-2026/stripe-sees-bigger-role-spore-developing-new-payments-technology-world",
+            "highlight": "Placeholder highlight text.",
+            "time_published": "2026-11-10T21:55:00Z",
+            "time_last_crawled": "2026-11-10T21:56:55Z",
+            "favicon": "https://www.businesstimes.com.sg/favicon.ico",
+            "cover_image": {
+              "url": "https://cassette.sphdigital.com.sg/image/businesstimes/9560c3f22f1f327ec89816546936e362acc5764a44ae3d6b0ca82e8933acb193?w=1200&f=webp",
+              "description": "Placeholder description."
+            },
+            "images": [
+              {
+                "url": "https://cassette.sphdigital.com.sg/image/businesstimes/9560c3f22f1f327ec89816546936e362acc5764a44ae3d6b0ca82e8933acb193?w=960&dpr=1&f=webp",
+                "description": "Placeholder description."
+              }
+            ]
+          },
+          {
+            "title": "Stripe Pay: Free Instant Transfers Built On Stripe's Ledger",
+            "url": "https://www.forbes.com/sites/zennonkapron/2026/11/05/stripe-pay-makes-business-transfers-free-and-instant-because-the-money-never-leaves-stripes-ledger/",
+            "highlight": "Placeholder highlight text.",
+            "time_published": "2026-11-06T03:01:33Z",
+            "time_last_crawled": "2026-11-06T03:19:41Z",
+            "favicon": "https://i.forbesimg.com/57X57-F.png",
+            "cover_image": {
+              "url": "https://imageio.forbes.com/specials-images/imageserve/6aed4293ac39919ed3907ac1/0x0.jpg?format=jpg&height=900&width=1600&fit=bounds",
+              "description": ""
+            }
+          },
+          {
+            "title": "AI agents making purchases for humans, spending Rs 9,480 per transaction: Stripe",
+            "url": "https://www.indiatoday.in/amp/technology/news/story/ai-agents-making-purchases-for-humans-spending-rs-9480-per-transaction-stripe-3020763-2026-10-19",
+            "highlight": "Placeholder highlight text.",
+            "time_published": "2026-10-19T11:19:47Z",
+            "time_last_crawled": "2026-10-19T16:05:21Z",
+            "favicon": "https://www.indiatoday.in/favicon.ico",
+            "cover_image": {
+              "url": "https://akm-img-a-in.tosshub.com/indiatoday/images/story/202610/ai-agents--stripe--ai-191635132-16x9_0.png?VersionId=XSsVpBj8kZFLdX7FUzaraAjTgK1U3T4R",
+              "description": ""
+            },
+            "images": [
+              {
+                "url": "https://akm-img-a-in.tosshub.com/indiatoday/images/story/202610/ai-agents--stripe--ai-191635132-16x9_0.png?VersionId=XSsVpBj8kZFLdX7FUzaraAjTgK1U3T4R&size=690:388",
+                "description": "Placeholder description."
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "company",
+        "name": "Adyen",
+        "summary": "Placeholder summary.",
+        "aliases": [
+          "adyen",
+          "adyen payments",
+          "adyen n.v.",
+          "adyen nv"
+        ],
+        "identifiers": {
+          "website": "adyen.com",
+          "linkedin_url": "https://www.linkedin.com/company/adyen",
+          "stock_ticker": "XAMS:ADYEN"
+        },
+        "attributes": {
+          "industry": "Financial Services",
+          "hq_location": "Simon Carmiggeltstraat 6, 12th floor, Amsterdam, North Holland 1011 DJ, NL",
+          "founded_year": 2006,
+          "employee_range": "1001-5000 employees"
+        },
+        "metrics": {
+          "financials": [
+            {
+              "revenue": 2225601024,
+              "net_income": 925163008,
+              "currency": "EUR",
+              "period": "FY, 2024",
+              "gross_profit": 1987774976
+            },
+            {
+              "revenue": 1029089984,
+              "net_income": 409614016,
+              "currency": "EUR",
+              "period": "H1, 2024",
+              "gross_profit": 910851008
+            },
+            {
+              "revenue": 1863405952,
+              "net_income": 698321984,
+              "currency": "EUR",
+              "period": "FY, 2023",
+              "gross_profit": 1626061056
+            },
+            {
+              "revenue": 853550016,
+              "net_income": 282172992,
+              "currency": "EUR",
+              "period": "H1, 2023",
+              "gross_profit": 739107008
+            },
+            {
+              "revenue": 8935611392,
+              "net_income": 564139008,
+              "currency": "EUR",
+              "period": "FY, 2022",
+              "gross_profit": 1330166016
+            },
+            {
+              "revenue": 3947481088,
+              "net_income": 282136992,
+              "currency": "EUR",
+              "period": "H1, 2022",
+              "gross_profit": 608529024
+            },
+            {
+              "revenue": 5995419136,
+              "net_income": 469716992,
+              "currency": "EUR",
+              "period": "FY, 2021",
+              "gross_profit": 1001516992
+            }
+          ],
+          "funding": [
+            {
+              "round": "Venture Round",
+              "date": "2015-09-30",
+              "lead_investors": "ICONIQ Capital"
+            },
+            {
+              "round": "Series B",
+              "amount": 250000000,
+              "date": "2014-12-15",
+              "currency": "USD",
+              "lead_investors": "General Atlantic"
+            },
+            {
+              "round": "Series A",
+              "amount": 16000000,
+              "date": "2011-08-22",
+              "currency": "USD",
+              "lead_investors": "Index Ventures"
+            }
+          ],
+          "web_traffic": {
+            "visits_monthly": 37776380,
+            "rank": 1446,
+            "period": "2026-08"
+          }
+        },
+        "key_people": [
+          {
+            "name": "Pieter van der Does",
+            "title": "CEO & co-founder"
+          },
+          {
+            "name": "Arnout Schuijff",
+            "title": "Chief Technology Officer"
+          },
+          {
+            "name": "Roelant Prins",
+            "title": "Chief Commerce Officer"
+          },
+          {
+            "name": "Gary Yang",
+            "title": "SVP Global Account Management and Partnerships"
+          },
+          {
+            "name": "Luke Salinas",
+            "title": "Senior Vice-President of Strategy for North America"
+          },
+          {
+            "name": "Tommy Bush",
+            "title": "SVP, Impact NA"
+          },
+          {
+            "name": "Paul Cook",
+            "title": "Managing Director of Global Acquiring"
+          },
+          {
+            "name": "Yogesh Sharma",
+            "title": "Product Manager"
+          },
+          {
+            "name": "Lauren Rogers",
+            "title": "Team Lead, Project Operations"
+          },
+          {
+            "name": "Anna Connors",
+            "title": "SVP Platforms & Financial Services Sales"
+          }
+        ],
+        "logo": {
+          "url": "https://media.licdn.com/dms/image/v2/D4E0BAQGkcf7qKLd6mQ/company-logo_200_200/B4EZpKb3XwKkAU-/0/1762185410414/adyen_logo"
+        },
+        "activities": [
+          {
+            "title": "Black Friday at Pandora runs from a blacked-out war room in Copenhagen.",
+            "url": "https://www.linkedin.com/posts/adyen_black-friday-at-pandora-runs-from-a-blacked-out-activity-7528464576888066048-B8dQ",
+            "highlight": "Placeholder highlight text.",
+            "authors": "Adyen",
+            "time_published": "2026-11-17T14:30:27Z"
+          },
+          {
+            "title": "600+ loyalty leaders in one room.",
+            "url": "https://www.linkedin.com/feed/update/urn:li:activity:7528126778847096833/",
+            "highlight": "Placeholder highlight text.",
+            "authors": "Ingo Uytdehaage",
+            "time_published": "2026-11-16T16:08:09Z",
+            "images": [
+              {
+                "url": "https://media.licdn.com/dms/image/v2/D4E22AQE1xL1CJdnYFw/feedshare-shrink_800/B4EaHjdQv4HMAg-/0/1794817462549",
+                "description": "Placeholder description."
+              }
+            ]
+          },
+          {
+            "title": "We’re partnering with Tabs as the first payments partner for Tabs Pay, its new embedded payments solution that brings",
+            "url": "https://www.linkedin.com/posts/adyen_were-partnering-with-tabs-as-the-first-payments-activity-7524207850907299840-iy4m",
+            "highlight": "Placeholder highlight text.",
+            "authors": "Adyen",
+            "time_published": "2026-11-05T20:35:44Z",
+            "images": [
+              {
+                "url": "https://media.licdn.com/dms/image/v2/D4E10AQGW5yETLZJSkA/image-shrink_1280/B4EaGtbKBgJUAc-/0/1793910940192",
+                "description": "Placeholder description."
+              }
+            ]
+          },
+          {
+            "title": "Nobody understands a growing business better than the software platform powering its daily operations.",
+            "url": "https://www.linkedin.com/feed/update/urn:li:activity:7523159744174276608/",
+            "highlight": "Placeholder highlight text.",
+            "authors": "Adyen",
+            "time_published": "2026-11-02T23:10:56Z",
+            "images": [
+              {
+                "url": "https://media.licdn.com/dms/image/v2/D4E10AQHszzaSsBnpXg/image-shrink_1280/B4EaGc4dMFI8Ac-/0/1793633407994",
+                "description": "Placeholder description."
+              }
+            ]
+          },
+          {
+            "title": "Platforms are in a unique position to close the gap between their merchants’ cash flow needs and the friction they face",
+            "url": "https://www.linkedin.com/posts/adyen_money2020-activity-7522042216819838978-MpWZ",
+            "highlight": "Placeholder highlight text.",
+            "authors": "Adyen",
+            "time_published": "2026-10-30T21:10:17Z",
+            "images": [
+              {
+                "url": "https://media.licdn.com/dms/image/v2/D4E10AQF1gjPhbjGM3w/image-shrink_800/B4EaGOpiVhG0Ag-/0/1793394615899",
+                "description": "Placeholder description."
+              },
+              {
+                "url": "https://media.licdn.com/dms/image/v2/D4E10AQEiyBKO1WYdBw/image-shrink_800/B4EaGOpicKG8Ag-/0/1793394616542",
+                "description": "Placeholder description."
+              },
+              {
+                "url": "https://media.licdn.com/dms/image/v2/D4E10AQFX45cUPoPUNg/image-shrink_800/B4EaGOpin_HwAg-/0/1793394617073",
+                "description": "Placeholder description."
+              }
+            ]
+          }
+        ],
+        "news": [
+          {
+            "title": "Analysts’ Top Technology Picks: Adyen (ADYYF), Amkor (AMKR)",
+            "url": "https://www.theglobeandmail.com/investing/markets/stocks/AMKR/pressreleases/8520817/analysts-top-technology-picks-adyen-adyyf-amkor-amkr/",
+            "highlight": "Placeholder highlight text.",
+            "time_published": "2026-10-28T10:40:34Z",
+            "time_last_crawled": "2026-10-29T10:03:19Z",
+            "favicon": "https://www.theglobeandmail.com/pf/resources/assets/meta/apple-touch-icon.png?d=984",
+            "cover_image": {
+              "url": "https://www.theglobeandmail.com/pf/resources/assets/meta/twitter-summary-240x240.png?d=984",
+              "description": "Placeholder description."
+            },
+            "images": [
+              {
+                "url": "https://www.theglobeandmail.com/images/throbber.gif",
+                "description": "Placeholder description."
+              }
+            ]
+          },
+          {
+            "title": "Financial Services Roundup: Market Talk",
+            "url": "https://www.wsj.com/business/financial-services-roundup-market-talk-297e8843",
+            "highlight": "Placeholder highlight text.",
+            "time_published": "2026-10-28T10:28:00Z",
+            "time_last_crawled": "2026-10-28T10:44:16Z",
+            "favicon": "https://s.wsj.net/media/wsj_apple-touch-icon-180x180.png",
+            "cover_image": {
+              "url": "https://images.wsj.net/im-49803959/social",
+              "description": "Placeholder description."
+            },
+            "images": [
+              {
+                "url": "https://images.wsj.net/im-49803959?width=700&height=492",
+                "description": "Placeholder description."
+              }
+            ]
+          },
+          {
+            "title": "Dutch fintech firm Adyen's revenue tops forecast; trims 2026 margin goal",
+            "url": "https://www.reuters.com/business/dutch-fintech-firm-adyens-revenue-tops-forecast-trims-2026-margin-goal-2026-10-28/",
+            "highlight": "Placeholder highlight text.",
+            "time_published": "2026-10-28T07:32:37Z",
+            "time_last_crawled": "2026-10-28T07:34:57Z",
+            "favicon": "https://www.reuters.com/pf/resources/images/reuters/favicon/tr_fvcn_kinesis_180x180_v2.png?d=392&mxId=00000000",
+            "cover_image": {
+              "url": "https://www.reuters.com/resizer/v2/5DYYQB2BJVMCVA5NO33ADKWGQA.jpg",
+              "description": "Placeholder description."
+            },
+            "images": [
+              {
+                "url": "https://www.reuters.com/resizer/v2/5DYYQB2BJVMCVA5NO33ADKWGQA.jpg",
+                "description": "Placeholder description."
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "request_id": "202611180412230286GGGF1TF4V",
+  "meta": {
+    "usage": {
+      "num_search_queries": 1
+    },
+    "latency": 240,
+    "warning": ""
+  },
+  "code": 0,
+  "msg": "success"
+}

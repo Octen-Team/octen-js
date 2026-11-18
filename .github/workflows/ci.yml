@@ -40,3 +40,58 @@ jobs:
         run: node --input-type=module -e "const m=await import('./dist/index.js'); if (m.default!==m.Octen) process.exit(1)"
       - name: End-to-end (packed tarball in ESM/CJS/TS projects, real-socket fault injection against dist)
         run: npm run test:e2e
+
+  ai-sdk-tools:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [20, 22, 24]
+    defaults:
+      run:
+        working-directory: integrations/ai-sdk-tools
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            integrations/ai-sdk-tools/package-lock.json
+      # The tools package depends on the SDK in this commit, so build the root first.
+      - name: Build the SDK at the repository root
+        working-directory: .
+        run: npm ci && npm run build
+      # The matrix installs this tarball in place of the published SDK, so it tests this commit.
+      - name: Pack the SDK from this commit
+        working-directory: .
+        run: |
+          f=$(npm pack --pack-destination "$RUNNER_TEMP" --silent)
+          echo "MATRIX_SDK=$RUNNER_TEMP/$f" >> "$GITHUB_ENV"
+      - run: npm ci
+      # Overrides the published SDK from the lockfile with this commit's source; --no-save keeps the lockfile clean.
+      - name: Link the SDK from this commit
+        run: npm install --no-save ../..
+      - name: Type-check (source and type tests)
+        run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - name: Check packed artifacts (ESM, CJS, d.ts)
+        run: |
+          npm pack --dry-run --json | node -e "
+            const files = JSON.parse(require('fs').readFileSync(0, 'utf8'))[0].files.map((f) => f.path);
+            const need = ['dist/index.js', 'dist/index.cjs', 'dist/index.d.ts', 'dist/index.d.cts'];
+            const missing = need.filter((n) => !files.includes(n));
+            if (missing.length) { console.error('missing from package:', missing); process.exit(1); }
+            console.log('package contains', need.join(', '));
+          "
+      - name: Build a tool from the CommonJS bundle
+        run: node -e "const t=require('./dist/index.cjs').octenWebSearch({apiKey:'k'}); if (typeof t.execute!=='function') process.exit(1)"
+      # Newest and oldest ai/zod pairs only; the full matrix runs locally and in the release workflow.
+      - name: Version matrix, newest pair
+        if: matrix.node-version == 24
+        run: bash scripts/matrix.sh 7.0.176 4.1.8
+      - name: Version matrix, oldest pair
+        if: matrix.node-version == 24
+        run: bash scripts/matrix.sh 5.0.291 3.25.76

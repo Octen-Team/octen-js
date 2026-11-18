@@ -1,0 +1,49 @@
+{
+  "data": {
+    "query": "solid-state battery breakthroughs",
+    "results": [
+      {
+        "title": "Solid State Battery Research Earns Professor Top Award",
+        "url": "https://news.northeastern.edu/2026/10/29/solid-state-battery-research-award/",
+        "highlight": "Placeholder highlight text.",
+        "full_content": "",
+        "authors": "Rich McKay",
+        "time_published": "2026-10-29T18:37:11Z",
+        "time_last_crawled": "2026-11-03T15:45:59Z",
+        "favicon": "https://news.northeastern.edu/wp-content/themes/ngn-theme/assets/images/favicons/apple-touch-icon.png"
+      },
+      {
+        "title": "'Just peel and stick' — researchers crack key manufacturing hurdle for solid-state batteries - The Herald Business",
+        "url": "https://biz.heraldcorp.com/article/10914778",
+        "highlight": "Placeholder highlight text.",
+        "full_content": "",
+        "authors": "Koo Bon-hyuk",
+        "time_published": "2026-10-26T03:00:04Z",
+        "time_last_crawled": "2026-10-26T03:01:25Z",
+        "favicon": "https://static.heraldcorp.com/wbazic/biz/www/image/m_touch_icon180.png"
+      },
+      {
+        "title": "10,000mAh Power Bank with Integrated USB-C Cable Achieves ~2,000 Cycles with Semi-Solid-State Battery | ASCII.jp English Edition",
+        "url": "https://ascii.jp/en/elem/000/004/450/4450425/",
+        "highlight": "Placeholder highlight text.",
+        "full_content": "",
+        "authors": "ASCII.jp",
+        "time_published": "2026-11-11T03:00:00Z",
+        "time_last_crawled": "2026-11-11T06:56:20Z",
+        "favicon": ""
+      }
+    ]
+  },
+  "request_id": "20261118041219487KRK9NEP42N",
+  "meta": {
+    "usage": {
+      "num_search_queries": 1,
+      "full_content_extra_count": 0
+    },
+    "latency": 87,
+    "result_type": "standard",
+    "warning": ""
+  },
+  "code": 0,
+  "msg": "success"
+}
