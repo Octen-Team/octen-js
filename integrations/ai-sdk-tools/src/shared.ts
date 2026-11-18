@@ -51,9 +51,11 @@ export function mergeParams<P>(
   modelInput: Record<string, unknown>,
   modelFields: readonly string[],
 ): P {
-  const dev: Record<string, unknown> = { ...devDefaults };
-  // query comes only from the model; a JS caller may still smuggle it into defaults.
-  delete dev['query'];
+  // An explicit undefined means "not set", so it must not overwrite a tool default.
+  const dev: Record<string, unknown> = Object.fromEntries(
+    Object.entries({ ...devDefaults }).filter(([key, value]) => value !== undefined && key !== 'query'),
+  );
+  // query comes only from the model; the filter above also drops one a JS caller put in defaults.
   const fromModel: Record<string, unknown> = {};
   for (const field of modelFields) {
     const value = modelInput[field];
@@ -85,10 +87,11 @@ export function requestOptions(abortSignal: AbortSignal | undefined): RequestOpt
   return abortSignal === undefined ? {} : { signal: abortSignal };
 }
 
-export function trimWebResult(r: object): ModelWebResult {
+export function trimWebResult(r: Partial<Record<keyof ModelWebResult, unknown>>): ModelWebResult {
   const out: ModelWebResult = {};
-  for (const key of ['title', 'url', 'highlight', 'time_published', 'full_content'] as const) {
-    const value = (r as Record<string, unknown>)[key];
+  const keys: (keyof ModelWebResult)[] = ['title', 'url', 'highlight', 'time_published', 'full_content'];
+  for (const key of keys) {
+    const value = r[key];
     // The API returns "" for fields that were not requested, e.g. full_content.
     if (typeof value === 'string' && value !== '') out[key] = value;
   }

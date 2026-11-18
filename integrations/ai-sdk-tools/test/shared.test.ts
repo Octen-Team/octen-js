@@ -1,4 +1,4 @@
-import { Octen, OctenValidationError } from '@octen.ai/sdk';
+import { Octen, OctenTimeoutError, OctenValidationError } from '@octen.ai/sdk';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { OctenToolOptions } from '../src/shared.js';
 import { mergeParams, modelSchema, requestOptions, resolveClient, trimWebResult } from '../src/shared.js';
@@ -65,6 +65,36 @@ describe('resolveClient', () => {
     vi.stubEnv('OCTEN_API_KEY', 'env-key');
     expect(resolveClient({})).toBeInstanceOf(Octen);
   });
+  describe('option forwarding', () => {
+    const okBody = JSON.stringify({ code: 0, msg: 'success', request_id: 'r', data: { query: 'q', results: [] }, meta: {} });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    // The client reads the global fetch on every call, so a stub observes what resolveClient configured.
+    it('forwards baseURL to the client', async () => {
+      const fetchMock = vi.fn(async (_url: unknown) => new Response(okBody, { status: 200 }));
+      vi.stubGlobal('fetch', fetchMock);
+      await resolveClient({ apiKey: 'k', baseURL: 'https://custom.example.test' }).search.search({ query: 'q' });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(String(fetchMock.mock.calls[0]?.[0])).toMatch(/^https:\/\/custom\.example\.test\/search/);
+    });
+
+    it('forwards maxRetries: 0 so a 503 is attempted exactly once', async () => {
+      const fetchMock = vi.fn(async () => new Response('{}', { status: 503 }));
+      vi.stubGlobal('fetch', fetchMock);
+      await expect(resolveClient({ apiKey: 'k', maxRetries: 0 }).search.search({ query: 'q' })).rejects.toThrow();
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('forwards timeout so a hung request rejects with OctenTimeoutError', async () => {
+      vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(() => {})));
+      await expect(
+        resolveClient({ apiKey: 'k', timeout: 50, maxRetries: 0 }).search.search({ query: 'q' }),
+      ).rejects.toBeInstanceOf(OctenTimeoutError);
+    });
+  });
 });
 
 describe('mergeParams', () => {
@@ -94,6 +124,11 @@ describe('mergeParams', () => {
   it('does not treat a dev default whose value is undefined as pinned', () => {
     const out = mergeParams<P>({}, { time_range: undefined } as unknown as Partial<P>, { query: 'q', time_range: 'day' }, fields);
     expect(out.time_range).toBe('day');
+  });
+
+  it('keeps a tool default when the dev default is explicitly undefined', () => {
+    const out = mergeParams<P>({ count: 5 }, { count: undefined } as unknown as Partial<P>, { query: 'q' }, fields);
+    expect(out.count).toBe(5);
   });
 
   it('drops a null model value so it cannot override a default', () => {
@@ -170,7 +205,7 @@ describe('trimWebResult', () => {
   // Input shapes: test/fixtures/search.json (full_content is "" when not requested, plus extra fields)
   // and test/fixtures/pulse-search.json (lite results carry only title and url).
   it('keeps only the five model-visible fields and drops an empty full_content', () => {
-    const out = trimWebResult({
+    const recorded = {
       title: 'T',
       url: 'https://a.example',
       highlight: 'H',
@@ -179,7 +214,8 @@ describe('trimWebResult', () => {
       time_published: '2026-10-29T18:37:11Z',
       time_last_crawled: '2026-11-03T15:45:59Z',
       favicon: 'https://a.example/f.png',
-    });
+    };
+    const out = trimWebResult(recorded);
     expect(out).toEqual({ title: 'T', url: 'https://a.example', highlight: 'H', time_published: '2026-10-29T18:37:11Z' });
     expect('full_content' in out).toBe(false);
   });
