@@ -53,14 +53,13 @@ jobs:
         run: npm run build
       - name: End-to-end (packed tarball in ESM/CJS/TS projects, real-socket fault injection against dist)
         run: npm run test:e2e
+      # npm 12.2.1 runs through npx: upgrading the bundled npm in place fails on the runner (MODULE_NOT_FOUND).
       # Pinned on purpose: `npm@latest` would let an unreviewed npm release run with our publish rights.
-      - name: Install npm 12.2.1 for OIDC
-        run: npm install -g npm@12.2.1
       - name: Print toolchain versions
         run: |
           echo "node $(node --version)"
-          echo "npm $(npm --version)"
+          echo "npm $(npx --yes npm@12.2.1 --version)"
       # No NODE_AUTH_TOKEN: with id-token: write and a trusted publisher configured on npmjs.com
       # (repo Octen-Team/octen-js, workflow release.yml), npm authenticates via OIDC.
       - name: Publish to npm (OIDC, provenance)
-        run: npm publish --provenance --access public
+        run: npx --yes npm@12.2.1 publish --provenance --access public
