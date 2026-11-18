@@ -246,15 +246,17 @@ For billing-sensitive jobs, set `maxRetries: 0` and handle retries yourself. Ser
 
 ## Differences from the Python SDK
 
-Compared with `octen-py` 0.11.1:
+Compared with `octen-py` 0.12.0:
 
 | Area | `octen-py` | `@octen.ai/sdk` |
 |---|---|---|
 | Parameter validation | Checks value ranges (such as `count`) locally | Checks only `query` and unknown keys; ranges are checked by the server (400) |
 | Unknown keys in nested request objects | Top level rejected, nested `highlight` / `full_content` allowed | Rejected at every level |
-| Client timeout | Retried | Not retried |
+| Client timeout | Retried by default; with `retry_after_send=False` raised at once, except connect and pool timeouts, which never reached the server and are always retried | Never retried (`OctenTimeoutError`) |
 | `Retry-After` | 429 only | 429 and 503; above 60 s no retry |
-| Network errors | All retried | Only errors before the request is sent |
+| Network errors | Retried by default; with `retry_after_send=False` only errors before the request is sent (connect failures) are retried | Only errors before the request is sent (`ECONNREFUSED`, `ENOTFOUND`, `EAI_AGAIN`); a connection dropped after sending is never retried |
+| Opting out of re-sending after send | Keyword-only client option `retry_after_send` (default `True`) | No option; never re-sends after a timeout, an abort or a connection dropped after sending |
+| `request_sent` on errors | `OctenTimeoutError` and `OctenConnectionError` carry `request_sent` (`False`, `True` or `None`) | Not exposed |
 | 2xx responses | Validated against the full response model | Judged only by the rules under [Errors](#errors) |
 | Error classes | Dedicated classes for 401 and 429 | Also 403, 400/422 and 5xx subclasses |
 | Auth headers | `x-api-key` and `Authorization: Bearer` | `x-api-key` only |
