@@ -13,6 +13,11 @@ describe('package metadata', () => {
     expect(pkg.version).toBe(TOOLS_VERSION);
   });
 
+  // Only versions that pass scripts/matrix.sh belong in this range.
+  it('accepts ai 5, 6 and 7 as a peer', () => {
+    expect(pkg.peerDependencies.ai).toBe('^5.0.0 || ^6.0.0 || ^7.0.0');
+  });
+
   it('accepts zod 3.25.76+ and 4.1.8+ as a peer', () => {
     expect(pkg.peerDependencies.zod).toBe('^3.25.76 || ^4.1.8');
   });

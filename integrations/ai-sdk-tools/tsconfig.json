@@ -17,5 +17,5 @@
     "noEmit": true
   },
   "include": ["src", "test", "tsup.config.ts", "vitest.config.ts", "vitest.live.config.ts"],
-  "exclude": ["test/types"]
+  "exclude": ["test/types", "test/matrix"]
 }
