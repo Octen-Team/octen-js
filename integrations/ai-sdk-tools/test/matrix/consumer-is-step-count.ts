@@ -1,4 +1,4 @@
-// Only type-checked when the installed ai exports isStepCount (ai 7 and later).
+// Type-checked only where the installed ai is 7 or later, the first major that exports isStepCount.
 import { generateText, isStepCount } from 'ai';
 import { octenWebSearch } from '@octen.ai/ai-sdk-tools';
 

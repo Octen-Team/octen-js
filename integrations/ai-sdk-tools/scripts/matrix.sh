@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Runs test/matrix/run.mjs and a type check against the packed package for each ai/zod pair.
-# Exits non-zero if any combo fails scenario A, scenario B, the type check or prints a DRIFT line.
+# Exits non-zero if any combo fails scenario A, scenario B, the schema check, the CJS load, the type check,
+# installs more than one SDK version or prints a DRIFT line.
 set -euo pipefail
 
 PKG_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -94,18 +95,28 @@ for combo in "${COMBOS[@]}"; do
     FAILED=1
     continue
   fi
-  cp "$MATRIX_DIR/run.mjs" "$MATRIX_DIR/consumer.ts" "$MATRIX_DIR/consumer-is-step-count.ts" "$dir/"
+  cp "$MATRIX_DIR/run.mjs" "$MATRIX_DIR/cjs-smoke.cjs" "$MATRIX_DIR/consumer.ts" "$MATRIX_DIR/consumer-is-step-count.ts" "$dir/"
+
+  # One SDK copy only, so MATRIX_SDK is the SDK the tools actually run on.
+  sdk_versions="$(cd "$dir" && find node_modules -path '*/@octen.ai/sdk/package.json' -exec node -p 'require(require("path").resolve(process.argv[1])).version' {} \; | sort -u | tr '\n' ' ')"
+  sdk=PASS
+  if [[ "$(echo "$sdk_versions" | wc -w | tr -d ' ')" != 1 ]]; then sdk=FAIL; fi
+  echo "sdk: $sdk (${sdk_versions% })"
 
   if [[ "$node_label" == "20" ]]; then runner=($NODE20); else runner=(node); fi
   run_ok=1
   (cd "$dir" && "${runner[@]}" run.mjs "$FIXTURE") >"$log" 2>&1 || run_ok=0
   cat "$log"
 
-  # isStepCount exists only from ai 7, so that file is checked only where ai exports it.
+  cjs=PASS
+  (cd "$dir" && "${runner[@]}" cjs-smoke.cjs) >"$dir/cjs.log" 2>&1 || cjs=FAIL
+  if [[ "$cjs" == FAIL ]]; then cat "$dir/cjs.log"; fi
+  echo "cjs: $cjs"
+
+  # isStepCount exists from ai 7; chosen by the installed version so a broken export fails the type check.
+  ai_major="$(cd "$dir" && node -p 'require("./node_modules/ai/package.json").version.split(".")[0]')"
   files=(consumer.ts)
-  if (cd "$dir" && node --input-type=module -e "import('ai').then((m) => process.exit(m.isStepCount ? 0 : 1))"); then
-    files+=(consumer-is-step-count.ts)
-  fi
+  if [[ "$ai_major" -ge 7 ]]; then files+=(consumer-is-step-count.ts); fi
   node -e 'const fs = require("fs"); const [src, dst, ...files] = process.argv.slice(1);
     const config = JSON.parse(fs.readFileSync(src, "utf8")); config.files = files;
     fs.writeFileSync(dst, JSON.stringify(config, null, 2));' \
@@ -117,6 +128,7 @@ for combo in "${COMBOS[@]}"; do
 
   a="$(field "$log" 'A generateText:' | cut -d' ' -f1)"
   b="$(field "$log" 'B streamText:' | cut -d' ' -f1)"
+  schema="$(field "$log" 'schema:' | cut -d' ' -f1)"
   major="$(sed -n 's/^combo: ai@\([0-9][0-9]*\)\..*/\1/p' "$log")"
   observed=""
   drift=none
@@ -131,11 +143,12 @@ for combo in "${COMBOS[@]}"; do
   done
   versions="$(head -n 1 "$log" | sed 's/^combo: //')"
   verdict=PASS
-  if [[ "$run_ok" -ne 1 || "$a" != PASS || "$b" != PASS || "$types" != PASS || "$drift" != none ]]; then
+  if [[ "$run_ok" -ne 1 || "$a" != PASS || "$b" != PASS || "$schema" != PASS || "$cjs" != PASS || "$sdk" != PASS \
+    || "$types" != PASS || "$drift" != none ]]; then
     verdict=FAIL
     FAILED=1
   fi
-  SUMMARY+=("$versions | A=${a:-?} B=${b:-?} types=$types drift=$drift |$observed | $verdict")
+  SUMMARY+=("$versions | A=${a:-?} B=${b:-?} schema=${schema:-?} cjs=$cjs sdk=$sdk types=$types drift=$drift |$observed | $verdict")
 done
 
 echo

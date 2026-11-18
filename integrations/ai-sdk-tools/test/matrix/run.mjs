@@ -267,6 +267,33 @@ async function scenarioCStream(kind) {
   return `${tokens.join('+') || 'none'} (${details.join('; ') || 'no error parts'}; tool threw ${s.toolThrew.join(',') || 'nothing'}; model calls ${s.prompts.length}; second call gets output ${fed?.output?.type ?? 'nothing'})`;
 }
 
+// What the model is shown: the JSON schema each tool hands to the model, and the AI SDK's own input check.
+async function scenarioSchema() {
+  const failures = [];
+  const client = new Octen({ apiKey: 'test-key', fetch: fakeFetch(200).fetch });
+  const tools = { webSearch: octenWebSearch({ client }), pinned: octenWebSearch({ client, defaults: { time_range: 'week' } }) };
+  const seen = [];
+  const model = new Mock({
+    doGenerate: async (options) => {
+      seen.push(options.tools ?? []);
+      return { content: [{ type: 'text', text: FINAL_TEXT }], finishReason: finishReason('stop'), usage: usage(), warnings: [] };
+    },
+  });
+  await ai.generateText({ model, tools, prompt: 'q' });
+  const byName = Object.fromEntries((seen[0] ?? []).map((t) => [t.name, t.inputSchema]));
+  const keys = (schema) => Object.keys(schema?.properties ?? {}).sort().join(',');
+  const required = (schema) => JSON.stringify(schema?.required ?? []);
+  check(failures, keys(byName.webSearch) === 'query,time_range', `webSearch properties ${keys(byName.webSearch)}`);
+  check(failures, required(byName.webSearch) === '["query"]', `webSearch required ${required(byName.webSearch)}`);
+  check(failures, keys(byName.pinned) === 'query', `pinned properties ${keys(byName.pinned)}`);
+  check(failures, required(byName.pinned) === '["query"]', `pinned required ${required(byName.pinned)}`);
+  const validate = async (value) => (await ai.asSchema(tools.webSearch.inputSchema).validate(value)).success;
+  check(failures, (await validate({ query: 'q', time_range: null })) === true, 'time_range null rejected');
+  check(failures, (await validate({ query: 'q' })) === true, 'missing time_range rejected');
+  check(failures, (await validate({ query: 'q', time_range: 'w' })) === false, "time_range 'w' accepted");
+  return { failures, timeRange: JSON.stringify(byName.webSearch?.properties?.time_range) };
+}
+
 // Observation only: what generateText does after a tool-call step when stopWhen is not set.
 async function scenarioD() {
   const s = setup(200);
@@ -288,10 +315,19 @@ const a = await attempt(scenarioA);
 console.log(`A generateText: ${a.length === 0 ? 'PASS' : `FAIL ${a.join('; ')}`}`);
 const b = await attempt(scenarioB);
 console.log(`B streamText: ${b.length === 0 ? 'PASS' : `FAIL ${b.join('; ')}`}`);
+let schemaFailures;
+try {
+  const { failures, timeRange } = await scenarioSchema();
+  schemaFailures = failures;
+  console.log(`schema: ${failures.length === 0 ? 'PASS' : `FAIL ${failures.join('; ')}`} (time_range ${timeRange})`);
+} catch (err) {
+  schemaFailures = [String(err)];
+  console.log(`schema: FAIL threw ${describeErr(err)}: ${err?.message ?? err}`);
+}
 const observe = (promise) => promise.catch((err) => `observe-failed (${err?.message ?? err})`);
 for (const [kind, label] of [[401, 'error-behavior'], ['conn', 'conn-error-behavior'], ['abort', 'abort-error-behavior']]) {
   console.log(`${label}: ${await observe(scenarioC(kind))}`);
   console.log(`stream-${label}: ${await observe(scenarioCStream(kind))}`);
 }
 console.log(`no-stopwhen: ${await observe(scenarioD())}`);
-process.exitCode = a.length === 0 && b.length === 0 ? 0 : 1;
+process.exitCode = a.length === 0 && b.length === 0 && schemaFailures.length === 0 ? 0 : 1;
