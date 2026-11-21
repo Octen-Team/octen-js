@@ -94,6 +94,22 @@ describe.skipIf(!enabled)('live: Image Search', () => {
     expect(results.some((r) => /eiffel/i.test(`${r.title ?? ''} ${r.description ?? ''}`))).toBe(true);
   });
 
+  // Same photo sent inline as base64 data instead of a URL
+  it('by base64 image data: returns results about the pictured subject', async () => {
+    const download = await fetch(EIFFEL_IMAGE, { signal: AbortSignal.timeout(30_000) });
+    expect(download.ok, `download status ${download.status}`).toBe(true);
+    const data = Buffer.from(await download.arrayBuffer()).toString('base64');
+    const res = logged(
+      'imageSearch image data',
+      await client().imageSearch.search({ inputs: [{ type: 'image', data }], count: 2 }),
+    );
+    const results = res.data?.results ?? [];
+    expect(results.length).toBeGreaterThanOrEqual(1);
+    const titles = JSON.stringify(results.map((r) => r.title));
+    console.log(`[live-family] imageSearch image data bytes=${data.length} titles=${titles}`);
+    expect(results.some((r) => /eiffel/i.test(`${r.title ?? ''} ${r.description ?? ''}`))).toBe(true);
+  });
+
   it('count 1000 -> OctenBadRequestError', async () => {
     const err = await client()
       .imageSearch.search({ inputs: [{ type: 'text', data: 'cat' }], count: 1000 })
