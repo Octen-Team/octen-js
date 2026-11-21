@@ -294,7 +294,7 @@ For billing-sensitive jobs, set `maxRetries: 0` and handle retries yourself. Ser
 
 ## Differences from the Python SDK
 
-Compared with `octen-py` 0.12.0:
+Compared with `octen-py` 0.13.0:
 
 | Area | `octen-py` | `@octen.ai/sdk` |
 |---|---|---|
@@ -305,7 +305,7 @@ Compared with `octen-py` 0.12.0:
 | Network errors | Retried by default; with `retry_after_send=False` only errors before the request is sent (connect failures) are retried | Only errors before the request is sent (`ECONNREFUSED`, `ENOTFOUND`, `EAI_AGAIN`); a connection dropped after sending is never retried |
 | Opting out of re-sending after send | Keyword-only client option `retry_after_send` (default `True`) | No option; never re-sends after a timeout, an abort or a connection dropped after sending |
 | `request_sent` on errors | `OctenTimeoutError` and `OctenConnectionError` carry `request_sent` (`False`, `True` or `None`) | Not exposed |
-| 2xx responses | Validated against the full response model | Judged only by the rules under [Errors](#errors) |
+| 2xx responses | Checks only the top-level fields each endpoint's model requires (always a `data` object); the contents of `data` are returned as plain dicts, not validated | Judged only by the rules under [Errors](#errors) |
 | Error classes | Dedicated classes for 401 and 429 | Also 403, 400/422 and 5xx subclasses |
 | Auth headers | `x-api-key` and `Authorization: Bearer` | `x-api-key` only |
 | Deprecated `topic` parameter | Still present | Not exposed |
