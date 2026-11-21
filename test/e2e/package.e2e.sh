@@ -106,4 +106,26 @@ fetch('$OCTEN_FAKE_BASE_URL/__requests').then(r => r.json()).then(seen => {
 });
 " || fail "fake server request check"
 pass "fake server saw only well-formed requests"
+
+# 6. The fake server checks the body shape per path, so a body sent to the wrong route is rejected
+node -e "
+const base = '$OCTEN_FAKE_BASE_URL';
+const headers = { 'x-api-key': 'fake-e2e-key', 'user-agent': 'octen-js-sdk/probe', 'content-type': 'application/json' };
+const probes = [
+  ['/image-search', { query: 'q' }],
+  ['/video-search', { inputs: [{ type: 'image', url: 'https://example.com/a.png' }] }],
+  ['/search', { inputs: [{ type: 'text', data: 'q' }] }],
+  ['/search-premier', { images: { group_id: 'deck_1' } }],
+  ['/design-search', { inputs: [{ type: 'text', data: 'q' }] }],
+  ['/not-an-endpoint', { query: 'q' }],
+];
+Promise.all(probes.map(([path, body]) =>
+  fetch(base + path, { method: 'POST', headers, body: JSON.stringify(body) }).then((r) => [path, r.status]),
+)).then((results) => {
+  const accepted = results.filter(([, status]) => status !== 400);
+  console.log('wrong-route probes: ' + JSON.stringify(results));
+  if (accepted.length) process.exit(1);
+});
+" || fail "fake server accepted a body on the wrong route"
+pass "fake server rejects bodies sent to the wrong route"
 echo "ALL PACKAGE CHECKS PASSED on node $(node -v)"

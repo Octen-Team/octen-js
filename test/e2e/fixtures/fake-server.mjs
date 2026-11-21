@@ -5,6 +5,28 @@ import { createServer } from 'node:http';
 const EXPECTED_KEY = process.env.FAKE_EXPECTED_KEY ?? 'fake-e2e-key';
 const seen = [];
 
+const nonEmpty = (v) => typeof v === 'string' && v !== '';
+const hasQuery = (b) => nonEmpty(b?.query);
+// Exactly one input of an allowed type; text needs data, an image url or data
+const hasInput = (types) => (b) => {
+  const input = Array.isArray(b?.inputs) && b.inputs.length === 1 ? b.inputs[0] : undefined;
+  if (!types.includes(input?.type) || b?.query !== undefined) return false;
+  return input.type === 'text' ? nonEmpty(input.data) : nonEmpty(input.url) || nonEmpty(input.data);
+};
+// The body shape each route accepts
+const ROUTES = {
+  '/search': hasQuery,
+  '/search-premier': hasQuery,
+  '/broad-search': hasQuery,
+  '/news-search': hasQuery,
+  '/business-search': hasQuery,
+  '/pulse-search': hasQuery,
+  '/place-search': hasQuery,
+  '/image-search': hasInput(['text', 'image']),
+  '/video-search': hasInput(['text']),
+  '/design-search': (b) => b?.inputs === undefined && (hasQuery(b) || nonEmpty(b?.images?.group_id)),
+};
+
 const server = createServer((req, res) => {
   if (req.method === 'GET' && req.url === '/__requests') {
     res.setHeader('content-type', 'application/json');
@@ -26,12 +48,9 @@ const server = createServer((req, res) => {
     } catch {
       problems.push('body is not JSON');
     }
-    // A search needs a query, except image/video search (inputs[0]) and a design group lookup (images.group_id)
-    const nonEmpty = (v) => typeof v === 'string' && v !== '';
-    const input = body?.inputs?.[0];
-    if (!nonEmpty(body?.query) && !nonEmpty(input?.data) && !nonEmpty(input?.url) && !nonEmpty(body?.images?.group_id)) {
-      problems.push('body has no query, inputs or images.group_id');
-    }
+    const accepts = Object.hasOwn(ROUTES, req.url) ? ROUTES[req.url] : undefined;
+    if (accepts === undefined) problems.push(`unknown path ${req.url}`);
+    else if (!accepts(body)) problems.push(`body shape not accepted by ${req.url}`);
     seen.push({ path: req.url, problems });
     res.setHeader('content-type', 'application/json');
     if (problems.length > 0) {

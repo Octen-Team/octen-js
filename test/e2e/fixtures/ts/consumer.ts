@@ -5,6 +5,12 @@ import type { DesignSearchResponse, ImageSearchParams, SearchPremierResponse, Se
 // Explicit undefined: must also compile under exactOptionalPropertyTypes (promised in the README)
 const client = new Octen({ apiKey: process.env.OCTEN_API_KEY, baseURL: process.env.OCTEN_FAKE_BASE_URL, maxRetries: 0 });
 
+// The fake server answers with request_id "fake-<path>", so each call must have reached its own route
+function hit(ids: string[], path: string, requestId: string): void {
+  if (requestId !== `fake-${path}`) throw new Error(`expected a call to ${path}, the server saw ${requestId}`);
+  ids.push(requestId);
+}
+
 export async function callAll(): Promise<string[]> {
   const ids: string[] = [];
   const web: SearchResponse = await client.search.search({
@@ -14,16 +20,16 @@ export async function callAll(): Promise<string[]> {
     time_range: 'month',
     highlight: { enable: true, max_tokens: 300 },
   });
-  ids.push(web.request_id);
+  hit(ids, '/search', web.request_id);
   const first: string | undefined = web.data?.results?.[0]?.url;
   if (first === undefined) throw new Error('no result');
 
   const broad = await client.search.broadSearch({ query: 'q', max_queries: 1, search_options: { count: 1, language: ['en'] } });
-  ids.push(broad.request_id);
+  hit(ids, '/broad-search', broad.request_id);
   const news = await client.search.newsSearch({ query: 'q', count: 1, subjects: { enable: true, count: 1 } });
-  ids.push(news.request_id);
+  hit(ids, '/news-search', news.request_id);
   const biz = await client.search.businessSearch({ query: 'q', entities: { enable: true, count: 1 } });
-  ids.push(biz.request_id);
+  hit(ids, '/business-search', biz.request_id);
   let narrowed = '';
   for (const e of biz.data?.entities ?? []) {
     if (e.type === 'company') narrowed = e.identifiers?.stock_ticker ?? '';
@@ -31,7 +37,7 @@ export async function callAll(): Promise<string[]> {
   }
   if (narrowed !== 'EXM') throw new Error(`company narrowing at runtime gave "${narrowed}"`);
   const pulse = await client.search.pulseSearch({ query: 'q', mode: 'lite', count: 1 });
-  ids.push(pulse.request_id);
+  hit(ids, '/pulse-search', pulse.request_id);
   const place = await client.placeSearch.search({
     query: 'q',
     places: { count: 1, max_reviews: 1 },
@@ -41,23 +47,23 @@ export async function callAll(): Promise<string[]> {
     web_search: { enable: false },
     user_location: { type: 'approximate', city: 'San Francisco' },
   });
-  ids.push(place.request_id);
+  hit(ids, '/place-search', place.request_id);
   const premier: SearchPremierResponse = await client.search.searchPremier({
     query: 'q',
     result_type: 'dynamic',
     count: 1,
   });
-  ids.push(premier.request_id);
+  hit(ids, '/search-premier', premier.request_id);
   const imageParams: ImageSearchParams = { inputs: [{ type: 'image', url: 'https://example.com/a.png' }], count: 1 };
   const image = await client.imageSearch.search(imageParams);
-  ids.push(image.request_id);
+  hit(ids, '/image-search', image.request_id);
   const video = await client.videoSearch.search({ inputs: [{ type: 'text', data: 'q' }], time_range: 'week' });
-  ids.push(video.request_id);
+  hit(ids, '/video-search', video.request_id);
   const design: DesignSearchResponse = await client.designSearch.search({
     images: { group_id: 'deck_1', count: 2, snippet: { enable: false } },
     web_search: { enable: false },
   });
-  ids.push(design.request_id);
+  hit(ids, '/design-search', design.request_id);
   const position: number | undefined = design.data?.images?.[0]?.group?.position;
   void position;
   return ids;
