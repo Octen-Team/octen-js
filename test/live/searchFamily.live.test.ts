@@ -148,11 +148,26 @@ describe.skipIf(!enabled)('live: Design Search', () => {
   });
 
   it('design_facts and snippet off remove those fields; web include_domains restricts hosts', async () => {
+    const query = 'SaaS pricing page';
+    // Control: with defaults the same query returns images that carry both fields
+    const control = logged(
+      'designSearch options control (defaults)',
+      await client().designSearch.search({ query, images: { count: 5 }, web_search: { enable: false } }),
+    );
+    const withDefaults = control.data?.images ?? [];
+    console.log(
+      `[live-family] designSearch control types=${JSON.stringify(withDefaults.map((i) => i.type))} ` +
+        `snippet=${withDefaults.filter((i) => i.snippet !== undefined).length} ` +
+        `design_facts=${withDefaults.filter((i) => i.design_facts !== undefined).length}`,
+    );
+    expect(withDefaults.some((i) => i.snippet !== undefined)).toBe(true);
+    expect(withDefaults.some((i) => i.design_facts !== undefined)).toBe(true);
+
     const res = logged(
       'designSearch options off',
       await client().designSearch.search({
-        query: 'SaaS pricing page',
-        images: { count: 2, design_facts: false, snippet: { enable: false } },
+        query,
+        images: { count: 3, design_facts: false, snippet: { enable: false } },
         web_search: { count: 2, include_domains: ['stripe.com'] },
       }),
     );
