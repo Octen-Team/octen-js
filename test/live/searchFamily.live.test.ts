@@ -96,7 +96,11 @@ describe.skipIf(!enabled)('live: Image Search', () => {
 
   // Same photo sent inline as base64 data instead of a URL
   it('by base64 image data: returns results about the pictured subject', async () => {
-    const download = await fetch(EIFFEL_IMAGE, { signal: AbortSignal.timeout(30_000) });
+    // Wikimedia may refuse fetch's default user agent, so name the client
+    const download = await fetch(EIFFEL_IMAGE, {
+      headers: { 'user-agent': 'octen-js-sdk-live-tests (https://github.com/Octen-Team/octen-js)' },
+      signal: AbortSignal.timeout(30_000),
+    });
     expect(download.ok, `download status ${download.status}`).toBe(true);
     const data = Buffer.from(await download.arrayBuffer()).toString('base64');
     const res = logged(
