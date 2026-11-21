@@ -85,18 +85,50 @@ describe('scripts/spec-drift.ts', { timeout: 30_000 }, () => {
     expect(r.status).toBe(1);
   });
 
-  // Moves ImageSearchRequest.inputs into its own schema behind a $ref (inside allOf), optionally changing maxItems
-  function refInputs(name: string, maxItems?: number): string {
+  // Moves ImageSearchRequest.inputs into its own schema behind a $ref (inside allOf, or direct), optionally changing maxItems
+  function refInputs(name: string, maxItems?: number, direct = false): string {
     return writeSpec(name, (s) => {
       const schemas = s.components.schemas as Record<string, unknown> & typeof s.components.schemas;
       const inputs = { ...s.components.schemas.ImageSearchRequest!.properties.inputs! };
       if (maxItems !== undefined) inputs.maxItems = maxItems;
       schemas.ImageSearchInputs = inputs as never;
-      s.components.schemas.ImageSearchRequest!.properties.inputs = {
-        allOf: [{ $ref: '#/components/schemas/ImageSearchInputs' }],
-      } as never;
+      const ref = { $ref: '#/components/schemas/ImageSearchInputs' };
+      s.components.schemas.ImageSearchRequest!.properties.inputs = (direct ? ref : { allOf: [ref] }) as never;
     });
   }
+
+  test('a direct $ref inputs property: same bounds are not drift, changed bounds are', () => {
+    const same = run(refInputs('ref-direct-same.json', undefined, true));
+    expect(same.out).toMatch(/No drift/);
+    expect(same.status).toBe(0);
+    const changed = run(refInputs('ref-direct-changed.json', 3, true));
+    expect(changed.out).toContain('/image-search request.inputs: maxItems 1 -> 3');
+    expect(changed.status).toBe(1);
+  });
+
+  test('a missing inputs property cannot be compared: exit 2', () => {
+    // Also dropped from required, so flattenSchema accepts the schema and only the bounds lookup fails
+    const live = writeSpec('inputs-missing.json', (s) => {
+      const video = s.components.schemas.VideoSearchRequest! as { properties: Record<string, unknown>; required?: string[] };
+      delete video.properties.inputs;
+      video.required = (video.required ?? []).filter((k) => k !== 'inputs');
+    });
+    const r = run(live);
+    expect(r.out).toContain('/video-search: request property "inputs" not found');
+    expect(r.status).toBe(2);
+  });
+
+  test('a $ref cycle through inputs cannot be compared: exit 2', () => {
+    const live = writeSpec('inputs-cycle.json', (s) => {
+      const schemas = s.components.schemas as Record<string, unknown>;
+      schemas.LoopA = { allOf: [{ $ref: '#/components/schemas/LoopB' }] };
+      schemas.LoopB = { allOf: [{ $ref: '#/components/schemas/LoopA' }] };
+      s.components.schemas.ImageSearchRequest!.properties.inputs = { $ref: '#/components/schemas/LoopA' } as never;
+    });
+    const r = run(live);
+    expect(r.out).toMatch(/cycle/);
+    expect(r.status).toBe(2);
+  });
 
   test('a $ref-ed inputs array with the same bounds is not drift', () => {
     const r = run(refInputs('ref-same.json'));
