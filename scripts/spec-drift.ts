@@ -78,14 +78,30 @@ function diffFlat(a: FlatSchema | undefined, b: FlatSchema | undefined, where: s
 
 type Bounds = { minItems: string; maxItems: string };
 
-// minItems / maxItems of a direct property of the endpoint's request schema ("none" when absent)
+// A schema node plus every node it pulls in through $ref and allOf, as flattenSchema resolves them
+function expand(spec: OpenAPI, node: unknown, stack: readonly string[] = []): Raw[] {
+  if (!isRaw(node)) return [];
+  const out: Raw[] = [node];
+  if (typeof node.$ref === 'string') {
+    const name = node.$ref.replace('#/components/schemas/', '');
+    if (stack.includes(name)) throw new Error(`$ref cycle at ${[...stack, name].join(' -> ')}`);
+    out.push(...expand(spec, spec.components?.schemas?.[name], [...stack, name]));
+  }
+  if (Array.isArray(node.allOf)) for (const member of node.allOf) out.push(...expand(spec, member, stack));
+  return out;
+}
+
+// minItems / maxItems of a request property ("none" when absent), resolved through $ref and allOf
 function cardinality(spec: OpenAPI, path: string, prop: string): Bounds {
-  const name = schemaRef(spec, path, 'request').replace('#/components/schemas/', '');
-  const schema = spec.components?.schemas?.[name];
-  const props = isRaw(schema) ? schema.properties : undefined;
-  const node = isRaw(props) ? props[prop] : undefined;
-  if (!isRaw(node)) throw new Error(`${path}: request property "${prop}" not found in ${name}`);
-  const bound = (k: string) => (typeof node[k] === 'number' ? String(node[k]) : 'none');
+  const schema = expand(spec, { $ref: schemaRef(spec, path, 'request') });
+  const defs = schema.map((n) => (isRaw(n.properties) ? n.properties[prop] : undefined)).filter(isRaw);
+  if (defs.length === 0) throw new Error(`${path}: request property "${prop}" not found`);
+  const nodes = defs.flatMap((d) => expand(spec, d));
+  const bound = (k: string) => {
+    const values = [...new Set(nodes.map((n) => n[k]).filter((v) => typeof v === 'number'))];
+    if (values.length > 1) throw new Error(`${path}: conflicting ${k} for "${prop}": ${values.join(', ')}`);
+    return values.length === 1 ? String(values[0]) : 'none';
+  };
   return { minItems: bound('minItems'), maxItems: bound('maxItems') };
 }
 

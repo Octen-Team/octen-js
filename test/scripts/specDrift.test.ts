@@ -85,6 +85,31 @@ describe('scripts/spec-drift.ts', { timeout: 30_000 }, () => {
     expect(r.status).toBe(1);
   });
 
+  // Moves ImageSearchRequest.inputs into its own schema behind a $ref (inside allOf), optionally changing maxItems
+  function refInputs(name: string, maxItems?: number): string {
+    return writeSpec(name, (s) => {
+      const schemas = s.components.schemas as Record<string, unknown> & typeof s.components.schemas;
+      const inputs = { ...s.components.schemas.ImageSearchRequest!.properties.inputs! };
+      if (maxItems !== undefined) inputs.maxItems = maxItems;
+      schemas.ImageSearchInputs = inputs as never;
+      s.components.schemas.ImageSearchRequest!.properties.inputs = {
+        allOf: [{ $ref: '#/components/schemas/ImageSearchInputs' }],
+      } as never;
+    });
+  }
+
+  test('a $ref-ed inputs array with the same bounds is not drift', () => {
+    const r = run(refInputs('ref-same.json'));
+    expect(r.out).toMatch(/No drift/);
+    expect(r.status).toBe(0);
+  });
+
+  test('a $ref-ed inputs array with changed bounds is drift', () => {
+    const r = run(refInputs('ref-changed.json', 4));
+    expect(r.out).toContain('/image-search request.inputs: maxItems 1 -> 4');
+    expect(r.status).toBe(1);
+  });
+
   test('/search-premier is compared on its own: repointing it at another schema is drift', () => {
     type Post = { requestBody: { content: Record<string, { schema: { $ref: string } }> } };
     const live = writeSpec('premier.json', (s) => {
