@@ -12,7 +12,8 @@ const hasInput = (types) => (b) => {
   const input = Array.isArray(b?.inputs) && b.inputs.length === 1 ? b.inputs[0] : undefined;
   if (!types.includes(input?.type) || b?.query !== undefined) return false;
   if (input.type === 'text') return nonEmpty(input.data) && input.url === undefined;
-  return nonEmpty(input.url) !== nonEmpty(input.data);
+  const given = [input.url, input.data].filter((v) => v !== undefined);
+  return given.length === 1 && nonEmpty(given[0]);
 };
 // The body shape each route accepts
 const ROUTES = {
