@@ -2,11 +2,11 @@
 
 Official TypeScript SDK for the [Octen](https://docs.octen.ai) search API. Zero runtime dependencies, ships ESM, CommonJS and type declarations.
 
-It covers six endpoints: Web Search, Broad Search, News Search, Business Search, Pulse Search and Place Search.
+It covers ten endpoints: Web Search, Web Search Premier, Broad Search, News Search, Business Search, Pulse Search, Place Search, Image Search, Video Search (invite-only beta) and Design Search.
 
 - [Install](#install)
 - [Quick start](#quick-start)
-- [The six methods](#the-six-methods)
+- [The methods](#the-methods)
 - [Request options](#request-options)
 - [Client options](#client-options)
 - [Errors](#errors)
@@ -50,9 +50,9 @@ client.search.search({ query: 'hello' }).then((res) => console.log(res.request_i
 
 Responses are the parsed JSON bodies, so field names are snake_case exactly as in the [API reference](https://docs.octen.ai). Response fields are typed as optional (hence the `?.` above) except `request_id` and the `type` of each Business Search entity; the SDK does not check response structure at runtime, and unknown extra fields are passed through untouched.
 
-## The six methods
+## The methods
 
-Every method takes the request body as an object (`query` is required everywhere) and an optional [request options](#request-options) object as the second argument. Parameter names match the API reference; the SDK does not rename them.
+Every method takes the request body as an object and an optional [request options](#request-options) object as the second argument. `query` is required everywhere except Image and Video Search, which take `inputs`, and Design Search, where it is optional for a group lookup. Parameter names match the API reference; the SDK does not rename them.
 
 ```ts
 // Web Search: POST /search
@@ -125,13 +125,61 @@ const places = await client.placeSearch.search({
 for (const p of places.data?.places ?? []) {
   console.log(p.name, p.distance, p.rating);
 }
+
+// Web Search Premier: POST /search-premier (deeper retrieval and reranking; same body and response as search)
+const premier = await client.search.searchPremier({
+  query: 'latest guidance on EU AI Act compliance',
+  result_type: 'dynamic', // only relevant results, up to count; default 'standard'
+  count: 10,
+  include_domains: ['europa.eu'],
+});
+console.log(premier.meta?.result_type, premier.data?.results?.length);
+
+// Image Search: POST /image-search (exactly one input: a text query, or an image as a public URL or base64 data)
+const images = await client.imageSearch.search({ inputs: [{ type: 'text', data: 'golden retriever puppy' }], count: 5 });
+const similar = await client.imageSearch.search({ inputs: [{ type: 'image', url: 'https://example.com/photo.jpg' }] });
+for (const img of images.data?.results ?? []) {
+  console.log(img.url, img.source_page, img.width, img.height);
+}
+
+// Video Search: POST /video-search (invite-only beta; without beta access the API rejects the call)
+const videos = await client.videoSearch.search({ inputs: [{ type: 'text', data: 'how to make fresh pasta' }], count: 5 });
+for (const v of videos.data?.results ?? []) {
+  console.log(v.title, v.url, v.duration_seconds);
+}
+
+// Design Search: POST /design-search (design references as image results, plus web results on the same query)
+const design = await client.designSearch.search({
+  query: 'SaaS pricing page with three tiers',
+  images: { count: 5, snippet: { enable: true, max_tokens: 5000 } },
+  web_search: { count: 3 },
+});
+for (const img of design.data?.images ?? []) {
+  console.log(img.type, img.url, img.design_facts, img.snippet?.code?.length);
+}
+// Page sections and slides carry a group; fetch the whole page or deck in order (no query needed)
+const groupId = design.data?.images?.find((img) => img.group)?.group?.group_id;
+if (groupId) {
+  const deck = await client.designSearch.search({ images: { group_id: groupId, count: 20 } });
+  console.log(deck.data?.images?.map((img) => img.group?.position));
+}
 ```
+
+`searchPremier` takes the same body as `search` (there is no `topic`) and returns the same response shape. Video Search is an invite-only beta: contact Octen to request access. In Design Search, `images` options apply to the image results and `web_search` options to the web results only; turn off what you do not need with `images: { design_facts: false, snippet: { enable: false } }`, `images: { enable: false }` or `web_search: { enable: false }`. `design_facts` and `group.master` are free-form objects whose keys vary by image.
 
 `BusinessEntity` note: the TypeScript type lists the two variants that exist today, `company` and `person`, so `entity.type === 'company'` narrows the type. The server can add new `type` values at any time and the SDK returns them unchanged at runtime, so always keep a `default` branch like the one above.
 
 ### Local validation
 
-Before sending anything the SDK checks that `query` is a non-empty string and rejects keys it does not know, at every nesting level (`OctenValidationError`, with the offending path in `field`, for example `highlight.max_token`). It does not check value ranges (for example `count`); out-of-range values come back from the server as a 400 (`OctenBadRequestError`). Keys whose value is `undefined` are treated as not passed. Values that JSON would silently turn into `null` are rejected instead: `NaN` and `Infinity` anywhere, and `undefined` items inside arrays (`field` is then the item's path, for example `include_domains[1]`). `broadSearch`'s `search_options` takes the same keys as `search`, except `query`.
+Before sending anything the SDK checks the required input and rejects keys it does not know, at every nesting level (`OctenValidationError`, with the offending path in `field`, for example `highlight.max_token`). It does not check value ranges (for example `count`); out-of-range values come back from the server as a 400 (`OctenBadRequestError`). Keys whose value is `undefined` are treated as not passed. Values that JSON would silently turn into `null` are rejected instead: `NaN` and `Infinity` anywhere, and `undefined` items inside arrays (`field` is then the item's path, for example `include_domains[1]`). `broadSearch`'s `search_options` takes the same keys as `search`, except `query`.
+
+The required input, checked with `field` naming the offending path:
+
+- `query` must be a non-empty string (not only whitespace) for every method except the three below.
+- `imageSearch` and `videoSearch`: `inputs` must hold exactly one input (`inputs`). A `text` input needs a non-empty `data` (`inputs[0].data`); an `image` input needs exactly one of `url` or `data` (base64), not both (`inputs[0]`).
+- `designSearch`: `query` must be a non-empty string unless `images.group_id` is set; an empty or blank `group_id` counts as not set (`query`).
+
+Lengths are not checked locally either: a `query` over 500 characters comes back as a 400.
 
 ## Request options
 
@@ -261,6 +309,8 @@ Compared with `octen-py` 0.12.0:
 | Error classes | Dedicated classes for 401 and 429 | Also 403, 400/422 and 5xx subclasses |
 | Auth headers | `x-api-key` and `Authorization: Bearer` | `x-api-key` only |
 | Deprecated `topic` parameter | Still present | Not exposed |
+| Image Search input | `query=` or `image_url=` (or raw `inputs`); also the deprecated `topic` and `html_snippet` | Raw `inputs` only, as in the API reference; no `topic` or `html_snippet` |
+| Video Search input | `query=` | Raw `inputs` |
 | Broad Search timeout | 30 s like every endpoint | 120 s, separate default, unless a client `timeout` is set explicitly |
 
 ## Integrations
@@ -277,7 +327,7 @@ OCTEN_LIVE=1 OCTEN_API_KEY=... npm run test:live   # real, billed calls
 npm run spec-drift   # compares the live OpenAPI spec with testdata/openapi.json
 ```
 
-`testdata/openapi.json` is a snapshot of the public OpenAPI spec that the contract tests compare against; see `testdata/README.md`. A weekly workflow (`spec-drift.yml`) fails when the six endpoints' schemas change upstream; it never rewrites the snapshot.
+`testdata/openapi.json` is a snapshot of the public OpenAPI spec that the contract tests compare against; see `testdata/README.md`. A weekly workflow (`spec-drift.yml`) fails when the ten endpoints' schemas change upstream; it never rewrites the snapshot.
 
 **Releasing.** The version lives in two places, `package.json` and `src/version.ts` (a smoke test fails if they differ), so a release bumps both. To release: bump both, add a `CHANGELOG.md` entry, merge to `main`, then push a `v<version>` tag. `release.yml` refuses prerelease versions (a `-` in the version) and tags that are not on `main`, checks that the tag equals both versions, type-checks, tests, builds, runs `test:e2e` and publishes with npm provenance through OIDC trusted publishing (no token stored). `prepublishOnly` also runs typecheck, tests and build before any `npm publish`.
 
