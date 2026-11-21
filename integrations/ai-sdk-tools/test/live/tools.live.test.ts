@@ -153,6 +153,14 @@ function premierClient(paths: string[]): Octen {
 }
 
 const PREMIER_QUERY = 'solid-state battery breakthroughs';
+// Diagnostics only: a missing or malformed URL is skipped instead of throwing.
+const hostOf = (url: unknown): string | undefined => {
+  try {
+    return new URL(String(url)).hostname;
+  } catch {
+    return undefined;
+  }
+};
 const onDomain = (url: unknown, domain: string) => {
   const host = new URL(String(url)).hostname;
   return host === domain || host.endsWith(`.${domain}`);
@@ -163,12 +171,14 @@ describe('live: web search premier against production', () => {
   it('octenWebSearchPremier execute with the tool defaults', { timeout: TIMEOUT }, async () => {
     const paths: string[] = [];
     const out = await runTool(octenWebSearchPremier({ client: premierClient(paths) }), { query: PREMIER_QUERY, time_range: 'month' });
-    expect(paths).toEqual(['/search-premier']);
+    // The SDK may retry a transient failure, so every attempt is checked, not just one.
+    expect(paths.length).toBeGreaterThan(0);
+    expect(paths.every((p) => p === '/search-premier'), paths.join(' ')).toBe(true);
     const results = out['results'] as Record<string, unknown>[];
     expectNamed(first(out, 'results'), ['url', 'title']);
     expect(results.length).toBeGreaterThan(2);
     expect(results.some((r) => 'full_content' in r)).toBe(false);
-    console.log(`premier results ${results.length}, hosts ${results.map((r) => new URL(String(r['url'])).hostname).join(' ')}`);
+    console.log(`premier results ${results.length}, hosts ${results.map((r) => hostOf(r['url'])).filter((h) => h !== undefined).join(' ')}`);
   });
 
   it('octenWebSearchPremier honors include_domains against an unfiltered control', { timeout: TIMEOUT }, async () => {
@@ -213,6 +223,8 @@ describe('live: web search premier against production', () => {
     expect(filtered.length).toBeGreaterThan(0);
     // An undated result parses to NaN and fails this check; one day of slack covers the window's time zone.
     expect(filtered.every((r) => r.at >= now - 32 * day && r.at <= now + day), JSON.stringify(filtered)).toBe(true);
-    console.log(`time_range control ${control.length} results, oldest ${new Date(Math.min(...control.map((r) => r.at))).toISOString()}; month ${filtered.length} results`);
+    const dated = control.map((r) => r.at).filter((at) => Number.isFinite(at));
+    const oldest = dated.length > 0 ? new Date(Math.min(...dated)).toISOString() : 'none dated';
+    console.log(`time_range control ${control.length} results, oldest ${oldest}; month ${filtered.length} results`);
   });
 });
