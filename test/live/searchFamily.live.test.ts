@@ -73,8 +73,8 @@ function expectSomeOutside(results: readonly Dated[], start: number, end: number
   expect(outside, `${name}: the control has a result outside the window`).toBe(true);
 }
 
-// A window strictly inside the control's dated results, so the control has results before start and after end:
-// dropping either bound would let one of them back in
+// A window from one day after the control's earliest dated result to one day before its latest, so dropping
+// either bound would let a control result back in
 function innerWindow(control: readonly Dated[], name: string): { start: string; end: string } {
   const times = control
     .map((r) => r.time_published)
@@ -86,11 +86,7 @@ function innerWindow(control: readonly Dated[], name: string): { start: string; 
   const first = times[0] ?? 0;
   const last = times[times.length - 1] ?? 0;
   expect(last - first, `${name}: the control needs dated results more than two days apart`).toBeGreaterThan(2 * DAY_MS);
-  const start = first + DAY_MS;
-  const end = last - DAY_MS;
-  expect(times.some((t) => t < start), `${name}: a control result before start`).toBe(true);
-  expect(times.some((t) => t > end), `${name}: a control result after end`).toBe(true);
-  return { start: new Date(start).toISOString(), end: new Date(end).toISOString() };
+  return { start: new Date(first + DAY_MS).toISOString(), end: new Date(last - DAY_MS).toISOString() };
 }
 
 type Texty = {
@@ -267,19 +263,20 @@ describe.skipIf(!enabled)('live: Web Search Premier', () => {
   });
 
   it('start_time and end_time each bound time_published (window inside the control)', async () => {
-    const w = innerWindow((await control()).data?.results ?? [], 'searchPremier start/end');
+    const params = {
+      query,
+      count: 5,
+      format: 'text',
+      result_type: 'standard',
+      full_content: fullContent,
+      time_basis: 'published',
+    } as const;
+    // Control: the same parameters without start_time/end_time
+    const windowControl = logged('searchPremier start/end control', await client().search.searchPremier(params));
+    const w = innerWindow(windowControl.data?.results ?? [], 'searchPremier start/end');
     const res = logged(
       'searchPremier start/end',
-      await client().search.searchPremier({
-        query,
-        count: 5,
-        format: 'text',
-        result_type: 'standard',
-        full_content: fullContent,
-        time_basis: 'published',
-        start_time: w.start,
-        end_time: w.end,
-      }),
+      await client().search.searchPremier({ ...params, start_time: w.start, end_time: w.end }),
     );
     expectAllWithin(res.data?.results ?? [], Date.parse(w.start), Date.parse(w.end), 'searchPremier start/end');
   });
@@ -504,18 +501,19 @@ describe.skipIf(!enabled)('live: Design Search', () => {
   });
 
   it('web start_time and end_time each bound time_published (window inside the control)', async () => {
-    const w = innerWindow((await control()).data?.results ?? [], 'designSearch web start/end');
+    const web = { full_content: { enable: true, max_tokens: 2000 }, time_basis: 'published' } as const;
+    // Control: the same parameters without start_time/end_time
+    const windowControl = logged(
+      'designSearch web start/end control',
+      await client().designSearch.search({ query, images: { enable: false }, web_search: web }),
+    );
+    const w = innerWindow(windowControl.data?.results ?? [], 'designSearch web start/end');
     const res = logged(
       'designSearch web start/end',
       await client().designSearch.search({
         query,
         images: { enable: false },
-        web_search: {
-          full_content: { enable: true, max_tokens: 2000 },
-          time_basis: 'published',
-          start_time: w.start,
-          end_time: w.end,
-        },
+        web_search: { ...web, start_time: w.start, end_time: w.end },
       }),
     );
     expectAllWithin(res.data?.results ?? [], Date.parse(w.start), Date.parse(w.end), 'designSearch web start/end');
