@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Octen API",
-    "description": "Octen API provides Broad Search, Web Search, Image Search, Video Search, Extract, Embeddings, VL Embeddings, Answer, and Deep Research services. The Web Search API searches ranked web results with optional filters, highlights, and full content. The Image Search API searches for images from a text query or an image. The Video Search API searches for videos from a text query. The Broad Search API decomposes a query into multiple sub-queries, searches them in parallel, and returns results grouped by sub-query. The Extract API extracts clean content from URLs, with optional query-focused highlights, page classification, and multimedia resources. The Embeddings API converts text into vector representations. The VL Embeddings API converts multimodal inputs into vector representations. The Answer API decomposes queries into multiple sub-queries for comprehensive search and synthesis. The Deep Research API runs a multi-round adaptive research pipeline that produces a structured research plan, executes iterative searches, and streams a final long-form report. The Pulse Search API generates the most likely URLs for a query in about 10ms, with optional highlights and full content in standard mode.",
+    "description": "Octen API provides Broad Search, Web Search, Image Search, Video Search, Extract, Embeddings, VL Embeddings, Answer, and Deep Research services. The Web Search API searches ranked web results with optional filters, highlights, and full content. The Image Search API searches for images from a text query or an image. The Video Search API searches for videos from a text query. The Broad Search API decomposes a query into multiple sub-queries, searches them in parallel, and returns results grouped by sub-query. The Extract API extracts clean content from URLs, with optional query-focused highlights, page classification, and multimedia resources. The Embeddings API converts text into vector representations. The VL Embeddings API converts multimodal inputs into vector representations. The Answer API decomposes queries into multiple sub-queries for comprehensive search and synthesis. The Deep Research API runs a multi-round adaptive research pipeline that produces a structured research plan, executes iterative searches, and streams a final long-form report. The Pulse Search API generates the most likely URLs for a query in about 10ms, with optional highlights and full content in standard mode. The Monitor API watches a topic or a set of pages on a schedule, records changes that meet your condition as events, and pushes them by webhook or email, or lets you pull them through the API.",
     "version": "1.0.0"
   },
   "servers": [
@@ -26,10 +26,10 @@
         "operationId": "pulse-search",
         "security": [
           {
-            "bearerAuthNoPayment": []
+            "Bearer": []
           },
           {
-            "apiKeyAuthNoPayment": []
+            "x-api-key": []
           }
         ],
         "x-mint": {
@@ -218,10 +218,10 @@
         "operationId": "search",
         "security": [
           {
-            "bearerAuthNoPayment": []
+            "Bearer": []
           },
           {
-            "apiKeyAuthNoPayment": []
+            "x-api-key": []
           }
         ],
         "x-mint": {
@@ -369,19 +369,161 @@
         }
       }
     },
+    "/search-premier": {
+      "post": {
+        "summary": "Web Search Premier",
+        "description": "Searches the live web with deeper retrieval and reranking, and returns ranked results with model-ready highlights and optional full content. Optional filters narrow sources, time windows, and languages.",
+        "operationId": "search-premier",
+        "x-mint": {
+          "href": "/api-reference/search-premier",
+          "metadata": {
+            "title": "Web Search Premier API Reference",
+            "sidebarTitle": "Web Search Premier"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchRequest"
+              },
+              "examples": {
+                "basic": {
+                  "summary": "Basic Search",
+                  "value": {
+                    "query": "What record did Kendrick Lamar break at the 2026 Grammy Awards?",
+                    "count": 5
+                  }
+                },
+                "domainFiltering": {
+                  "summary": "Domain Filtering + Time Range + Highlights",
+                  "value": {
+                    "query": "summary judgment",
+                    "count": 10,
+                    "time_basis": "published",
+                    "start_time": "2024-01-01T00:00:00+08:00",
+                    "end_time": "2025-01-01T00:00:00+08:00",
+                    "include_domains": [
+                      "uscourts.gov"
+                    ],
+                    "highlight": {
+                      "enable": true,
+                      "max_tokens": 300
+                    },
+                    "full_content": {
+                      "enable": false
+                    },
+                    "format": "text"
+                  }
+                },
+                "fullContent": {
+                  "summary": "Full Content Enabled",
+                  "value": {
+                    "query": "latest WHO guidance on influenza vaccination",
+                    "count": 5,
+                    "full_content": {
+                      "enable": true,
+                      "max_tokens": 1000
+                    }
+                  }
+                },
+                "dynamicResults": {
+                  "summary": "Dynamic Results",
+                  "value": {
+                    "query": "EU AI Act enforcement timeline",
+                    "result_type": "dynamic",
+                    "count": 10
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful search response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchResponse"
+                },
+                "example": {
+                  "code": 0,
+                  "msg": "success",
+                  "request_id": "req_abc123def456",
+                  "data": {
+                    "query": "latest WHO guidance on influenza vaccination",
+                    "results": [
+                      {
+                        "title": "Influenza (Seasonal) - World Health Organization (WHO)",
+                        "url": "https://www.who.int/news-room/fact-sheets/detail/influenza-(seasonal)",
+                        "highlight": "WHO recommends annual vaccination for high-risk groups\n\n...\n\nSeasonal influenza vaccination policies vary by region...",
+                        "authors": "World Health Organization",
+                        "time_published": "2024-10-15T00:00:00Z",
+                        "time_last_crawled": "2026-01-20T02:12:34Z",
+                        "favicon": "https://www.who.int/favicon.ico",
+                        "cover_image": {
+                          "url": "https://www.who.int/images/default-source/influenza/seasonal-influenza-cover.jpg",
+                          "description": "Seasonal influenza vaccination"
+                        },
+                        "images": [
+                          {
+                            "url": "https://www.who.int/images/default-source/influenza/influenza-vaccine-vial.jpg",
+                            "description": "A vial of seasonal influenza vaccine."
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "meta": {
+                    "usage": {
+                      "num_search_queries": 1,
+                      "full_content_extra_count": 0
+                    },
+                    "result_type": "standard",
+                    "latency": 237,
+                    "warning": ""
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing parameter query — Returned when a required parameter is missing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 400,
+                  "msg": "Missing parameter query",
+                  "request_id": "req_abc123def456"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/InsufficientBalance"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
     "/news-search": {
       "post": {
         "summary": "News Search",
         "description": "Searches live news and returns ranked articles with model-ready highlights, images, and optional full content. Related articles are also grouped into subjects, each with a summary, a representative article, and its own timeline.",
         "operationId": "news-search",
-        "security": [
-          {
-            "bearerAuthNoPayment": []
-          },
-          {
-            "apiKeyAuthNoPayment": []
-          }
-        ],
         "x-mint": {
           "href": "/api-reference/news-search",
           "metadata": {
@@ -566,14 +708,6 @@
         "summary": "Business Search",
         "description": "Searches the web for business content. The companies and people behind the query are also returned as entity cards.",
         "operationId": "business-search",
-        "security": [
-          {
-            "bearerAuthNoPayment": []
-          },
-          {
-            "apiKeyAuthNoPayment": []
-          }
-        ],
         "x-mint": {
           "href": "/api-reference/business-search",
           "metadata": {
@@ -867,14 +1001,6 @@
         "summary": "Place Search",
         "description": "Searches for places that match the query. Each place is returned as a place card carrying its address, coordinates, contact details, opening status, and rating. For better results, pass the request location in `latitude` and `longitude`, or in `user_location`.",
         "operationId": "place-search",
-        "security": [
-          {
-            "bearerAuthNoPayment": []
-          },
-          {
-            "apiKeyAuthNoPayment": []
-          }
-        ],
         "x-mint": {
           "href": "/api-reference/place-search",
           "metadata": {
@@ -1048,6 +1174,329 @@
                 "example": {
                   "code": 400,
                   "msg": "Invalid params. Missing parameter query",
+                  "request_id": "req_abc123def456"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/InsufficientBalance"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/design-search": {
+      "post": {
+        "summary": "Design Search",
+        "description": "Searches for design references that match the query. Each reference is returned as an image result: a screenshot of a web page, page section, app screen, or slide, with its design values. Web results on the same query are returned alongside.",
+        "operationId": "design-search",
+        "x-mint": {
+          "href": "/api-reference/design-search",
+          "metadata": {
+            "title": "Design Search API Reference",
+            "sidebarTitle": "Design Search"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DesignSearchRequest"
+              },
+              "examples": {
+                "basic": {
+                  "summary": "Basic Design Search",
+                  "value": {
+                    "query": "pricing section for a SaaS landing page"
+                  }
+                },
+                "images_only": {
+                  "summary": "Images Only",
+                  "value": {
+                    "query": "iOS onboarding screen",
+                    "images": {
+                      "count": 10
+                    },
+                    "web_search": {
+                      "enable": false
+                    }
+                  }
+                },
+                "group": {
+                  "summary": "Get a Whole Deck",
+                  "value": {
+                    "images": {
+                      "group_id": "deck_3b7f0e92c4a1d85f6e2b9c07a3d4f1e8b5c26a9d0f7e3b1c4a8d2e6f9b0c5a7d",
+                      "count": 30
+                    }
+                  }
+                },
+                "web_results": {
+                  "summary": "Web Results Options",
+                  "value": {
+                    "query": "dark mode color contrast",
+                    "images": {
+                      "count": 5,
+                      "snippet": {
+                        "enable": true,
+                        "max_tokens": 5000
+                      }
+                    },
+                    "web_search": {
+                      "count": 10,
+                      "language": [
+                        "en"
+                      ],
+                      "highlight": {
+                        "enable": true,
+                        "max_tokens": 300
+                      },
+                      "full_content": {
+                        "enable": true,
+                        "max_tokens": 2048
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful design search response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignSearchResponse"
+                },
+                "example": {
+                  "code": 0,
+                  "msg": "success",
+                  "request_id": "req_abc123def456",
+                  "data": {
+                    "query": "pricing section for a SaaS landing page",
+                    "images": [
+                      {
+                        "type": "web_section",
+                        "title": "Simple, transparent pricing",
+                        "description": "A pricing section on a white background with three plan cards side by side; the middle card has a green border and a Most popular badge.",
+                        "url": "https://cdn.octen.ai/octen-public-resource/data/design/web_page/8d2e5c41a07b93f6e1d4c28a5b90f3e7c6a1d2b4/s-004.png?sdd=1&se=2026-11-19T13%3A00%3A00Z&sig=example",
+                        "thumbnail": "https://cdn.octen.ai/octen-public-resource/data/design/thumb/4a1c/4a1c9e07b52d83f6a0e1c7d94b28f5e3.jpg?sdd=1&se=2026-11-19T13%3A00%3A00Z&sig=example",
+                        "source_page": "https://www.example-saas.com/pricing",
+                        "width": 1440,
+                        "height": 860,
+                        "group": {
+                          "group_id": "pg_8d2e5c41a07b93f6e1d4c28a5b90f3e7c6a1d2b4",
+                          "type": "web_page",
+                          "name": "Pricing | Example SaaS",
+                          "position": 4,
+                          "total": 9
+                        },
+                        "design_facts": {
+                          "color": {
+                            "background": {
+                              "$type": "color",
+                              "$value": {
+                                "alpha": 1,
+                                "colorSpace": "srgb",
+                                "components": [
+                                  1,
+                                  1,
+                                  1
+                                ],
+                                "hex": "#ffffff"
+                              }
+                            },
+                            "text": {
+                              "$type": "color",
+                              "$value": {
+                                "alpha": 1,
+                                "colorSpace": "srgb",
+                                "components": [
+                                  0.0627,
+                                  0.0941,
+                                  0.1569
+                                ],
+                                "hex": "#101828"
+                              }
+                            },
+                            "accent": {
+                              "$type": "color",
+                              "$value": {
+                                "alpha": 1,
+                                "colorSpace": "srgb",
+                                "components": [
+                                  0.0863,
+                                  0.6392,
+                                  0.2902
+                                ],
+                                "hex": "#16a34a"
+                              }
+                            }
+                          },
+                          "fontFamily": {
+                            "heading": {
+                              "$type": "fontFamily",
+                              "$value": [
+                                "Inter"
+                              ]
+                            },
+                            "body": {
+                              "$type": "fontFamily",
+                              "$value": [
+                                "Inter"
+                              ]
+                            }
+                          },
+                          "fontSize": {
+                            "heading": {
+                              "$type": "dimension",
+                              "$value": {
+                                "unit": "px",
+                                "value": 40
+                              }
+                            },
+                            "body": {
+                              "$type": "dimension",
+                              "$value": {
+                                "unit": "px",
+                                "value": 16
+                              }
+                            }
+                          },
+                          "radius": {
+                            "default": {
+                              "$type": "dimension",
+                              "$value": {
+                                "unit": "px",
+                                "value": 12
+                              }
+                            }
+                          }
+                        },
+                        "snippet": {
+                          "format": "html",
+                          "code": "<section class=\"pricing\"><h2 class=\"pricing-title\">Simple, transparent pricing</h2><div class=\"plans\"><div class=\"plan\">…</div></div></section>"
+                        }
+                      },
+                      {
+                        "type": "slide",
+                        "title": "Market opportunity",
+                        "description": "A slide with three nested circles on the left labeled TAM, SAM, and SOM, and a figure with a one-line note for each on the right.",
+                        "url": "https://cdn.octen.ai/octen-public-resource/data/design/deck/3b7f0e92c4a1d85f6e2b9c07a3d4f1e8b5c26a9d0f7e3b1c4a8d2e6f9b0c5a7d/p-005.png?sdd=1&se=2026-11-19T13%3A00%3A00Z&sig=example",
+                        "thumbnail": "https://cdn.octen.ai/octen-public-resource/data/design/thumb/9e5b/9e5b2c18f0a74d36b1e8c5a29d07f4b3.jpg?sdd=1&se=2026-11-19T13%3A00%3A00Z&sig=example",
+                        "source_page": "https://www.example-startup.com/files/seed-deck.pptx",
+                        "width": 1920,
+                        "height": 1080,
+                        "group": {
+                          "group_id": "deck_3b7f0e92c4a1d85f6e2b9c07a3d4f1e8b5c26a9d0f7e3b1c4a8d2e6f9b0c5a7d",
+                          "type": "deck",
+                          "name": "Example Startup Seed Deck",
+                          "position": 5,
+                          "total": 14,
+                          "master": {
+                            "width": 1280,
+                            "height": 720,
+                            "majorFont": "Calibri Light",
+                            "minorFont": "Calibri",
+                            "palette": {
+                              "dk1": "#000000",
+                              "lt1": "#FFFFFF",
+                              "dk2": "#0E2841",
+                              "lt2": "#E8E8E8",
+                              "accent1": "#156082",
+                              "accent2": "#E97132",
+                              "accent3": "#196B24",
+                              "accent4": "#0F9ED5",
+                              "accent5": "#A02B93",
+                              "accent6": "#4EA72E",
+                              "hlink": "#467886",
+                              "folHlink": "#96607D"
+                            }
+                          }
+                        },
+                        "design_facts": {
+                          "layoutFacts": {
+                            "aspectRatio": 1.7778,
+                            "elementCount": 12,
+                            "imageCount": 0,
+                            "textCount": 9
+                          },
+                          "styleFacts": {
+                            "fontFamilies": [
+                              "Calibri"
+                            ],
+                            "fontSizes": [
+                              "18pt",
+                              "36pt"
+                            ],
+                            "foregroundColors": [
+                              "#0E2841"
+                            ]
+                          },
+                          "typographyMap": {
+                            "title": {
+                              "fontFamily": "Calibri Light",
+                              "fontSizePt": 36,
+                              "fontWeight": 400
+                            },
+                            "other": {
+                              "color": "#0E2841",
+                              "fontFamily": "Calibri",
+                              "fontSizePt": 18,
+                              "fontWeight": 400
+                            }
+                          }
+                        }
+                      }
+                    ],
+                    "results": [
+                      {
+                        "title": "Pricing Page Design: 12 Patterns That Convert",
+                        "url": "https://www.example-design-blog.com/pricing-page-patterns",
+                        "highlight": "Three plans side by side, with the recommended plan raised and outlined, is the most common layout. Keep plan names short and put the price above the feature list.",
+                        "authors": "Example Design Blog",
+                        "time_published": "2026-09-08T00:00:00Z",
+                        "time_last_crawled": "2026-11-02T06:15:00Z",
+                        "favicon": "https://www.example-design-blog.com/favicon.ico",
+                        "cover_image": {
+                          "url": "https://img.example-design-blog.com/pricing-page-patterns/cover.png",
+                          "description": "Three pricing cards side by side"
+                        }
+                      }
+                    ]
+                  },
+                  "meta": {
+                    "usage": {
+                      "num_search_queries": 1
+                    },
+                    "latency": 276
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid or missing parameter.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 400,
+                  "msg": "Invalid params. Param images.count must be at most 100",
                   "request_id": "req_abc123def456"
                 }
               }
@@ -2912,10 +3361,10 @@
         },
         "security": [
           {
-            "bearerAuthNoPayment": []
+            "Bearer": []
           },
           {
-            "apiKeyAuthNoPayment": []
+            "x-api-key": []
           }
         ],
         "requestBody": {
@@ -3884,7 +4333,7 @@
                       "index": 2,
                       "delta": {
                         "type": "text_delta",
-                        "text": "Beijing is cloudy turning sunny today, with a high of 32\u00b0C."
+                        "text": "Beijing is cloudy turning sunny today, with a high of 32 degrees."
                       }
                     }
                   },
@@ -5244,6 +5693,1132 @@
           }
         }
       }
+    },
+    "/monitors": {
+      "post": {
+        "summary": "Create a monitor",
+        "description": "Creates a monitor that watches a topic or up to 10 pages on a schedule. The first run starts right away and records a baseline. Each account can have up to 30 monitors, not counting deleted ones.",
+        "operationId": "post-monitor",
+        "x-mint": {
+          "href": "/api-reference/post-monitor",
+          "metadata": {
+            "title": "Create Monitor API Reference",
+            "sidebarTitle": "Create Monitor"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MonitorCreateRequest"
+              },
+              "examples": {
+                "page": {
+                  "summary": "Page monitor",
+                  "value": {
+                    "type": "page",
+                    "page": {
+                      "urls": ["https://shop.example.com/products/widget-pro"],
+                      "output_schema": [
+                        { "field_name": "price", "field_type": "number", "field_desc": "Current price in USD" }
+                      ]
+                    },
+                    "condition": "price drops more than 10%",
+                    "schedule": { "interval": "1h" },
+                    "webhook": { "url": "https://example.com/hooks/octen" }
+                  }
+                },
+                "topic": {
+                  "summary": "Topic monitor",
+                  "value": {
+                    "type": "topic",
+                    "topic": {
+                      "query": "solid-state battery breakthroughs",
+                      "include_domains": ["news.example.com", "research.example.org"],
+                      "output_schema": [
+                        { "field_name": "headline", "field_type": "string", "field_desc": "Article headline" }
+                      ]
+                    },
+                    "condition": "a substantive new development",
+                    "schedule": { "interval": "6h" },
+                    "webhook": { "url": "https://example.com/hooks/octen" }
+                  }
+                },
+                "minimal": {
+                  "summary": "Minimal page monitor",
+                  "value": {
+                    "type": "page",
+                    "page": { "urls": ["https://example.com/terms"] }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful monitor creation response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MonitorCreateResponse"
+                },
+                "example": {
+                  "code": 0,
+                  "msg": "success",
+                  "request_id": "req_abc123def456",
+                  "data": {
+                    "monitor_id": "mon_123",
+                    "name": "shop.example.com/products/widget-pro",
+                    "type": "page",
+                    "page": {
+                      "urls": ["https://shop.example.com/products/widget-pro"],
+                      "output_schema": [
+                        { "field_name": "price", "field_type": "number", "field_desc": "Current price in USD" }
+                      ]
+                    },
+                    "condition": "price drops more than 10%",
+                    "schedule": { "interval": "1h" },
+                    "webhook": { "url": "https://example.com/hooks/octen", "secret": "octen_whsec_..." },
+                    "status": "active",
+                    "next_run_at": "2026-11-16T09:22:10Z",
+                    "last_notified_at": null,
+                    "created_at": "2026-11-16T08:22:10Z",
+                    "notifications_7d": 0,
+                    "first_run_id": "run_788"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid params — Returned when a required parameter is missing or invalid. Also returned with code 400101 (`Monitor limit reached`) when the account already has the maximum number of monitors.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 400107,
+                  "msg": "Missing required field: type",
+                  "request_id": "req_abc123def456"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/InsufficientBalance"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "get": {
+        "summary": "List monitors",
+        "description": "Lists your monitors, newest first.",
+        "operationId": "get-monitors",
+        "x-mint": {
+          "href": "/api-reference/get-monitors",
+          "metadata": {
+            "title": "List Monitors API Reference",
+            "sidebarTitle": "List Monitors"
+          }
+        },
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "active",
+                "paused"
+              ]
+            },
+            "description": "Only return monitors with this status."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 20,
+              "minimum": 1,
+              "maximum": 100
+            },
+            "description": "Maximum number of monitors to return."
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The `next_cursor` from the previous response. Omit for the first page."
+          },
+          {
+            "name": "name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filters monitors by name. Fuzzy, case-insensitive match."
+          },
+          {
+            "name": "page_no",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10000
+            },
+            "description": "Page number, for page-based pagination. Mutually exclusive with `cursor`."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful monitor list response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MonitorListResponse"
+                },
+                "example": {
+                  "code": 0,
+                  "msg": "success",
+                  "request_id": "req_abc123def456",
+                  "data": {
+                    "monitors": [
+                      {
+                        "monitor_id": "mon_456",
+                        "name": "solid-state battery breakthroughs",
+                        "type": "topic",
+                        "status": "active",
+                        "created_at": "2026-11-16T08:22:16Z",
+                        "schedule": { "interval": "6h" },
+                        "condition": "a substantive new development",
+                        "query": "solid-state battery breakthroughs",
+                        "last_run": { "run_id": "run_790", "status": "completed", "at": "2026-11-16T08:22:21Z" }
+                      },
+                      {
+                        "monitor_id": "mon_123",
+                        "name": "shop.example.com/products/widget-pro",
+                        "type": "page",
+                        "status": "active",
+                        "created_at": "2026-11-16T08:22:10Z",
+                        "schedule": { "interval": "1h" },
+                        "condition": "price drops more than 10%",
+                        "urls": ["https://shop.example.com/products/widget-pro"],
+                        "last_run": { "run_id": "run_789", "status": "completed", "at": "2026-11-16T14:00:07Z" }
+                      }
+                    ],
+                    "next_cursor": ""
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid params — Returned when a required parameter is missing or invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 400100,
+                  "msg": "Invalid params: limit must be an integer between 1 and 100",
+                  "request_id": "req_abc123def456"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/monitors/{id}": {
+      "get": {
+        "summary": "Get a monitor",
+        "description": "Returns a monitor by id.",
+        "operationId": "get-monitor",
+        "x-mint": {
+          "href": "/api-reference/get-monitor",
+          "metadata": {
+            "title": "Get Monitor API Reference",
+            "sidebarTitle": "Get Monitor"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/MonitorId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful monitor response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MonitorGetResponse"
+                },
+                "example": {
+                  "code": 0,
+                  "msg": "success",
+                  "request_id": "req_abc123def456",
+                  "data": {
+                    "monitor_id": "mon_123",
+                    "name": "shop.example.com/products/widget-pro",
+                    "type": "page",
+                    "page": {
+                      "urls": ["https://shop.example.com/products/widget-pro"],
+                      "output_schema": [
+                        { "field_name": "price", "field_type": "number", "field_desc": "Current price in USD" }
+                      ]
+                    },
+                    "condition": "price drops more than 10%",
+                    "schedule": { "interval": "1h" },
+                    "webhook": { "url": "https://example.com/hooks/octen" },
+                    "status": "active",
+                    "next_run_at": "2026-11-16T15:00:00Z",
+                    "last_run": { "run_id": "run_789", "status": "completed", "at": "2026-11-16T14:00:07Z" },
+                    "last_notified_at": "2026-11-16T14:00:07Z",
+                    "created_at": "2026-11-16T08:22:10Z",
+                    "notifications_7d": 1
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/MonitorNotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "patch": {
+        "summary": "Update a monitor",
+        "description": "Updates a monitor, or pauses or resumes it. Send only the fields to change; `type` can't be changed. An update doesn't trigger a run.\n\n**Effect of each change**\n\n| You change | Effect |\n| --- | --- |\n| `topic.query` | Clears the results found so far; the next run is judged like a first run. |\n| Other `topic` fields | Keeps the results found so far; the next run returns only unseen results. |\n| `page.urls` | New URLs are judged like a first run; removed URLs are no longer compared. |\n| `page.output_schema`, or `condition` on a `page` monitor with `output_schema` | The next run records a new baseline and is judged like a first run. |\n| `condition` in other cases | Applies from the next run. |\n| Any other field | The baseline is kept. |",
+        "operationId": "patch-monitor",
+        "x-mint": {
+          "href": "/api-reference/patch-monitor",
+          "metadata": {
+            "title": "Update Monitor API Reference",
+            "sidebarTitle": "Update Monitor"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/MonitorId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MonitorUpdateRequest"
+              },
+              "examples": {
+                "pause": {
+                  "summary": "Pause",
+                  "value": { "status": "paused" }
+                },
+                "schedule": {
+                  "summary": "Change the schedule",
+                  "value": { "schedule": { "interval": "6h" } }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful monitor update response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MonitorUpdateResponse"
+                },
+                "example": {
+                  "code": 0,
+                  "msg": "success",
+                  "request_id": "req_abc123def456",
+                  "data": {
+                    "monitor_id": "mon_123",
+                    "name": "shop.example.com/products/widget-pro",
+                    "type": "page",
+                    "page": {
+                      "urls": ["https://shop.example.com/products/widget-pro"],
+                      "output_schema": [
+                        { "field_name": "price", "field_type": "number", "field_desc": "Current price in USD" }
+                      ]
+                    },
+                    "condition": "price drops more than 10%",
+                    "schedule": { "interval": "1h" },
+                    "webhook": { "url": "https://example.com/hooks/octen" },
+                    "status": "paused",
+                    "pause_reason": "user",
+                    "last_run": { "run_id": "run_789", "status": "completed", "at": "2026-11-16T14:00:07Z" },
+                    "last_notified_at": "2026-11-16T14:00:07Z",
+                    "created_at": "2026-11-16T08:22:10Z",
+                    "notifications_7d": 1
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid params — Returned when a required parameter is missing or invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 400100,
+                  "msg": "Invalid params: status must be active or paused",
+                  "request_id": "req_abc123def456"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/MonitorNotFound"
+          },
+          "409": {
+            "description": "Conflict — Returned with code 409102 when the monitor was changed by another request at the same time. Retry the request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 409102,
+                  "msg": "Monitor was modified concurrently",
+                  "request_id": "req_abc123def456"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a monitor",
+        "description": "Deletes a monitor and stops its runs. This can't be undone.",
+        "operationId": "delete-monitor",
+        "x-mint": {
+          "href": "/api-reference/delete-monitor",
+          "metadata": {
+            "title": "Delete Monitor API Reference",
+            "sidebarTitle": "Delete Monitor"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/MonitorId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful monitor deletion response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MonitorDeleteResponse"
+                },
+                "example": {
+                  "code": 0,
+                  "msg": "success",
+                  "request_id": "req_abc123def456",
+                  "data": { "monitor_id": "mon_123", "status": "deleted" }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/MonitorNotFound"
+          },
+          "409": {
+            "description": "Conflict — Returned with code 409102 when the monitor was changed by another request at the same time. Retry the request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 409102,
+                  "msg": "Monitor was modified concurrently",
+                  "request_id": "req_abc123def456"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/monitors/{id}/trigger": {
+      "post": {
+        "summary": "Trigger a monitor run",
+        "description": "Runs a monitor once, outside its schedule. A manual run always fetches fresh pages and doesn't change the schedule. Get the result from [Get Monitor Run](/api-reference/get-monitor-run) with the returned `run_id`.\n\nThe run isn't triggered when:\n\n- The previous run is still `queued` or `processing`: returns `409101`.\n- The monitor is paused: returns `409103`. Resume it first by sending `status: active` with [Update Monitor](/api-reference/patch-monitor), then trigger.\n- Less than 3 seconds have passed since the last manual trigger of this monitor: returns `429101`.",
+        "operationId": "post-monitor-trigger",
+        "x-mint": {
+          "href": "/api-reference/post-monitor-trigger",
+          "metadata": {
+            "title": "Trigger Monitor Run API Reference",
+            "sidebarTitle": "Trigger Monitor Run"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/MonitorId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful trigger response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MonitorTriggerResponse"
+                },
+                "example": {
+                  "code": 0,
+                  "msg": "success",
+                  "request_id": "req_abc123def456",
+                  "data": { "run_id": "run_791", "status": "queued" }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/InsufficientBalance"
+          },
+          "404": {
+            "$ref": "#/components/responses/MonitorNotFound"
+          },
+          "409": {
+            "description": "Conflict — Returned when the previous run is still `queued` or `processing` (code 409101), or the monitor is paused (code 409103).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 409101,
+                  "msg": "Previous run still in progress",
+                  "request_id": "req_abc123def456"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests — Returned with code 429101 when the same monitor is triggered again within 3 seconds, or with code 429 when the account exceeds the Monitor rate limit.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 429101,
+                  "msg": "Please wait a few seconds before triggering this monitor again.",
+                  "request_id": "req_abc123def456"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/monitors/{id}/runs": {
+      "get": {
+        "summary": "List monitor runs",
+        "description": "Lists a monitor's runs, including runs that found no changes.",
+        "operationId": "get-monitor-runs",
+        "x-mint": {
+          "href": "/api-reference/get-monitor-runs",
+          "metadata": {
+            "title": "List Monitor Runs API Reference",
+            "sidebarTitle": "List Monitor Runs"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/MonitorId"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "queued",
+                "processing",
+                "completed",
+                "skipped",
+                "failed"
+              ]
+            },
+            "description": "Only return runs with this status."
+          },
+          {
+            "name": "order_by",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "time_desc",
+                "time_asc"
+              ],
+              "default": "time_desc"
+            },
+            "description": "Newest first or oldest first."
+          },
+          {
+            "name": "only_changes",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "description": "If true, returns only runs with changes."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 20,
+              "minimum": 1,
+              "maximum": 100
+            },
+            "description": "Maximum number of runs to return."
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The `next_cursor` from the previous response. Omit for the first page."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful run list response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MonitorRunListResponse"
+                },
+                "example": {
+                  "code": 0,
+                  "msg": "success",
+                  "request_id": "req_abc123def456",
+                  "data": {
+                    "runs": [
+                      {
+                        "run_id": "run_790",
+                        "kind": "create",
+                        "status": "completed",
+                        "scheduled_at": "2026-11-16T08:22:16Z",
+                        "started_at": "2026-11-16T08:22:17Z",
+                        "finished_at": "2026-11-16T08:22:21Z",
+                        "items_total": 10,
+                        "items_changed": 10,
+                        "items_notified": 3,
+                        "usage": { "num_queries": 1, "num_urls": 0, "cost": 0.002 }
+                      }
+                    ],
+                    "next_cursor": ""
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid params — Returned when a required parameter is missing or invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 400100,
+                  "msg": "Invalid params: limit must be an integer between 1 and 100",
+                  "request_id": "req_abc123def456"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/MonitorNotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/monitors/{id}/runs/{run_id}": {
+      "get": {
+        "summary": "Get a monitor run",
+        "description": "Returns a monitor run by id, including every result it checked.",
+        "operationId": "get-monitor-run",
+        "x-mint": {
+          "href": "/api-reference/get-monitor-run",
+          "metadata": {
+            "title": "Get Monitor Run API Reference",
+            "sidebarTitle": "Get Monitor Run"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/MonitorId"
+          },
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "run_789",
+            "description": "The run id returned by Create Monitor (`first_run_id`), Trigger Monitor Run, or List Monitor Runs."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful run response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MonitorRunResponse"
+                },
+                "examples": {
+                  "page": {
+                    "summary": "Page monitor",
+                    "value": {
+                      "code": 0,
+                      "msg": "success",
+                      "request_id": "req_abc123def456",
+                      "data": {
+                        "run_id": "run_789",
+                        "monitor_id": "mon_123",
+                        "kind": "scheduled",
+                        "status": "completed",
+                        "scheduled_at": "2026-11-16T14:00:00Z",
+                        "started_at": "2026-11-16T14:00:01Z",
+                        "finished_at": "2026-11-16T14:00:07Z",
+                        "items_total": 1,
+                        "items_changed": 1,
+                        "items_notified": 1,
+                        "usage": { "num_queries": 0, "num_urls": 1, "cost": 0.003 },
+                        "items": [
+                          {
+                            "url": "https://shop.example.com/products/widget-pro",
+                            "title": "Widget Pro – Example Shop",
+                            "change_status": "changed",
+                            "notified": true,
+                            "delivered": true,
+                            "event_id": "evt_1",
+                            "rule": { "satisfied": true },
+                            "fields": { "price": 849 },
+                            "changed": {
+                              "price": { "previous": 999, "current": 849, "changed": true, "delta": -150, "pct": -0.1502 }
+                            },
+                            "previous_detected_at": "2026-11-16T13:00:05Z",
+                            "full_content": "Widget Pro\nPrice: $849.00\nIn stock",
+                            "judgment": { "meaningful": true, "confidence": "high", "reason": "price: 999 → 849 (-15.0%) (price change < -10%)" }
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "topic": {
+                    "summary": "Topic monitor",
+                    "value": {
+                      "code": 0,
+                      "msg": "success",
+                      "request_id": "req_abc123def456",
+                      "data": {
+                        "run_id": "run_792",
+                        "monitor_id": "mon_456",
+                        "kind": "scheduled",
+                        "status": "completed",
+                        "scheduled_at": "2026-11-16T20:00:00Z",
+                        "started_at": "2026-11-16T20:00:01Z",
+                        "finished_at": "2026-11-16T20:00:04Z",
+                        "items_total": 2,
+                        "items_changed": 1,
+                        "items_notified": 1,
+                        "usage": { "num_queries": 1, "num_urls": 0, "cost": 0.002 },
+                        "items": [
+                          {
+                            "url": "https://news.example.com/2026/11/16/solid-state-pilot-line",
+                            "title": "Battery maker starts pilot production of solid-state cells",
+                            "change_status": "new",
+                            "notified": true,
+                            "delivered": true,
+                            "event_id": "evt_3",
+                            "fields": { "headline": "Battery maker starts pilot production of solid-state cells" },
+                            "highlight": "The company said its pilot line can produce enough solid-state cells for road testing next year ...",
+                            "authors": "Example News",
+                            "time_published": "2026-11-16T03:00:00Z",
+                            "judgment": { "meaningful": true, "confidence": "high", "reason": "Matches the condition" }
+                          },
+                          {
+                            "url": "https://research.example.org/papers/sulfide-electrolyte-cycle-life",
+                            "title": "Sulfide electrolyte improves solid-state battery cycle life",
+                            "change_status": "unchanged",
+                            "notified": false,
+                            "delivered": false,
+                            "fields": { "headline": "Sulfide electrolyte improves solid-state battery cycle life" },
+                            "highlight": "Researchers report a sulfide electrolyte that keeps more than 90% capacity after 1,000 cycles ...",
+                            "authors": "Example Research",
+                            "time_published": "2026-11-12T09:00:00Z"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Not found — Returned with code 404101 when the monitor doesn't exist, or code 404102 when the run doesn't exist for this monitor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 404102,
+                  "msg": "Run not found",
+                  "request_id": "req_abc123def456"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/monitors/{id}/events": {
+      "get": {
+        "summary": "List monitor events",
+        "description": "Lists the events a monitor generated. Events include only a content preview; get the full content from [Get Monitor Run](/api-reference/get-monitor-run).",
+        "operationId": "get-monitor-events",
+        "x-mint": {
+          "href": "/api-reference/get-monitor-events",
+          "metadata": {
+            "title": "List Monitor Events API Reference",
+            "sidebarTitle": "List Monitor Events"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/MonitorId"
+          },
+          {
+            "name": "run_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Only return events from this run."
+          },
+          {
+            "name": "order_by",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "time_desc",
+                "time_asc"
+              ],
+              "default": "time_desc"
+            },
+            "description": "Newest first or oldest first."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 20,
+              "minimum": 1,
+              "maximum": 20
+            },
+            "description": "Maximum number of events to return."
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The `next_cursor` from the previous response. Omit for the first page."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful event list response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MonitorEventListResponse"
+                },
+                "example": {
+                  "code": 0,
+                  "msg": "success",
+                  "request_id": "req_abc123def456",
+                  "data": {
+                    "events": [
+                      {
+                        "event_id": "evt_1",
+                        "event_type": "monitor.change",
+                        "monitor_id": "mon_123",
+                        "run_id": "run_789",
+                        "url": "https://shop.example.com/products/widget-pro",
+                        "title": "Widget Pro – Example Shop",
+                        "change_status": "changed",
+                        "fields": { "price": 849 },
+                        "changed": { "price": { "previous": 999, "current": 849, "changed": true, "delta": -150, "pct": -0.1502 } },
+                        "previous_detected_at": "2026-11-16T13:00:05Z",
+                        "content_preview": "Widget Pro\nPrice: $849.00\nIn stock",
+                        "judgment": { "meaningful": true, "confidence": "high", "reason": "price: 999 → 849 (-15.0%) (price change < -10%)" },
+                        "delivered": true,
+                        "detected_at": "2026-11-16T14:00:07Z"
+                      }
+                    ],
+                    "next_cursor": ""
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid params — Returned when a required parameter is missing or invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 400100,
+                  "msg": "Invalid params: limit must be an integer between 1 and 20",
+                  "request_id": "req_abc123def456"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/MonitorNotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    }
+  },
+  "webhooks": {
+    "monitor.run.completed": {
+      "post": {
+        "summary": "Monitor run completed",
+        "description": "After each run that generates events, Octen sends one POST to the monitor's `webhook.url`, carrying all of that run's events in `items`. Runs that generate no events send nothing, and items that weren't notified aren't included.\n\nEach delivery is an HTTPS POST to `webhook.url` with a UTF-8 JSON body and the following headers.",
+        "operationId": "monitor-webhooks",
+        "security": [],
+        "parameters": [
+          {
+            "name": "X-Octen-Event",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The event type. Currently always `monitor.run.completed`."
+          },
+          {
+            "name": "X-Octen-Delivery",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The delivery id, such as `dlv_01JD…`. One per run. It stays the same across retries of a delivery, so use it to deduplicate."
+          },
+          {
+            "name": "X-Octen-Timestamp",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "When this request was sent, in Unix seconds. Regenerated on each retry."
+          },
+          {
+            "name": "X-Octen-Signature",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The signature: `sha256=` followed by 64 lowercase hex characters. See [Verify the Signature](#verify-the-signature) for the algorithm. Recomputed on each retry."
+          },
+          {
+            "name": "User-Agent",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "`Octen-Webhook/1.0`"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "A UTF-8 JSON body, sent with `Content-Type: application/json`.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MonitorWebhookPayload"
+              },
+              "example": {
+                "event_type": "monitor.run.completed",
+                "monitor_id": "mon_123",
+                "run_id": "run_789",
+                "detected_at": "2026-11-16T14:00:07.123Z",
+                "metadata": {
+                  "team": "pricing"
+                },
+                "items": [
+                  {
+                    "event_type": "monitor.change",
+                    "run_id": "run_789",
+                    "detected_at": "2026-11-16T14:00:07.120Z",
+                    "event_id": "evt_1",
+                    "url": "https://shop.example.com/products/widget-pro",
+                    "title": "Widget Pro – Example Shop",
+                    "change_status": "changed",
+                    "fields": {
+                      "price": 849
+                    },
+                    "judgment": {
+                      "meaningful": true,
+                      "confidence": "high",
+                      "reason": "price: 999 → 849 (-15.0%) (price change < -10%)"
+                    },
+                    "changed": {
+                      "price": {
+                        "previous": 999,
+                        "current": 849,
+                        "delta": -150,
+                        "pct": -0.1502,
+                        "changed": true
+                      }
+                    },
+                    "previous_detected_at": "2026-11-16T13:00:05.002Z",
+                    "full_content": "Widget Pro\nPrice: $849.00\nIn stock"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Return any `2xx` to acknowledge. The response body is ignored."
+          },
+          "410": {
+            "description": "Ends this delivery right away with no retries. The webhook stays configured, and later runs still deliver."
+          }
+        }
+      }
     }
   },
   "components": {
@@ -5337,6 +6912,33 @@
             }
           }
         }
+      },
+      "MonitorNotFound": {
+        "description": "Monitor not found — Returned when the monitor id does not exist or was deleted.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "code": 404101,
+              "msg": "Monitor not found",
+              "request_id": "req_abc123def456"
+            }
+          }
+        }
+      }
+    },
+    "parameters": {
+      "MonitorId": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string"
+        },
+        "example": "mon_123",
+        "description": "The monitor id returned by Create Monitor."
       }
     },
     "schemas": {
@@ -5349,7 +6951,7 @@
           "query": {
             "type": "string",
             "maxLength": 500,
-            "description": "The search query.\n\n**Operators**\n\n- `site:<domain>`: restrict results to a single domain. For multiple domains, use `include_domains` and `exclude_domains`.\n- `-site:<domain>`: exclude a single domain from the results."
+            "description": "The search query.\n\n**Operators**\n\n- `site:<domain>`: restrict results to a single domain. For multiple domains, use `include_domains` and `exclude_domains`.\n- `-site:<domain>`: exclude a single domain from the results.\n- `before:<YYYY-MM-DD>`: return only pages published before this date.\n- `after:<YYYY-MM-DD>`: return only pages published after this date.\n- `\"<words>\"`: return only pages that contain every word inside the quotes.\n- `<term> OR <term>`: return pages that match either term."
           }
         },
         "allOf": [
@@ -7154,6 +8756,445 @@
           }
         }
       },
+      "DesignSearchRequest": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "The search query. Optional when `images.group_id` is set."
+          },
+          "images": {
+            "$ref": "#/components/schemas/DesignImageOptions"
+          },
+          "web_search": {
+            "$ref": "#/components/schemas/DesignWebSearchOptions"
+          }
+        }
+      },
+      "DesignWebSearchOptions": {
+        "type": "object",
+        "description": "Controls the web results. These options apply to the web results only and do not affect the image results.",
+        "properties": {
+          "enable": {
+            "type": "boolean",
+            "default": true,
+            "description": "If true, returns `data.results`."
+          },
+          "count": {
+            "type": "integer",
+            "default": 5,
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Number of web results to return."
+          },
+          "highlight": {
+            "$ref": "#/components/schemas/HighlightOptions"
+          },
+          "full_content": {
+            "$ref": "#/components/schemas/FullContentOptions"
+          },
+          "include_domains": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 60
+            },
+            "maxItems": 1200,
+            "description": "A list of domains to specifically include in the web results. The `site:` query operator adds to this list.",
+            "example": [
+              "octen.ai",
+              "wikipedia.org"
+            ]
+          },
+          "exclude_domains": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 60
+            },
+            "maxItems": 1200,
+            "description": "A list of domains to specifically exclude from the web results. The `-site:` query operator adds to this list. If a domain appears in both `include_domains` and `exclude_domains`, `exclude_domains` takes precedence.",
+            "example": [
+              "spam.com",
+              "ads.example.net"
+            ]
+          },
+          "language": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "ar",
+                "de",
+                "en",
+                "es",
+                "fr",
+                "hi",
+                "id",
+                "it",
+                "ja",
+                "ko",
+                "nl",
+                "pl",
+                "pt",
+                "ru",
+                "th",
+                "tr",
+                "vi",
+                "zh"
+              ]
+            },
+            "default": [],
+            "description": "A list of languages to restrict web results to, as ISO 639-1 codes. By default, no language filter is applied.",
+            "example": [
+              "en",
+              "zh"
+            ]
+          },
+          "time_basis": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "published",
+              "crawled"
+            ],
+            "default": "auto",
+            "description": "Determines which time field is used for time filtering. `published` uses time_published; `crawled` uses time_last_crawled. Results missing this field are excluded when filtering by time."
+          },
+          "time_range": {
+            "type": "string",
+            "enum": [
+              "day",
+              "week",
+              "month",
+              "year",
+              "d",
+              "w",
+              "m",
+              "y"
+            ],
+            "description": "Relative time window counting back from the current time based on `time_basis`. Mutually exclusive with `start_time`/`end_time` — if both are provided, `start_time`/`end_time` take precedence."
+          },
+          "start_time": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Start time for filtering web results. ISO 8601 format.",
+            "example": "2025-01-01T00:00:00+08:00"
+          },
+          "end_time": {
+            "type": "string",
+            "format": "date-time",
+            "description": "End time for filtering web results. ISO 8601 format.",
+            "example": "2025-01-01T00:00:00+08:00"
+          }
+        }
+      },
+      "DesignImageOptions": {
+        "type": "object",
+        "description": "Controls the image results.",
+        "properties": {
+          "enable": {
+            "type": "boolean",
+            "default": true,
+            "description": "If true, returns `data.images`."
+          },
+          "count": {
+            "type": "integer",
+            "default": 5,
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Number of image results to return."
+          },
+          "design_facts": {
+            "type": "boolean",
+            "default": true,
+            "description": "If true, returns `design_facts` for each image result."
+          },
+          "snippet": {
+            "$ref": "#/components/schemas/DesignSnippetOptions"
+          },
+          "group_id": {
+            "type": "string",
+            "description": "Returns the images in this group, in group order, instead of searching by `query`. Takes the `group.group_id` of an image result.",
+            "example": "deck_3b7f0e92c4a1d85f6e2b9c07a3d4f1e8b5c26a9d0f7e3b1c4a8d2e6f9b0c5a7d"
+          }
+        }
+      },
+      "DesignSnippetOptions": {
+        "type": "object",
+        "description": "Controls the reusable code returned with image results.",
+        "properties": {
+          "enable": {
+            "type": "boolean",
+            "default": true,
+            "description": "If true, returns `snippet` for image results that have reusable code."
+          },
+          "max_tokens": {
+            "type": "integer",
+            "default": 5000,
+            "minimum": 100,
+            "maximum": 100000,
+            "description": "Maximum tokens of snippet code included per result."
+          }
+        }
+      },
+      "DesignSearchResponse": {
+        "type": "object",
+        "required": [
+          "request_id"
+        ],
+        "properties": {
+          "code": {
+            "type": "integer",
+            "description": "Business status code. 0 indicates success."
+          },
+          "msg": {
+            "type": "string",
+            "description": "A message describing the result."
+          },
+          "request_id": {
+            "type": "string",
+            "description": "The unique identifier for this request."
+          },
+          "data": {
+            "$ref": "#/components/schemas/DesignSearchData"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/DesignSearchMeta"
+          }
+        }
+      },
+      "DesignSearchData": {
+        "type": "object",
+        "description": "The main response payload.",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "The original query."
+          },
+          "images": {
+            "type": "array",
+            "description": "A list of image results. Returned only if `images.enable` is true.",
+            "items": {
+              "$ref": "#/components/schemas/DesignImageResult"
+            }
+          },
+          "results": {
+            "type": "array",
+            "description": "A list of web results. Returned only if `web_search.enable` is true.",
+            "items": {
+              "$ref": "#/components/schemas/DesignSearchResult"
+            }
+          }
+        }
+      },
+      "DesignSearchResult": {
+        "type": "object",
+        "description": "A single web result.",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "The title of the result page."
+          },
+          "url": {
+            "type": "string",
+            "description": "The URL of the result page."
+          },
+          "highlight": {
+            "type": "string",
+            "description": "Query-relevant highlight snippets. Returned only if `web_search.highlight.enable` is true."
+          },
+          "full_content": {
+            "type": "string",
+            "description": "Full raw page content. Returned only if `web_search.full_content.enable` is true."
+          },
+          "authors": {
+            "type": "string",
+            "description": "Website name or author."
+          },
+          "time_published": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Publish time in ISO 8601."
+          },
+          "time_last_crawled": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Last crawl time in ISO 8601."
+          },
+          "favicon": {
+            "type": "string",
+            "description": "The favicon URL of the result site."
+          },
+          "cover_image": {
+            "type": "object",
+            "description": "The page cover image. Returned when the page has one.",
+            "properties": {
+              "url": {
+                "type": "string",
+                "description": "The cover image URL."
+              },
+              "description": {
+                "type": "string",
+                "description": "Text description of the cover image."
+              }
+            }
+          },
+          "images": {
+            "type": "array",
+            "description": "In-body images of the page, in order of appearance. Returned when the page has any.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string",
+                  "description": "The image URL."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "Text description of the image."
+                }
+              }
+            }
+          }
+        }
+      },
+      "DesignImageResult": {
+        "type": "object",
+        "description": "A single image result.",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "web_page",
+              "web_section",
+              "app_screen",
+              "slide"
+            ],
+            "description": "The image type.\n\n- `web_page`: a full web page.\n- `web_section`: one section of a web page.\n- `app_screen`: a mobile app screen.\n- `slide`: one slide of a deck."
+          },
+          "title": {
+            "type": "string",
+            "description": "The title of the image."
+          },
+          "description": {
+            "type": "string",
+            "description": "Server-generated text description of the image content."
+          },
+          "url": {
+            "type": "string",
+            "description": "The image URL."
+          },
+          "thumbnail": {
+            "type": "string",
+            "description": "Thumbnail URL."
+          },
+          "source_page": {
+            "type": "string",
+            "description": "URL of the original page hosting the image. Not returned for `app_screen` results."
+          },
+          "width": {
+            "type": "integer",
+            "description": "Image width in pixels."
+          },
+          "height": {
+            "type": "integer",
+            "description": "Image height in pixels."
+          },
+          "group": {
+            "$ref": "#/components/schemas/DesignImageGroup"
+          },
+          "design_facts": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Design values of the image, such as colors, fonts, and font sizes. Fields vary by image. Returned only if `images.design_facts` is true."
+          },
+          "snippet": {
+            "$ref": "#/components/schemas/DesignSnippet"
+          }
+        }
+      },
+      "DesignImageGroup": {
+        "type": "object",
+        "description": "The web page or deck the image belongs to. Returned for `web_section` and `slide` results.",
+        "properties": {
+          "group_id": {
+            "type": "string",
+            "description": "The group identifier. Pass it as `images.group_id` to get every image in the group."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "web_page",
+              "deck"
+            ],
+            "description": "The group type.\n\n- `web_page`: the sections of one web page.\n- `deck`: the slides of one deck."
+          },
+          "name": {
+            "type": "string",
+            "description": "The name of the web page or deck."
+          },
+          "position": {
+            "type": "integer",
+            "description": "The position of this image in the group, starting at 1."
+          },
+          "total": {
+            "type": "integer",
+            "description": "The number of images in the group."
+          },
+          "master": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The slide master of the deck, such as its theme colors and fonts. Returned only for `deck` groups, and may be empty."
+          }
+        }
+      },
+      "DesignSnippet": {
+        "type": "object",
+        "description": "Reusable code for the image. Returned only if `images.snippet.enable` is true and the image has reusable code.",
+        "properties": {
+          "format": {
+            "type": "string",
+            "enum": [
+              "html"
+            ],
+            "description": "The code format."
+          },
+          "code": {
+            "type": "string",
+            "description": "The code."
+          }
+        }
+      },
+      "DesignSearchMeta": {
+        "type": "object",
+        "description": "Additional metadata for the search request.",
+        "properties": {
+          "usage": {
+            "$ref": "#/components/schemas/DesignSearchUsage"
+          },
+          "latency": {
+            "type": "number",
+            "description": "Response time in milliseconds."
+          },
+          "warning": {
+            "type": "string",
+            "nullable": true,
+            "description": "Warning message, if any."
+          }
+        }
+      },
+      "DesignSearchUsage": {
+        "type": "object",
+        "description": "Usage information for the search request.",
+        "properties": {
+          "num_search_queries": {
+            "type": "integer",
+            "description": "Number of search queries executed."
+          }
+        }
+      },
       "PulseSearchRequest": {
         "type": "object",
         "required": [
@@ -8177,6 +10218,8 @@
           "model": {
             "type": "string",
             "enum": [
+              "openai/gpt-6.2-astra",
+              "openai/gpt-6.2-sol",
               "openai/gpt-6.1-sol",
               "openai/gpt-6.1-terra",
               "openai/gpt-6-astra",
@@ -8190,7 +10233,6 @@
               "anthropic/claude-sonnet-5.5",
               "anthropic/claude-sonnet-5",
               "anthropic/claude-haiku-5.5",
-              "google/gemini-4-carbon",
               "google/gemini-4-argon",
               "google/gemini-4-hydrogen",
               "google/gemini-3.8-flash",
@@ -9285,6 +11327,8 @@
           "model": {
             "type": "string",
             "enum": [
+              "openai/gpt-6.2-astra",
+              "openai/gpt-6.2-sol",
               "openai/gpt-6.1-sol",
               "openai/gpt-6.1-terra",
               "openai/gpt-6-astra",
@@ -9302,7 +11346,6 @@
               "anthropic/claude-sonnet-4.6",
               "anthropic/claude-haiku-5.5",
               "anthropic/claude-haiku-4.5",
-              "google/gemini-4-carbon",
               "google/gemini-4-argon",
               "google/gemini-4-hydrogen",
               "google/gemini-3.8-flash",
@@ -11803,6 +13846,8 @@
           "model": {
             "type": "string",
             "enum": [
+              "openai/gpt-6.2-astra",
+              "openai/gpt-6.2-sol",
               "openai/gpt-6.1-sol",
               "openai/gpt-6.1-terra",
               "openai/gpt-6-astra",
@@ -11816,7 +13861,6 @@
               "anthropic/claude-sonnet-5.5",
               "anthropic/claude-sonnet-5",
               "anthropic/claude-haiku-5.5",
-              "google/gemini-4-carbon",
               "google/gemini-4-argon",
               "google/gemini-4-hydrogen",
               "google/gemini-3.8-flash",
@@ -13939,6 +15983,1682 @@
             }
           }
         }
+      },
+      "MonitorOutputSchemaField": {
+        "type": "object",
+        "required": [
+          "field_name",
+          "field_type"
+        ],
+        "properties": {
+          "field_name": {
+            "type": "string",
+            "maxLength": 64,
+            "description": "The key of the field in `fields`. Letters, digits, and underscores only; can't start with a digit."
+          },
+          "field_type": {
+            "type": "string",
+            "enum": [
+              "string",
+              "number",
+              "boolean"
+            ],
+            "description": "The value type. Returns `null` when the value can't be extracted."
+          },
+          "field_desc": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "What the field holds, such as `Current price in USD`."
+          }
+        }
+      },
+      "MonitorHighlightOptions": {
+        "type": "object",
+        "description": "Controls highlight extraction from result pages.",
+        "properties": {
+          "enable": {
+            "type": "boolean",
+            "default": true,
+            "description": "If true, returns query-relevant highlight in each result."
+          },
+          "max_tokens": {
+            "type": "integer",
+            "default": 1024,
+            "minimum": 100,
+            "maximum": 20000,
+            "description": "Max tokens returned per highlight."
+          }
+        }
+      },
+      "MonitorTopicOptions": {
+        "type": "object",
+        "required": [
+          "query"
+        ],
+        "description": "Search settings for a topic monitor. Required when `type` is `topic`.",
+        "properties": {
+          "query": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "The search query."
+          },
+          "include_domains": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 60
+            },
+            "maxItems": 1200,
+            "description": "A list of domains to specifically include in the search results."
+          },
+          "exclude_domains": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 60
+            },
+            "maxItems": 1200,
+            "description": "A list of domains to specifically exclude from the search results."
+          },
+          "highlight": {
+            "$ref": "#/components/schemas/MonitorHighlightOptions"
+          },
+          "full_content": {
+            "$ref": "#/components/schemas/FullContentOptions"
+          },
+          "include_images": {
+            "type": "boolean",
+            "default": false,
+            "description": "Whether to include images in each result."
+          },
+          "output_schema": {
+            "type": "array",
+            "maxItems": 20,
+            "items": {
+              "$ref": "#/components/schemas/MonitorOutputSchemaField"
+            },
+            "description": "Fields to extract from each result. Values are returned in `fields`."
+          }
+        }
+      },
+      "MonitorPageOptions": {
+        "type": "object",
+        "required": [
+          "urls"
+        ],
+        "description": "Settings for a page monitor. Required when `type` is `page`.",
+        "properties": {
+          "urls": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 10,
+            "items": {
+              "type": "string",
+              "maxLength": 2048
+            },
+            "description": "Public `http` or `https` URLs to watch, each up to 2,048 bytes. Duplicates are removed."
+          },
+          "output_schema": {
+            "type": "array",
+            "maxItems": 20,
+            "items": {
+              "$ref": "#/components/schemas/MonitorOutputSchemaField"
+            },
+            "description": "Fields to watch on each page. Without it, the monitor watches the whole page for meaningful changes."
+          }
+        }
+      },
+      "MonitorSchedule": {
+        "type": "object",
+        "description": "How often the monitor runs.",
+        "properties": {
+          "interval": {
+            "type": "string",
+            "default": "1h",
+            "description": "`1h`–`100h` in hours, or `1d`–`30d` in days."
+          },
+          "cron": {
+            "type": "string",
+            "description": "A cron expression, used instead of `interval`. Runs must be at least 1 hour apart."
+          },
+          "timezone": {
+            "type": "string",
+            "default": "UTC",
+            "description": "IANA time zone for `cron`, such as `America/New_York`."
+          }
+        }
+      },
+      "MonitorCreateRequest": {
+        "type": "object",
+        "required": [
+          "type"
+        ],
+        "description": "Request body for the Create Monitor API.",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "topic",
+              "page"
+            ],
+            "description": "The monitor type. `topic` finds new content on a topic. `page` watches the given URLs for changes."
+          },
+          "topic": {
+            "$ref": "#/components/schemas/MonitorTopicOptions"
+          },
+          "page": {
+            "$ref": "#/components/schemas/MonitorPageOptions"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 256,
+            "description": "The monitor name. Defaults to the query, or the domain and path of the first URL."
+          },
+          "condition": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 1000,
+            "description": "When to notify, in natural language, such as `price drops more than 10%`. An empty string or `null` means no condition.\n\nOn the first run, and the first run after an update that resets the baseline, items are judged like this. Without a condition, one notification is sent with a `baseline` item for each page fetched successfully, or each new `topic` result (up to 10). With a condition, only items that already meet it are included; a condition about a change, such as `price drops more than 10%`, usually doesn't fire on the first run. After that, a `topic` monitor notifies for each new relevant result; a `page` monitor notifies when any `output_schema` field changes or, without `output_schema`, when a model judges the page change meaningful."
+          },
+          "schedule": {
+            "$ref": "#/components/schemas/MonitorSchedule"
+          },
+          "webhook": {
+            "type": "object",
+            "required": [
+              "url"
+            ],
+            "description": "Where to push events.",
+            "properties": {
+              "url": {
+                "type": "string",
+                "maxLength": 2048,
+                "description": "A public HTTPS URL that receives one signed POST after each run that generates events. See [Monitor Webhooks](/api-reference/monitor-webhooks)."
+              }
+            }
+          },
+          "email": {
+            "type": "object",
+            "required": [
+              "to"
+            ],
+            "description": "Email notifications. Each run's events are sent as one email.",
+            "properties": {
+              "to": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 5,
+                "items": {
+                  "type": "string"
+                },
+                "description": "Recipient addresses."
+              }
+            }
+          },
+          "metadata": {
+            "type": "object",
+            "maxProperties": 8,
+            "additionalProperties": {
+              "type": "string",
+              "maxLength": 512
+            },
+            "description": "Your own key-value pairs, returned as-is in responses and webhooks. Up to 8 pairs; keys up to 16 characters, string values up to 512 characters."
+          }
+        }
+      },
+      "MonitorUpdateRequest": {
+        "type": "object",
+        "description": "Request body for the Update Monitor API.",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "paused"
+            ],
+            "description": "`paused` stops scheduled runs; `active` resumes them. A monitor paused automatically for low balance stays paused after you top up until you send `active`."
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 256,
+            "description": "The monitor name."
+          },
+          "condition": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 1000,
+            "description": "The notification condition. Send `null` or `\"\"` to remove it."
+          },
+          "topic": {
+            "type": "object",
+            "description": "Search settings. `topic` monitors only. Send only the sub-fields to change; send `null` for a sub-field to reset it to its default.",
+            "properties": {
+              "query": {
+                "type": "string",
+                "maxLength": 500,
+                "description": "The search query."
+              },
+              "include_domains": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "maxLength": 60
+                },
+                "maxItems": 1200,
+                "description": "A list of domains to specifically include in the search results."
+              },
+              "exclude_domains": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "maxLength": 60
+                },
+                "maxItems": 1200,
+                "description": "A list of domains to specifically exclude from the search results."
+              },
+              "highlight": {
+                "type": "object",
+                "description": "Controls highlight extraction from result pages.",
+                "properties": {
+                  "enable": {
+                    "type": "boolean",
+                    "description": "If true, returns query-relevant highlight in each result."
+                  },
+                  "max_tokens": {
+                    "type": "integer",
+                    "minimum": 100,
+                    "maximum": 20000,
+                    "description": "Max tokens returned per highlight."
+                  }
+                }
+              },
+              "full_content": {
+                "type": "object",
+                "description": "Controls whether to return the full raw content of each result page.",
+                "properties": {
+                  "enable": {
+                    "type": "boolean",
+                    "description": "If true, returns `full_content` for each result."
+                  },
+                  "max_tokens": {
+                    "type": "integer",
+                    "minimum": 100,
+                    "maximum": 100000,
+                    "description": "Maximum tokens of full content included per result."
+                  }
+                }
+              },
+              "include_images": {
+                "type": "boolean",
+                "description": "Whether to include images in each result."
+              },
+              "output_schema": {
+                "type": "array",
+                "maxItems": 20,
+                "items": {
+                  "$ref": "#/components/schemas/MonitorOutputSchemaField"
+                },
+                "description": "Fields to extract from each result. Values are returned in `fields`. Replaces the existing list."
+              }
+            }
+          },
+          "page": {
+            "type": "object",
+            "description": "Page settings. `page` monitors only. Send only the sub-fields to change.",
+            "properties": {
+              "urls": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 10,
+                "items": {
+                  "type": "string",
+                  "maxLength": 2048
+                },
+                "description": "Public `http` or `https` URLs, each up to 2,048 bytes. Replaces the existing list."
+              },
+              "output_schema": {
+                "type": "array",
+                "maxItems": 20,
+                "items": {
+                  "$ref": "#/components/schemas/MonitorOutputSchemaField"
+                },
+                "description": "Fields to watch on each page. Replaces the existing list."
+              }
+            }
+          },
+          "schedule": {
+            "type": "object",
+            "description": "How often the monitor runs. Use either `interval` or `cron`.",
+            "properties": {
+              "interval": {
+                "type": "string",
+                "description": "`1h`–`100h` in hours, or `1d`–`30d` in days."
+              },
+              "cron": {
+                "type": "string",
+                "description": "A cron expression. Runs must be at least 1 hour apart."
+              },
+              "timezone": {
+                "type": "string",
+                "description": "IANA time zone for `cron`. Defaults to `UTC`."
+              }
+            }
+          },
+          "webhook": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "required": [
+              "url"
+            ],
+            "description": "Where to push events. Send `null` to remove the webhook. Adding a webhook returns a new `secret`.",
+            "properties": {
+              "url": {
+                "type": "string",
+                "maxLength": 2048,
+                "description": "A public HTTPS URL."
+              },
+              "rotate_secret": {
+                "type": "boolean",
+                "description": "If true, rotates the signing secret. The new `secret` is returned only in this response."
+              }
+            }
+          },
+          "email": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "required": [
+              "to"
+            ],
+            "description": "Email notifications. Send `null` to remove them.",
+            "properties": {
+              "to": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 5,
+                "items": {
+                  "type": "string"
+                },
+                "description": "Recipient addresses."
+              }
+            }
+          },
+          "metadata": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "maxProperties": 8,
+            "additionalProperties": {
+              "type": "string",
+              "maxLength": 512
+            },
+            "description": "Your own key-value pairs. Replaces the existing object instead of merging; send `null` or `{}` to clear it. Up to 8 pairs; keys up to 16 characters, string values up to 512 characters."
+          }
+        }
+      },
+      "MonitorOutputSchemaFieldInfo": {
+        "type": "object",
+        "properties": {
+          "field_name": {
+            "type": "string",
+            "description": "The key of the field in `fields`."
+          },
+          "field_type": {
+            "type": "string",
+            "description": "`string`, `number`, or `boolean`."
+          },
+          "field_desc": {
+            "type": "string",
+            "description": "What the field holds. Returned only when set."
+          }
+        }
+      },
+      "MonitorTopicConfig": {
+        "type": "object",
+        "description": "Search settings for a topic monitor. Returned for `topic` monitors only.",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "The search query."
+          },
+          "include_domains": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Domains to include. `[]` when not set."
+          },
+          "exclude_domains": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Domains to exclude. `[]` when not set."
+          },
+          "highlight": {
+            "type": "object",
+            "description": "Highlight settings.",
+            "properties": {
+              "enable": {
+                "type": "boolean",
+                "description": "Whether highlights are returned."
+              },
+              "max_tokens": {
+                "type": "integer",
+                "description": "Max tokens returned per highlight."
+              }
+            }
+          },
+          "full_content": {
+            "type": "object",
+            "description": "Full content settings.",
+            "properties": {
+              "enable": {
+                "type": "boolean",
+                "description": "Whether full content is returned."
+              },
+              "max_tokens": {
+                "type": "integer",
+                "description": "Maximum tokens of full content included per result."
+              }
+            }
+          },
+          "include_images": {
+            "type": "boolean",
+            "description": "Whether images are included."
+          },
+          "output_schema": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MonitorOutputSchemaFieldInfo"
+            },
+            "description": "Fields to extract. Returned only when set."
+          }
+        }
+      },
+      "MonitorPageConfig": {
+        "type": "object",
+        "description": "Settings for a page monitor. Returned for `page` monitors only.",
+        "properties": {
+          "urls": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The watched page URLs."
+          },
+          "output_schema": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MonitorOutputSchemaFieldInfo"
+            },
+            "description": "Fields to watch on each page. Returned only when set."
+          }
+        }
+      },
+      "MonitorScheduleConfig": {
+        "type": "object",
+        "description": "How often the monitor runs.",
+        "properties": {
+          "interval": {
+            "type": "string",
+            "description": "The run interval, such as `1h` or `1d`. Returned only when using `interval`."
+          },
+          "cron": {
+            "type": "string",
+            "description": "The cron expression. Returned only when using `cron`."
+          },
+          "timezone": {
+            "type": "string",
+            "description": "The time zone for `cron`. Returned only when using `cron`."
+          }
+        }
+      },
+      "MonitorEmailConfig": {
+        "type": "object",
+        "description": "Email notifications. Returned only when set.",
+        "properties": {
+          "to": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Recipient addresses."
+          }
+        }
+      },
+      "MonitorLastRun": {
+        "type": "object",
+        "description": "The latest run. Returned only after the monitor has run.",
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "description": "The run id."
+          },
+          "status": {
+            "type": "string",
+            "description": "The run status: `queued`, `processing`, `completed`, `skipped`, or `failed`."
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the run finished, in ISO 8601."
+          }
+        }
+      },
+      "MonitorCreateData": {
+        "type": "object",
+        "properties": {
+          "monitor_id": {
+            "type": "string",
+            "description": "The monitor id."
+          },
+          "name": {
+            "type": "string",
+            "description": "The monitor name."
+          },
+          "type": {
+            "type": "string",
+            "description": "`topic` or `page`."
+          },
+          "topic": {
+            "$ref": "#/components/schemas/MonitorTopicConfig"
+          },
+          "page": {
+            "$ref": "#/components/schemas/MonitorPageConfig"
+          },
+          "condition": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The notification condition. `null` when not set."
+          },
+          "schedule": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MonitorScheduleConfig"
+              }
+            ],
+            "description": "How often the monitor runs. Defaults to `{\"interval\": \"1h\"}`."
+          },
+          "webhook": {
+            "type": "object",
+            "description": "The webhook settings. Returned only when set.",
+            "properties": {
+              "url": {
+                "type": "string",
+                "description": "The webhook URL."
+              },
+              "secret": {
+                "type": "string",
+                "description": "The webhook signing secret. Returned only in this response."
+              }
+            }
+          },
+          "email": {
+            "$ref": "#/components/schemas/MonitorEmailConfig"
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Your key-value pairs. Returned only when set."
+          },
+          "status": {
+            "type": "string",
+            "description": "`active` on creation."
+          },
+          "next_run_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The next scheduled run."
+          },
+          "last_notified_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When the monitor last sent a notification. `null` if it hasn't notified yet."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Creation time in ISO 8601."
+          },
+          "notifications_7d": {
+            "type": "integer",
+            "description": "Events generated in the past 7 days."
+          },
+          "first_run_id": {
+            "type": "string",
+            "description": "The id of the run started on creation."
+          }
+        }
+      },
+      "Monitor": {
+        "type": "object",
+        "properties": {
+          "monitor_id": {
+            "type": "string",
+            "description": "The monitor id."
+          },
+          "name": {
+            "type": "string",
+            "description": "The monitor name."
+          },
+          "type": {
+            "type": "string",
+            "description": "`topic` or `page`."
+          },
+          "topic": {
+            "$ref": "#/components/schemas/MonitorTopicConfig"
+          },
+          "page": {
+            "$ref": "#/components/schemas/MonitorPageConfig"
+          },
+          "condition": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The notification condition. `null` when not set."
+          },
+          "schedule": {
+            "$ref": "#/components/schemas/MonitorScheduleConfig"
+          },
+          "webhook": {
+            "type": "object",
+            "description": "The webhook settings. Returned only when set.",
+            "properties": {
+              "url": {
+                "type": "string",
+                "description": "The webhook URL."
+              }
+            }
+          },
+          "email": {
+            "$ref": "#/components/schemas/MonitorEmailConfig"
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Your key-value pairs. Returned only when set."
+          },
+          "status": {
+            "type": "string",
+            "description": "`active` or `paused`."
+          },
+          "pause_reason": {
+            "type": "string",
+            "description": "Why the monitor is paused: `user` (manually), `fetch_failed` or `judge_failed` (automatically, after repeated failures), or `insufficient_balance` (automatically, for low balance). Returned only when paused."
+          },
+          "next_run_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The next scheduled run. Returned only when active."
+          },
+          "last_run": {
+            "$ref": "#/components/schemas/MonitorLastRun"
+          },
+          "last_notified_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When the monitor last sent a notification. `null` if it hasn't notified yet."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Creation time in ISO 8601."
+          },
+          "notifications_7d": {
+            "type": "integer",
+            "description": "Events generated in the past 7 days."
+          }
+        }
+      },
+      "MonitorUpdateData": {
+        "type": "object",
+        "properties": {
+          "monitor_id": {
+            "type": "string",
+            "description": "The monitor id."
+          },
+          "name": {
+            "type": "string",
+            "description": "The monitor name."
+          },
+          "type": {
+            "type": "string",
+            "description": "`topic` or `page`."
+          },
+          "topic": {
+            "$ref": "#/components/schemas/MonitorTopicConfig"
+          },
+          "page": {
+            "$ref": "#/components/schemas/MonitorPageConfig"
+          },
+          "condition": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The notification condition. `null` when not set."
+          },
+          "schedule": {
+            "$ref": "#/components/schemas/MonitorScheduleConfig"
+          },
+          "webhook": {
+            "type": "object",
+            "description": "The webhook settings. Returned only when set.",
+            "properties": {
+              "url": {
+                "type": "string",
+                "description": "The webhook URL."
+              },
+              "secret": {
+                "type": "string",
+                "description": "The new webhook signing secret. Returned only when this update adds a webhook or sets `rotate_secret`."
+              }
+            }
+          },
+          "email": {
+            "$ref": "#/components/schemas/MonitorEmailConfig"
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Your key-value pairs. Returned only when set."
+          },
+          "status": {
+            "type": "string",
+            "description": "`active` or `paused`."
+          },
+          "pause_reason": {
+            "type": "string",
+            "description": "Why the monitor is paused: `user` (manually), `fetch_failed` or `judge_failed` (automatically, after repeated failures), or `insufficient_balance` (automatically, for low balance). Returned only when paused."
+          },
+          "next_run_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The next scheduled run. Returned only when active."
+          },
+          "last_run": {
+            "$ref": "#/components/schemas/MonitorLastRun"
+          },
+          "last_notified_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When the monitor last sent a notification. `null` if it hasn't notified yet."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Creation time in ISO 8601."
+          },
+          "notifications_7d": {
+            "type": "integer",
+            "description": "Events generated in the past 7 days."
+          }
+        }
+      },
+      "MonitorListItem": {
+        "type": "object",
+        "properties": {
+          "monitor_id": {
+            "type": "string",
+            "description": "The monitor id."
+          },
+          "name": {
+            "type": "string",
+            "description": "The monitor name."
+          },
+          "type": {
+            "type": "string",
+            "description": "`topic` or `page`."
+          },
+          "status": {
+            "type": "string",
+            "description": "`active` or `paused`."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Creation time in ISO 8601."
+          },
+          "schedule": {
+            "$ref": "#/components/schemas/MonitorScheduleConfig"
+          },
+          "condition": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The notification condition. `null` when not set."
+          },
+          "query": {
+            "type": "string",
+            "description": "The search query. Returned for `topic` monitors only."
+          },
+          "urls": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The watched pages. Returned for `page` monitors only."
+          },
+          "last_run": {
+            "$ref": "#/components/schemas/MonitorLastRun"
+          }
+        }
+      },
+      "MonitorListData": {
+        "type": "object",
+        "properties": {
+          "monitors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MonitorListItem"
+            },
+            "description": "Monitors, newest first."
+          },
+          "next_cursor": {
+            "type": "string",
+            "description": "Pass as `cursor` to get the next page. Empty when there are no more results or when using `page_no`."
+          },
+          "total": {
+            "type": "integer",
+            "description": "Total number of matching monitors. Returned only when `page_no` is set."
+          }
+        }
+      },
+      "MonitorUsage": {
+        "type": "object",
+        "description": "Usage for this run.",
+        "properties": {
+          "num_queries": {
+            "type": "integer",
+            "description": "Number of searches run. `topic` monitors only."
+          },
+          "num_urls": {
+            "type": "integer",
+            "description": "Number of pages fetched successfully. `page` monitors only."
+          },
+          "cost": {
+            "type": "number",
+            "description": "The run's cost in USD."
+          }
+        }
+      },
+      "MonitorRunSummary": {
+        "type": "object",
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "description": "The run id."
+          },
+          "kind": {
+            "type": "string",
+            "description": "`create` (the first run), `scheduled`, or `manual`."
+          },
+          "status": {
+            "type": "string",
+            "description": "`queued`, `processing`, `completed`, `skipped`, or `failed`."
+          },
+          "scheduled_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the run was scheduled."
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the run started."
+          },
+          "finished_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the run finished."
+          },
+          "skip_reason": {
+            "type": "string",
+            "description": "Why the run was skipped: `overlap` (the previous run is still going), `paused` (the monitor is paused), `insufficient_balance` (low balance), or `stale` (waited in the queue for over 1 hour while the system was busy). After 3 `insufficient_balance` skips in a row, the monitor is paused. Returned only for skipped runs."
+          },
+          "error_code": {
+            "type": "string",
+            "description": "The error code, such as `fetch_failed`, `judge_failed`, or `timeout`. Returned only for failed runs."
+          },
+          "items_total": {
+            "type": "integer",
+            "description": "Number of results or pages checked, excluding URLs that failed to fetch."
+          },
+          "items_changed": {
+            "type": "integer",
+            "description": "Number of new results or changed pages."
+          },
+          "items_notified": {
+            "type": "integer",
+            "description": "Number of events generated, that is, changes that met the condition."
+          },
+          "usage": {
+            "$ref": "#/components/schemas/MonitorUsage"
+          }
+        }
+      },
+      "MonitorRunListData": {
+        "type": "object",
+        "properties": {
+          "runs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MonitorRunSummary"
+            },
+            "description": "Runs on this page."
+          },
+          "next_cursor": {
+            "type": "string",
+            "description": "Pass as `cursor` to get the next page. Empty when there are no more results."
+          }
+        }
+      },
+      "MonitorFieldChange": {
+        "type": "object",
+        "properties": {
+          "previous": {
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ],
+            "description": "The value before the change: the value at the last notification, or the first run's value if there hasn't been one."
+          },
+          "current": {
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ],
+            "description": "The value after the change."
+          },
+          "changed": {
+            "type": "boolean",
+            "description": "Whether the field changed."
+          },
+          "delta": {
+            "type": "number",
+            "description": "The amount of change. Number fields only."
+          },
+          "pct": {
+            "type": "number",
+            "description": "The relative change, such as `-0.5` for a 50% drop. Number fields only."
+          }
+        }
+      },
+      "MonitorJudgment": {
+        "type": "object",
+        "description": "The judgment result.",
+        "properties": {
+          "meaningful": {
+            "type": "boolean",
+            "description": "Whether the change was judged worth notifying."
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ],
+            "description": "Confidence of the judgment."
+          },
+          "reason": {
+            "type": "string",
+            "description": "Why the event was sent, such as `price: 51.77 → 45 (-13.1%) (price < 50)`. The format may change; to read field values, use `changed` or `fields`. Not returned on the first run of a monitor with no condition."
+          }
+        }
+      },
+      "MonitorImage": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The image URL."
+          },
+          "description": {
+            "type": "string",
+            "description": "Text description of the image. Returned only when available."
+          }
+        }
+      },
+      "MonitorRunItem": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The URL of the result or page."
+          },
+          "title": {
+            "type": "string",
+            "description": "The title of the page. Returned only when available."
+          },
+          "change_status": {
+            "type": "string",
+            "description": "`new`, `changed`, `baseline` (the first run), `unchanged` (already seen, or no change), or `failed` (fetch failed)."
+          },
+          "notified": {
+            "type": "boolean",
+            "description": "Whether a notification was generated."
+          },
+          "delivered": {
+            "type": "boolean",
+            "description": "Whether it was delivered by webhook or email. `false` when no delivery channel is set."
+          },
+          "event_id": {
+            "type": "string",
+            "description": "The event id. Returned only for notified items."
+          },
+          "filtered": {
+            "type": "string",
+            "description": "Why the item wasn't notified, such as `duplicate` (a repeat of a result already pushed) or `stale` (old news published more than 5 days ago; not applied on the first run). Returned only for filtered items on `topic` monitors."
+          },
+          "error": {
+            "type": "string",
+            "description": "Why the fetch failed, such as `fetch_failed`, `timeout`, `blocked`, or `not_found`. Returned only when `change_status` is `failed`."
+          },
+          "rule": {
+            "type": "object",
+            "description": "The result of a measurable condition. `page` monitors only.",
+            "properties": {
+              "satisfied": {
+                "type": "boolean",
+                "description": "Whether the condition is met."
+              }
+            }
+          },
+          "fields": {
+            "type": "object",
+            "description": "Values extracted with `output_schema`, keyed by `field_name`. Returned only when `output_schema` is set."
+          },
+          "changed": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/MonitorFieldChange"
+            },
+            "description": "Previous and current values of each `output_schema` field, and whether it changed, keyed by `field_name`. `page` monitors only."
+          },
+          "previous_detected_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the previous value was recorded, in ISO 8601. `page` monitors only."
+          },
+          "full_content": {
+            "type": "string",
+            "description": "Full raw page content. For `page` monitors, returned for every item except `unchanged` and `failed` ones. For `topic` monitors, returned only if `full_content.enable` is true, and not for `unchanged` items."
+          },
+          "images": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MonitorImage"
+            },
+            "description": "Images on the result page. Returned only when `topic.include_images` is true, and not for `unchanged` items."
+          },
+          "highlight": {
+            "type": "string",
+            "description": "Query-relevant highlight snippets. `topic` monitors only."
+          },
+          "authors": {
+            "type": "string",
+            "description": "Website name or author. `topic` monitors only."
+          },
+          "time_published": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Publish time in ISO 8601. `topic` monitors only."
+          },
+          "judgment": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MonitorJudgment"
+              }
+            ],
+            "description": "The judgment result. Not returned for `unchanged`, `failed`, or filtered items."
+          }
+        }
+      },
+      "MonitorRun": {
+        "type": "object",
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "description": "The run id."
+          },
+          "monitor_id": {
+            "type": "string",
+            "description": "The monitor id."
+          },
+          "kind": {
+            "type": "string",
+            "description": "`create` (the first run), `scheduled`, or `manual`."
+          },
+          "status": {
+            "type": "string",
+            "description": "`queued`, `processing`, `completed`, `skipped`, or `failed`."
+          },
+          "scheduled_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the run was scheduled."
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the run started."
+          },
+          "finished_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the run finished."
+          },
+          "skip_reason": {
+            "type": "string",
+            "description": "Why the run was skipped: `overlap` (the previous run is still going), `paused` (the monitor is paused), `insufficient_balance` (low balance), or `stale` (waited in the queue for over 1 hour while the system was busy). After 3 `insufficient_balance` skips in a row, the monitor is paused. Returned only for skipped runs."
+          },
+          "error_code": {
+            "type": "string",
+            "description": "The error code, such as `fetch_failed`, `judge_failed`, or `timeout`. Returned only for failed runs."
+          },
+          "items_total": {
+            "type": "integer",
+            "description": "Number of results or pages checked, excluding URLs that failed to fetch."
+          },
+          "items_changed": {
+            "type": "integer",
+            "description": "Number of new results or changed pages."
+          },
+          "items_notified": {
+            "type": "integer",
+            "description": "Number of events generated, that is, changes that met the condition."
+          },
+          "usage": {
+            "$ref": "#/components/schemas/MonitorUsage"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MonitorRunItem"
+            },
+            "description": "Every result or page this run checked."
+          }
+        }
+      },
+      "MonitorEvent": {
+        "type": "object",
+        "properties": {
+          "event_id": {
+            "type": "string",
+            "description": "The event id."
+          },
+          "event_type": {
+            "type": "string",
+            "description": "`monitor.new` for a new `topic` result, or `monitor.change` for a `page` change."
+          },
+          "monitor_id": {
+            "type": "string",
+            "description": "The monitor id."
+          },
+          "run_id": {
+            "type": "string",
+            "description": "The run that generated the event."
+          },
+          "url": {
+            "type": "string",
+            "description": "The URL of the result or page."
+          },
+          "title": {
+            "type": "string",
+            "description": "The title of the page. Returned only when available."
+          },
+          "change_status": {
+            "type": "string",
+            "description": "`new`, `changed`, or `baseline` (the first run)."
+          },
+          "fields": {
+            "type": "object",
+            "description": "Values extracted with `output_schema`, keyed by `field_name`. Returned only when `output_schema` is set."
+          },
+          "changed": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/MonitorFieldChange"
+            },
+            "description": "Previous and current values of each `output_schema` field, and whether it changed, keyed by `field_name`. `page` monitors only."
+          },
+          "previous_detected_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the previous value was recorded, in ISO 8601. `page` monitors only."
+          },
+          "content_preview": {
+            "type": "string",
+            "description": "The first 500 characters of the content. Always returned for `page` events; returned for `topic` events when `full_content.enable` is true."
+          },
+          "highlight": {
+            "type": "string",
+            "description": "Query-relevant highlight snippets. `topic` monitors only."
+          },
+          "images": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MonitorImage"
+            },
+            "description": "Images on the result page. Returned only when `topic.include_images` is true."
+          },
+          "authors": {
+            "type": "string",
+            "description": "Website name or author. `topic` monitors only."
+          },
+          "time_published": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Publish time in ISO 8601. `topic` monitors only."
+          },
+          "judgment": {
+            "$ref": "#/components/schemas/MonitorJudgment"
+          },
+          "delivered": {
+            "type": "boolean",
+            "description": "Whether it was delivered by webhook or email. `false` when no delivery channel is set."
+          },
+          "detected_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the change was detected, in ISO 8601."
+          }
+        }
+      },
+      "MonitorEventListData": {
+        "type": "object",
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MonitorEvent"
+            },
+            "description": "Events, newest first."
+          },
+          "next_cursor": {
+            "type": "string",
+            "description": "Pass as `cursor` to get the next page. Empty when there are no more results."
+          }
+        }
+      },
+      "MonitorWebhookItem": {
+        "type": "object",
+        "properties": {
+          "event_type": {
+            "type": "string",
+            "description": "`monitor.new` for a new `topic` result, or `monitor.change` for a `page` change."
+          },
+          "run_id": {
+            "type": "string",
+            "description": "Same as the top-level `run_id`."
+          },
+          "detected_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the event was detected, in ISO 8601. Usually within 1 second of the top-level `detected_at`."
+          },
+          "event_id": {
+            "type": "string",
+            "description": "The event id."
+          },
+          "url": {
+            "type": "string",
+            "description": "The URL of the result or page."
+          },
+          "title": {
+            "type": "string",
+            "description": "The title of the page. Returned only when available."
+          },
+          "change_status": {
+            "type": "string",
+            "description": "`new`, `changed`, or `baseline` (the first run)."
+          },
+          "fields": {
+            "type": "object",
+            "description": "Values extracted with `output_schema`, keyed by `field_name`. Returned only when `output_schema` is set."
+          },
+          "changed": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/MonitorFieldChange"
+            },
+            "description": "Previous and current values of each `output_schema` field, and whether it changed, keyed by `field_name`. `page` monitors only."
+          },
+          "previous_detected_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the previous value was recorded, in ISO 8601. `page` monitors only."
+          },
+          "full_content": {
+            "type": "string",
+            "description": "Full raw page content. Always returned for `page` monitors; returned for `topic` monitors only if `full_content.enable` is true."
+          },
+          "full_content_truncated": {
+            "type": "boolean",
+            "description": "If true, `full_content` was shortened. Returned only when shortened."
+          },
+          "highlight": {
+            "type": "string",
+            "description": "Query-relevant highlight snippets. `topic` monitors only."
+          },
+          "highlight_truncated": {
+            "type": "boolean",
+            "description": "If true, `highlight` was shortened. Returned only when shortened."
+          },
+          "authors": {
+            "type": "string",
+            "description": "Website name or author. `topic` monitors only."
+          },
+          "time_published": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Publish time in ISO 8601. `topic` monitors only."
+          },
+          "images": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MonitorImage"
+            },
+            "description": "Images on the result page. Returned only when `topic.include_images` is true."
+          },
+          "judgment": {
+            "$ref": "#/components/schemas/MonitorJudgment"
+          }
+        }
+      },
+      "MonitorWebhookPayload": {
+        "type": "object",
+        "properties": {
+          "event_type": {
+            "type": "string",
+            "description": "Always `monitor.run.completed`."
+          },
+          "monitor_id": {
+            "type": "string",
+            "description": "The monitor id."
+          },
+          "run_id": {
+            "type": "string",
+            "description": "The run that generated these events."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MonitorWebhookItem"
+            },
+            "description": "The events generated by this run. Notified items only."
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "The monitor's `metadata`. Returned only when set."
+          },
+          "detected_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When this run detected the changes, in ISO 8601."
+          }
+        }
+      },
+      "MonitorCreateResponse": {
+        "type": "object",
+        "required": [
+          "request_id"
+        ],
+        "properties": {
+          "code": {
+            "type": "integer",
+            "description": "Business status code. 0 indicates success."
+          },
+          "msg": {
+            "type": "string",
+            "description": "A message describing the result."
+          },
+          "request_id": {
+            "type": "string",
+            "description": "The unique identifier for this request."
+          },
+          "data": {
+            "$ref": "#/components/schemas/MonitorCreateData"
+          }
+        }
+      },
+      "MonitorListResponse": {
+        "type": "object",
+        "required": [
+          "request_id"
+        ],
+        "properties": {
+          "code": {
+            "type": "integer",
+            "description": "Business status code. 0 indicates success."
+          },
+          "msg": {
+            "type": "string",
+            "description": "A message describing the result."
+          },
+          "request_id": {
+            "type": "string",
+            "description": "The unique identifier for this request."
+          },
+          "data": {
+            "$ref": "#/components/schemas/MonitorListData"
+          }
+        }
+      },
+      "MonitorGetResponse": {
+        "type": "object",
+        "required": [
+          "request_id"
+        ],
+        "properties": {
+          "code": {
+            "type": "integer",
+            "description": "Business status code. 0 indicates success."
+          },
+          "msg": {
+            "type": "string",
+            "description": "A message describing the result."
+          },
+          "request_id": {
+            "type": "string",
+            "description": "The unique identifier for this request."
+          },
+          "data": {
+            "$ref": "#/components/schemas/Monitor"
+          }
+        }
+      },
+      "MonitorUpdateResponse": {
+        "type": "object",
+        "required": [
+          "request_id"
+        ],
+        "properties": {
+          "code": {
+            "type": "integer",
+            "description": "Business status code. 0 indicates success."
+          },
+          "msg": {
+            "type": "string",
+            "description": "A message describing the result."
+          },
+          "request_id": {
+            "type": "string",
+            "description": "The unique identifier for this request."
+          },
+          "data": {
+            "$ref": "#/components/schemas/MonitorUpdateData"
+          }
+        }
+      },
+      "MonitorDeleteResponse": {
+        "type": "object",
+        "required": [
+          "request_id"
+        ],
+        "properties": {
+          "code": {
+            "type": "integer",
+            "description": "Business status code. 0 indicates success."
+          },
+          "msg": {
+            "type": "string",
+            "description": "A message describing the result."
+          },
+          "request_id": {
+            "type": "string",
+            "description": "The unique identifier for this request."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "monitor_id": {
+                "type": "string",
+                "description": "The id of the deleted monitor."
+              },
+              "status": {
+                "type": "string",
+                "description": "Always `deleted`."
+              }
+            }
+          }
+        }
+      },
+      "MonitorTriggerResponse": {
+        "type": "object",
+        "required": [
+          "request_id"
+        ],
+        "properties": {
+          "code": {
+            "type": "integer",
+            "description": "Business status code. 0 indicates success."
+          },
+          "msg": {
+            "type": "string",
+            "description": "A message describing the result."
+          },
+          "request_id": {
+            "type": "string",
+            "description": "The unique identifier for this request."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "run_id": {
+                "type": "string",
+                "description": "The id of this manual run."
+              },
+              "status": {
+                "type": "string",
+                "description": "`queued` when triggered."
+              }
+            }
+          }
+        }
+      },
+      "MonitorRunListResponse": {
+        "type": "object",
+        "required": [
+          "request_id"
+        ],
+        "properties": {
+          "code": {
+            "type": "integer",
+            "description": "Business status code. 0 indicates success."
+          },
+          "msg": {
+            "type": "string",
+            "description": "A message describing the result."
+          },
+          "request_id": {
+            "type": "string",
+            "description": "The unique identifier for this request."
+          },
+          "data": {
+            "$ref": "#/components/schemas/MonitorRunListData"
+          }
+        }
+      },
+      "MonitorRunResponse": {
+        "type": "object",
+        "required": [
+          "request_id"
+        ],
+        "properties": {
+          "code": {
+            "type": "integer",
+            "description": "Business status code. 0 indicates success."
+          },
+          "msg": {
+            "type": "string",
+            "description": "A message describing the result."
+          },
+          "request_id": {
+            "type": "string",
+            "description": "The unique identifier for this request."
+          },
+          "data": {
+            "$ref": "#/components/schemas/MonitorRun"
+          }
+        }
+      },
+      "MonitorEventListResponse": {
+        "type": "object",
+        "required": [
+          "request_id"
+        ],
+        "properties": {
+          "code": {
+            "type": "integer",
+            "description": "Business status code. 0 indicates success."
+          },
+          "msg": {
+            "type": "string",
+            "description": "A message describing the result."
+          },
+          "request_id": {
+            "type": "string",
+            "description": "The unique identifier for this request."
+          },
+          "data": {
+            "$ref": "#/components/schemas/MonitorEventListData"
+          }
+        }
       }
     },
     "securitySchemes": {
@@ -13953,12 +17673,12 @@
         "name": "x-api-key",
         "description": "API key used for request authentication. Alternatively, you can send the key as a Bearer token in the `Authorization` header. Note: A payment method is required to use the API."
       },
-      "bearerAuthNoPayment": {
+      "Bearer": {
         "type": "http",
         "scheme": "bearer",
         "description": "Bearer token used for request authentication. Alternatively, you can send the API key in the `x-api-key` header."
       },
-      "apiKeyAuthNoPayment": {
+      "x-api-key": {
         "type": "apiKey",
         "in": "header",
         "name": "x-api-key",
