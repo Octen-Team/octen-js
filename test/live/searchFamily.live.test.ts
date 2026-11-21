@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import Octen, {
-  OctenAPIError,
-  OctenAuthenticationError,
-  OctenBadRequestError,
-  OctenPermissionDeniedError,
-} from '../../src/index';
+import Octen, { OctenAPIError, OctenAuthenticationError, OctenBadRequestError } from '../../src/index';
 
 // Web Search Premier, Image, Video and Design Search against production https://api.octen.ai (billed, small counts).
 // Runs only with OCTEN_LIVE=1 and OCTEN_API_KEY. Each test checks that its options take effect, not only success.
@@ -111,29 +106,16 @@ describe.skipIf(!enabled)('live: Image Search', () => {
 });
 
 describe.skipIf(!enabled)('live: Video Search (invite-only beta)', () => {
-  // The key used on 2026-11-21 had beta access; the rejection branch assumes a 403 and is unverified.
-  it('returns video results, or a permission error when the key has no beta access', async () => {
-    const outcome = await client()
-      .videoSearch.search({ inputs: [{ type: 'text', data: 'how to make fresh pasta' }], count: 2 })
-      .then(
-        (res) => ({ res }),
-        (err: unknown) => ({ err }),
-      );
-    if ('res' in outcome) {
-      logged('videoSearch', outcome.res);
-      const results = outcome.res.data?.results ?? [];
-      expect(results.length).toBeGreaterThanOrEqual(1);
-      expect(results.length).toBeLessThanOrEqual(2);
-      for (const r of results) expect(r.url).toMatch(/^https?:\/\//);
-      return;
-    }
-    const err = outcome.err;
-    if (err instanceof OctenAPIError) {
-      console.log(
-        `[live-family] videoSearch rejected: ${err.name} status=${err.status} code=${err.code} msg=${JSON.stringify(err.message)}`,
-      );
-    }
-    expect(err).toBeInstanceOf(OctenPermissionDeniedError);
+  // The key used for these tests has beta access, so anything but results (including any 403) is a failure.
+  it('returns up to count video results for a text query', async () => {
+    const res = logged(
+      'videoSearch',
+      await client().videoSearch.search({ inputs: [{ type: 'text', data: 'how to make fresh pasta' }], count: 2 }),
+    );
+    const results = res.data?.results ?? [];
+    expect(results.length).toBeGreaterThanOrEqual(1);
+    expect(results.length).toBeLessThanOrEqual(2);
+    for (const r of results) expect(r.url).toMatch(/^https?:\/\//);
   });
 });
 
