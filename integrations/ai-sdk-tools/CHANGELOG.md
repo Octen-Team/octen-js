@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.0
+
+- New tool `octenWebSearchPremier` for `POST /search-premier`: deeper retrieval and reranking than Web Search, with the same parameters and response. It is built like `octenWebSearch`: the model supplies `query` and an optional `time_range`, every other request field (`count`, `highlight`, `full_content`, `result_type`, domain and language filters and so on) is set through `defaults`, and pinning `time_range` removes it from the model's schema. The built-in defaults are `count: 5` and `highlight: { enable: true, max_tokens: 300 }`, and results are trimmed to the same web result fields. New public types `WebSearchPremierInput` and `WebSearchPremierToolResult`.
+- Requires `@octen.ai/sdk` 0.2.x (dependency range `^0.2.0`), the first SDK release with `searchPremier`. If your project pins `@octen.ai/sdk` 0.1.x, upgrade it to 0.2.x so a single SDK copy is installed and a `client` you create still type-checks when passed to the tools.
+- The six existing tools send the same requests and return the same results as in 0.1.2.
+
 ## 0.1.2
 
 - Accepts `@octen.ai/sdk` 0.2.x as well as 0.1.x (dependency range `^0.1.0 || ^0.2.0`), so installing it next to `@octen.ai/sdk` 0.2.0 keeps a single SDK copy and a `client` you create type-checks when passed to the tools. No tool behavior changes.

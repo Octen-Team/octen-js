@@ -1,10 +1,10 @@
 # @octen.ai/ai-sdk-tools
 
-[Octen](https://docs.octen.ai) search tools for the [Vercel AI SDK](https://ai-sdk.dev). Give a model web search, news, company and people lookup, place search and official-page lookup with one function call each. Built on [`@octen.ai/sdk`](https://github.com/Octen-Team/octen-js).
+[Octen](https://docs.octen.ai) search tools for the [Vercel AI SDK](https://ai-sdk.dev). Give a model web search (standard or Premier), news, company and people lookup, place search and official-page lookup with one function call each. Built on [`@octen.ai/sdk`](https://github.com/Octen-Team/octen-js).
 
 - [Install](#install)
 - [Quick start](#quick-start)
-- [The six tools](#the-six-tools)
+- [The seven tools](#the-seven-tools)
 - [Options and precedence](#options-and-precedence)
 - [What the model sees](#what-the-model-sees)
 - [Errors and cancellation](#errors-and-cancellation)
@@ -44,23 +44,35 @@ Any AI SDK provider works the same way: only the `model` line changes. `stopWhen
 
 `octenWebSearch()` reads `OCTEN_API_KEY` when it is called, not when the package is imported. If no key is set, the call throws the same error the SDK's `Octen` constructor throws.
 
-## The six tools
+## The seven tools
 
 Each factory returns an AI SDK `Tool`. Pass any of them under any name in `tools`.
 
 | Factory | Endpoint | What the model provides |
 |---|---|---|
 | `octenWebSearch(options?)` | `POST /search` | `query`, optional `time_range` |
+| `octenWebSearchPremier(options?)` | `POST /search-premier` | `query`, optional `time_range` |
 | `octenBroadSearch(options?)` | `POST /broad-search` | `query` |
 | `octenNewsSearch(options?)` | `POST /news-search` | `query`, optional `time_range` |
 | `octenBusinessSearch(options?)` | `POST /business-search` | `query` |
 | `octenPlaceSearch(options?)` | `POST /place-search` | `query` |
 | `octenPulseSearch(options?)` | `POST /pulse-search` | `query` |
 
-- **Web** is general search. **Broad** splits a multi-part question into sub-queries and runs them in parallel. **News** returns recent articles plus storylines. **Business** returns company and person cards plus sources. **Place** finds shops, restaurants and services with address, rating and opening hours. **Pulse** finds the official page for a site, product or document.
+- **Web** is general search. **Web Search Premier** takes the same parameters and returns the same shape, but uses deeper retrieval and reranking so the page that holds the answer ranks higher; use it for a specific fact, a niche document or a page that is hard to find, and Web for low-latency lookups. **Broad** splits a multi-part question into sub-queries and runs them in parallel. **News** returns recent articles plus storylines. **Business** returns company and person cards plus sources. **Place** finds shops, restaurants and services with address, rating and opening hours. **Pulse** finds the official page for a site, product or document.
 - `time_range` is `day`, `week`, `month` or `year`. The model may also send `null` or leave it out, which means no time filter.
-- The model only ever supplies `query` (and `time_range` for Web and News). Everything else is fixed by the tool or by you through `defaults`, so the model has fewer decisions to get wrong.
+- The model only ever supplies `query` (and `time_range` for Web, Web Search Premier and News). Everything else is fixed by the tool or by you through `defaults`, so the model has fewer decisions to get wrong.
 - Place does not take a location from the model. Either put the area in the query ("coffee near Shibuya, Tokyo"), or pin a location with `defaults`.
+
+Everything that changes how much a call returns or costs, such as `count`, `highlight`, `full_content` or `result_type`, is yours to set. For example, a Web Search Premier tool restricted to a few sources:
+
+```ts
+import { octenWebSearchPremier } from '@octen.ai/ai-sdk-tools';
+
+// The model still only writes the query and may pick a time range; the rest is fixed here.
+const premier = octenWebSearchPremier({
+  defaults: { count: 3, result_type: 'dynamic', include_domains: ['nature.com', 'science.org'] },
+});
+```
 
 ## Options and precedence
 
@@ -107,7 +119,7 @@ The factory builds one client and every call of that tool reuses it.
 2. your `defaults`;
 3. the tool's built-in defaults, listed under [What the model sees](#what-the-model-sees).
 
-**Fields you pin disappear from the model.** If `defaults` sets `time_range` on Web or News, the `time_range` input is removed from that tool's schema, so the model cannot override it. `query` always comes from the model, and a `query` placed in `defaults` is ignored.
+**Fields you pin disappear from the model.** If `defaults` sets `time_range` on Web, Web Search Premier or News, the `time_range` input is removed from that tool's schema, so the model cannot override it. `query` always comes from the model, and a `query` placed in `defaults` is ignored.
 
 **Merging happens at the top level only.** A nested object you pass replaces the tool's own object entirely; the two are not combined key by key:
 
@@ -138,6 +150,7 @@ A "web result" below has `title`, `url`, `highlight`, `time_published` and `full
 | Tool | Result | Built-in defaults |
 |---|---|---|
 | Web | `{ request_id, warning?, results: WebResult[] }` | `count: 5`, `highlight: { enable: true, max_tokens: 300 }` |
+| Web Search Premier | `{ request_id, warning?, results: WebResult[] }` | `count: 5`, `highlight: { enable: true, max_tokens: 300 }` (the API's own highlight default is 512 tokens) |
 | Pulse | `{ request_id, warning?, results: WebResult[] }` | `count: 5` |
 | Broad | `{ request_id, warning?, queries: string[], search_results: { query?, results: WebResult[] }[] }` | `search_options: { highlight: { enable: true, max_tokens: 300 } }`; the tool sends no `count` or `max_queries` |
 | News | `{ request_id, warning?, results: WebResult[], subjects: { name?, summary?, time_latest?, top_news?: { title?, url? } }[] }` | `count: 5`, `highlight: { enable: true, max_tokens: 300 }` |
@@ -146,7 +159,7 @@ A "web result" below has `title`, `url`, `highlight`, `time_published` and `full
 
 - **Business entities.** A company keeps `type`, `name`, `summary` and `website` (taken from `identifiers.website`). A person keeps `type`, `name`, `summary`, `current_position` and `linkedin_url`. An entity type the SDK does not know yet keeps only `type`, `name` and `summary`. An entity without a `type` is dropped. Because an unknown `type` comes through as its own string, checking `e.type === 'company'` alone does not narrow the type: add a key check such as `'website' in e`, or cast to the exported `ModelCompany` or `ModelPerson`.
 - **Places** keep `name`, `category`, `address`, `latitude`, `longitude`, `distance`, `rating`, `review_count`, `opening_hours`, `status`, `phone` and `website`. A value of `0` is kept; only missing values are dropped. `results` is empty unless you turn on web results with `defaults: { web_search: { enable: true } }`.
-- **Full content is off by default.** A web result carries `full_content` only if you turn it on, for example `defaults: { full_content: { enable: true, max_tokens: 1000 } }`. Full content beyond the free allowance is billed separately, and it is a lot of text for the model to read, so the tools leave it off unless you ask for it. Web, News, Business and Pulse take `full_content` at the top level of `defaults`; Broad takes it under `search_options` and Place under `web_search`.
+- **Full content is off by default.** A web result carries `full_content` only if you turn it on, for example `defaults: { full_content: { enable: true, max_tokens: 1000 } }`. Full content beyond the free allowance is billed separately, and it is a lot of text for the model to read, so the tools leave it off unless you ask for it. Web, Web Search Premier, News, Business and Pulse take `full_content` at the top level of `defaults`; Broad takes it under `search_options` and Place under `web_search`.
 
 ## Errors and cancellation
 
@@ -274,16 +287,16 @@ Keep in mind that each tool call the model makes is a separate Octen request, an
 
 `ai` 7 is published as ESM only, so loading this package through `require()` (CommonJS) together with `ai` 7 needs Node 20.19 or later, or Node 22.12 or later: older Node versions cannot `require()` an ES module and fail with `ERR_REQUIRE_ESM`. Measured on 2026-11-18 with `@octen.ai/ai-sdk-tools` 0.1.0 and `ai` 7.0.176: Node 20.18.3 and 22.11.0 fail, Node 20.19.0 and 22.12.0 work. The ESM build works on Node 20 and later.
 
-The package declares `ai` and `zod` as peer dependency ranges. A version matrix (`scripts/matrix.sh` in the repository) checks them; on 2026-11-18 it passed for exactly these eight combinations:
+The package declares `ai` and `zod` as peer dependency ranges. A version matrix (`scripts/matrix.sh` in the repository) checks them; on 2026-11-21, for version 0.2.0 with `@octen.ai/sdk` 0.2.0, it passed for exactly these eight combinations:
 
 | `ai` | `zod` | Node |
 |---|---|---|
 | 5.0.291 | 3.25.76, 4.1.8 | 24.18.0 |
 | 6.0.333 | 3.25.76, 4.1.8 | 24.18.0 |
 | 7.0.176 | 3.25.76, 4.1.8 | 24.18.0 |
-| 7.0.176 | 4.6.7 | 20.20.2, 24.18.0 |
+| 7.0.179 | 4.6.7 | 20.20.2, 24.18.0 |
 
-`ai` 5 and 6 were run on Node 24 only, `zod` 4.6.7 only with `ai` 7.0.176, and Node 20 only with `ai` 7.0.176 and `zod` 4.6.7. For each combination the matrix drives `generateText` and `streamText` with the AI SDK's mock model through a search and an answer, checks the JSON schema the model is given (`query` required, `time_range` optional and removed when pinned) and that `time_range: null` passes the AI SDK's input check, records how the failures described under [What the AI SDK does with the error](#what-the-ai-sdk-does-with-the-error) surface, loads the package through `require`, and type-checks a project that uses all six tools with TypeScript 6.0.3, `strict` and `skipLibCheck: false`. With `skipLibCheck: false` you also need `@types/json-schema`, because the AI SDK's own declarations import `json-schema`.
+`ai` 5 and 6 were run on Node 24 only, `zod` 4.6.7 only with `ai` 7.0.179, and Node 20 only with `ai` 7.0.179 and `zod` 4.6.7. For each combination the matrix drives `generateText` and `streamText` with the AI SDK's mock model through a search and an answer, checks the JSON schema the model is given (`query` required, `time_range` optional and removed when pinned) and that `time_range: null` passes the AI SDK's input check, records how the failures described under [What the AI SDK does with the error](#what-the-ai-sdk-does-with-the-error) surface, loads the package through `require`, and type-checks a project that uses all seven tools with TypeScript 6.0.3, `strict` and `skipLibCheck: false`. With `skipLibCheck: false` you also need `@types/json-schema`, because the AI SDK's own declarations import `json-schema`.
 
 The public types do not mention zod, so whether you use zod 3 or 4 does not affect your type checking. `ai` 4 is not supported: it uses `parameters` where this package uses the `inputSchema` form of `tool()`.
 
