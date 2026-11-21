@@ -111,20 +111,27 @@ pass "fake server saw only well-formed requests"
 node -e "
 const base = '$OCTEN_FAKE_BASE_URL';
 const headers = { 'x-api-key': 'fake-e2e-key', 'user-agent': 'octen-js-sdk/probe', 'content-type': 'application/json' };
+const shape = (path) => 'body shape not accepted by ' + path;
+const text = [{ type: 'text', data: 'q' }];
+// [path, body, the only reason the 400 may give]; the last two each hit one clause alone
 const probes = [
   ['/image-search', { query: 'q' }],
   ['/video-search', { inputs: [{ type: 'image', url: 'https://example.com/a.png' }] }],
-  ['/search', { inputs: [{ type: 'text', data: 'q' }] }],
+  ['/search', { inputs: text }],
   ['/search-premier', { images: { group_id: 'deck_1' } }],
-  ['/design-search', { inputs: [{ type: 'text', data: 'q' }] }],
-  ['/not-an-endpoint', { query: 'q' }],
-];
-Promise.all(probes.map(([path, body]) =>
-  fetch(base + path, { method: 'POST', headers, body: JSON.stringify(body) }).then((r) => [path, r.status]),
+  ['/design-search', { inputs: text }],
+  ['/image-search', { query: 'q', inputs: text }],
+  ['/design-search', { query: 'q', inputs: text }],
+].map(([path, body]) => [path, body, shape(path)]);
+probes.push(['/not-an-endpoint', { query: 'q' }, 'unknown path /not-an-endpoint']);
+Promise.all(probes.map(([path, body, reason]) =>
+  fetch(base + path, { method: 'POST', headers, body: JSON.stringify(body) })
+    .then((r) => r.json().then((b) => ({ path, status: r.status, msg: b.msg, ok: r.status === 400 && b.msg === 'fake server rejected: ' + reason }))),
 )).then((results) => {
-  const accepted = results.filter(([, status]) => status !== 400);
-  console.log('wrong-route probes: ' + JSON.stringify(results));
-  if (accepted.length) process.exit(1);
+  console.log('wrong-route probes: ' + JSON.stringify(results.map(({ path, status, ok }) => [path, status, ok])));
+  const wrong = results.filter((r) => !r.ok);
+  for (const r of wrong) console.error('probe not rejected for its shape: ' + JSON.stringify(r));
+  if (wrong.length) process.exit(1);
 });
 " || fail "fake server accepted a body on the wrong route"
 pass "fake server rejects bodies sent to the wrong route"
