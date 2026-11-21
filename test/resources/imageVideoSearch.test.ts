@@ -61,6 +61,7 @@ describe('ImageSearchResource.search', () => {
     ['an input type the endpoint does not take', { inputs: [{ type: 'video', url: 'https://v.example.com/a.mp4' }] }, 'inputs[0].type'],
     ['a text input without data', { inputs: [{ type: 'text' }] }, 'inputs[0].data'],
     ['a text input with blank data', { inputs: [{ type: 'text', data: '  ' }] }, 'inputs[0].data'],
+    ['a text input carrying url', { inputs: [{ type: 'text', data: 'q', url: 'https://img.example.com/a.png' }] }, 'inputs[0].url'],
     ['an image input without url or data', { inputs: [{ type: 'image' }] }, 'inputs[0]'],
     ['an image input with an empty url', { inputs: [{ type: 'image', url: '' }] }, 'inputs[0]'],
     [

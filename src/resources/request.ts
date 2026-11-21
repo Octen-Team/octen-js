@@ -54,6 +54,10 @@ function assertSingleInput(params: unknown, allowedTypes: readonly string[]): vo
   if (type === 'text' && !isNonBlank(data)) {
     throw new OctenValidationError('inputs[0].data', 'A text input needs data: a non-empty query string.');
   }
+  // The spec documents url for image inputs only
+  if (type === 'text' && url !== undefined) {
+    throw new OctenValidationError('inputs[0].url', 'A text input takes data only; url is for image inputs.');
+  }
   if (type === 'image') {
     const given = [url, data].filter((v) => v !== undefined);
     if (given.length !== 1 || typeof given[0] !== 'string' || given[0] === '') {

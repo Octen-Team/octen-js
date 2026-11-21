@@ -176,7 +176,7 @@ Before sending anything the SDK checks the required input and rejects keys it do
 The required input, checked with `field` naming the offending path:
 
 - `query` must be a non-empty string (not only whitespace) for every method except the three below.
-- `imageSearch` and `videoSearch`: `inputs` must hold exactly one input (`inputs`), of a type the endpoint takes: `text` or `image` for Image Search, `text` for Video Search (`inputs[0].type`). A `text` input needs a non-empty `data` (`inputs[0].data`); an `image` input needs exactly one of `url` or `data` (base64), not both (`inputs[0]`).
+- `imageSearch` and `videoSearch`: `inputs` must hold exactly one input (`inputs`), of a type the endpoint takes: `text` or `image` for Image Search, `text` for Video Search (`inputs[0].type`). A `text` input needs a non-empty `data` (`inputs[0].data`) and takes no `url` (`inputs[0].url`); an `image` input needs exactly one of `url` or `data` (base64), not both (`inputs[0]`).
 - `designSearch`: `query` must be a non-empty string unless `images.group_id` is set; an empty or blank `group_id` counts as not set (`query`).
 
 Lengths are not checked locally either: a `query` over 500 characters comes back as a 400.
