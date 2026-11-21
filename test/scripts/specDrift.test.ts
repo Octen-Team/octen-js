@@ -12,7 +12,8 @@ const TSX = join(ROOT, 'node_modules/.bin/tsx');
 const dir = mkdtempSync(join(tmpdir(), 'octen-spec-drift-'));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
-type Spec = { components: { schemas: Record<string, { properties: Record<string, { enum?: string[] }> }> } };
+type Property = { enum?: string[]; minItems?: number; maxItems?: number };
+type Spec = { components: { schemas: Record<string, { properties: Record<string, Property> }> } };
 
 function writeSpec(name: string, mutate: (s: Spec) => void): string {
   const spec = JSON.parse(readFileSync(SNAPSHOT, 'utf8')) as Spec;
@@ -66,6 +67,21 @@ describe('scripts/spec-drift.ts', { timeout: 30_000 }, () => {
     });
     const r = run(live);
     expect(r.out).toContain(`${place}: removed from live spec`);
+    expect(r.status).toBe(1);
+  });
+
+  // The SDK checks locally that inputs holds exactly one item, so a change in its bounds must not pass silently.
+  test.each([
+    ['ImageSearchRequest', 'maxItems', 2, '/image-search request.inputs: maxItems 1 -> 2'],
+    ['ImageSearchRequest', 'minItems', 0, '/image-search request.inputs: minItems 1 -> 0'],
+    ['VideoSearchRequest', 'maxItems', 3, '/video-search request.inputs: maxItems 1 -> 3'],
+    ['VideoSearchRequest', 'minItems', 1, '/video-search request.inputs: minItems none -> 1'],
+  ] as const)('%s inputs %s changed to %d exits 1', (schema, key, value, expected) => {
+    const live = writeSpec(`cardinality-${schema}-${key}.json`, (s) => {
+      s.components.schemas[schema]!.properties.inputs![key] = value;
+    });
+    const r = run(live);
+    expect(r.out).toContain(expected);
     expect(r.status).toBe(1);
   });
 

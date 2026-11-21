@@ -21,6 +21,12 @@ const ENDPOINTS = [
   '/design-search',
 ];
 
+// flattenSchema drops minItems/maxItems; these arrays are checked locally (exactly one input), so compare their bounds too
+const CARDINALITY = [
+  ['/image-search', 'inputs'],
+  ['/video-search', 'inputs'],
+] as const;
+
 type Raw = Record<string, unknown>;
 
 function isRaw(v: unknown): v is Raw {
@@ -70,6 +76,29 @@ function diffFlat(a: FlatSchema | undefined, b: FlatSchema | undefined, where: s
   }
 }
 
+type Bounds = { minItems: string; maxItems: string };
+
+// minItems / maxItems of a direct property of the endpoint's request schema ("none" when absent)
+function cardinality(spec: OpenAPI, path: string, prop: string): Bounds {
+  const name = schemaRef(spec, path, 'request').replace('#/components/schemas/', '');
+  const schema = spec.components?.schemas?.[name];
+  const props = isRaw(schema) ? schema.properties : undefined;
+  const node = isRaw(props) ? props[prop] : undefined;
+  if (!isRaw(node)) throw new Error(`${path}: request property "${prop}" not found in ${name}`);
+  const bound = (k: string) => (typeof node[k] === 'number' ? String(node[k]) : 'none');
+  return { minItems: bound('minItems'), maxItems: bound('maxItems') };
+}
+
+function cardinalityAll(spec: OpenAPI): Map<string, Bounds> {
+  return new Map(CARDINALITY.map(([path, prop]) => [`${path} request.${prop}`, cardinality(spec, path, prop)]));
+}
+
+function diffCardinality(a: Bounds, b: Bounds, where: string, out: string[]): void {
+  for (const k of ['minItems', 'maxItems'] as const) {
+    if (a[k] !== b[k]) out.push(`${where}: ${k} ${a[k]} -> ${b[k]}`);
+  }
+}
+
 function flattenAll(spec: OpenAPI): Map<string, FlatSchema> {
   const flat = new Map<string, FlatSchema>();
   for (const path of ENDPOINTS) {
@@ -97,14 +126,20 @@ async function fetchText(url: string): Promise<string> {
 async function main(): Promise<number> {
   let snapshot: Map<string, FlatSchema>;
   let live: Map<string, FlatSchema>;
+  let snapshotBounds: Map<string, Bounds>;
+  let liveBounds: Map<string, Bounds>;
   try {
-    snapshot = flattenAll(JSON.parse(readFileSync(SNAPSHOT_PATH, 'utf8')) as OpenAPI);
+    const spec = JSON.parse(readFileSync(SNAPSHOT_PATH, 'utf8')) as OpenAPI;
+    snapshot = flattenAll(spec);
+    snapshotBounds = cardinalityAll(spec);
   } catch (err) {
     console.error(`cannot read the snapshot (${SNAPSHOT_PATH}): ${String(err)}`);
     return 2;
   }
   try {
-    live = flattenAll(await downloadLive());
+    const spec = await downloadLive();
+    live = flattenAll(spec);
+    liveBounds = cardinalityAll(spec);
   } catch (err) {
     // A structure flattenSchema does not recognize in the live spec also needs a human look
     console.error(`cannot read the live spec (${LIVE_URL}): ${String(err)}`);
@@ -114,6 +149,9 @@ async function main(): Promise<number> {
   const differences: string[] = [];
   for (const [name, snap] of snapshot) {
     diffFlat(snap, live.get(name), name, differences);
+  }
+  for (const [name, bounds] of snapshotBounds) {
+    diffCardinality(bounds, liveBounds.get(name) as Bounds, name, differences);
   }
   if (differences.length === 0) {
     console.log(`No drift: ${snapshot.size} request/response schemas match the snapshot.`);
