@@ -7,11 +7,12 @@ const seen = [];
 
 const nonEmpty = (v) => typeof v === 'string' && v !== '';
 const hasQuery = (b) => nonEmpty(b?.query);
-// Exactly one input of an allowed type; text needs data, an image url or data
+// Exactly one input of an allowed type; text needs data and no url, an image exactly one of url or data
 const hasInput = (types) => (b) => {
   const input = Array.isArray(b?.inputs) && b.inputs.length === 1 ? b.inputs[0] : undefined;
   if (!types.includes(input?.type) || b?.query !== undefined) return false;
-  return input.type === 'text' ? nonEmpty(input.data) : nonEmpty(input.url) || nonEmpty(input.data);
+  if (input.type === 'text') return nonEmpty(input.data) && input.url === undefined;
+  return nonEmpty(input.url) !== nonEmpty(input.data);
 };
 // The body shape each route accepts
 const ROUTES = {

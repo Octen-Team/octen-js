@@ -113,7 +113,7 @@ const base = '$OCTEN_FAKE_BASE_URL';
 const headers = { 'x-api-key': 'fake-e2e-key', 'user-agent': 'octen-js-sdk/probe', 'content-type': 'application/json' };
 const shape = (path) => 'body shape not accepted by ' + path;
 const text = [{ type: 'text', data: 'q' }];
-// [path, body, the only reason the 400 may give]; the last two each hit one clause alone
+// [path, body, the only reason the 400 may give]; the last four each hit one clause alone
 const probes = [
   ['/image-search', { query: 'q' }],
   ['/video-search', { inputs: [{ type: 'image', url: 'https://example.com/a.png' }] }],
@@ -122,6 +122,8 @@ const probes = [
   ['/design-search', { inputs: text }],
   ['/image-search', { query: 'q', inputs: text }],
   ['/design-search', { query: 'q', inputs: text }],
+  ['/image-search', { inputs: [{ type: 'image', url: 'https://example.com/a.png', data: 'aGVsbG8=' }] }],
+  ['/image-search', { inputs: [{ type: 'text', data: 'q', url: 'https://example.com/a.png' }] }],
 ].map(([path, body]) => [path, body, shape(path)]);
 probes.push(['/not-an-endpoint', { query: 'q' }, 'unknown path /not-an-endpoint']);
 Promise.all(probes.map(([path, body, reason]) =>
