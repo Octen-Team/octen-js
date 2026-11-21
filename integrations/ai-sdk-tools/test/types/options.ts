@@ -5,6 +5,7 @@ import {
   octenNewsSearch,
   octenPlaceSearch,
   octenWebSearch,
+  octenWebSearchPremier,
 } from '@octen.ai/ai-sdk-tools';
 import type {
   BusinessSearchToolResult,
@@ -12,6 +13,8 @@ import type {
   ModelEntity,
   ModelPerson,
   TimeRange,
+  WebSearchPremierInput,
+  WebSearchPremierToolResult,
 } from '@octen.ai/ai-sdk-tools';
 
 const client = new Octen({ apiKey: 'test-key' });
@@ -54,4 +57,19 @@ export function entityFields(out: BusinessSearchToolResult): string[] {
   }
   const unknown: ModelEntity = { type: 'fund', name: 'X' };
   return [...fields, unknown.type];
+}
+
+// Developer settings for Web Search Premier are typed as the SDK's SearchPremierParams, so mistakes fail to compile.
+export function premierOptions(): WebSearchPremierToolResult['results'] {
+  octenWebSearchPremier({ client, defaults: { count: 3, result_type: 'dynamic', full_content: { enable: true }, format: 'markdown' } });
+  // @ts-expect-error client already carries its own apiKey
+  octenWebSearchPremier({ client, apiKey: 'k' });
+  // @ts-expect-error query always comes from the model
+  octenWebSearchPremier({ defaults: { query: 'x' } });
+  // @ts-expect-error result_type is standard or dynamic
+  octenWebSearchPremier({ client, defaults: { result_type: 'deep' } });
+  // @ts-expect-error topic is not a /search-premier request field
+  octenWebSearchPremier({ client, defaults: { topic: 'news' } });
+  const input: WebSearchPremierInput = { query: 'q', time_range: null };
+  return input.query === '' ? [] : [{ title: 't', url: 'u' }];
 }

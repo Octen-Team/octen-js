@@ -8,6 +8,7 @@ import {
   octenPlaceSearch,
   octenPulseSearch,
   octenWebSearch,
+  octenWebSearchPremier,
 } from '@octen.ai/ai-sdk-tools';
 import type { WebSearchToolResult } from '@octen.ai/ai-sdk-tools';
 
@@ -17,6 +18,7 @@ const client = new Octen({ apiKey: 'test-key' });
 export async function consume(): Promise<string> {
   const tools = {
     webSearch: octenWebSearch({ client }),
+    webSearchPremier: octenWebSearchPremier({ client, defaults: { count: 3 } }),
     broadSearch: octenBroadSearch({ client }),
     newsSearch: octenNewsSearch({ client, defaults: { time_range: 'week' } }),
     businessSearch: octenBusinessSearch({ client }),

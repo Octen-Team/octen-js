@@ -7,11 +7,13 @@ import {
   octenPlaceSearch,
   octenPulseSearch,
   octenWebSearch,
+  octenWebSearchPremier,
 } from '../src/index.js';
 import { clientFor, recordingFetch } from './helpers.js';
 
 const FACTORIES = {
   octenWebSearch,
+  octenWebSearchPremier,
   octenBroadSearch,
   octenNewsSearch,
   octenBusinessSearch,
@@ -20,7 +22,7 @@ const FACTORIES = {
 };
 
 describe('public entry point', () => {
-  it('exports exactly the six factories at runtime', async () => {
+  it('exports exactly the seven factories at runtime', async () => {
     const mod = await import('../src/index.js');
     expect(Object.keys(mod).sort()).toEqual(Object.keys(FACTORIES).sort());
   });
