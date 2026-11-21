@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.2
+
+- Accepts `@octen.ai/sdk` 0.2.x as well as 0.1.x (dependency range `^0.1.0 || ^0.2.0`), so installing it next to `@octen.ai/sdk` 0.2.0 keeps a single SDK copy and a `client` you create type-checks when passed to the tools. No tool behavior changes.
+
 ## 0.1.1
 
 - Documented the Node requirement for loading the package with `require()` (CommonJS) together with `ai` 7: Node 20.19 or later, or Node 22.12 or later. The ESM build still works on Node 20 and later.
