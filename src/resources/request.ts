@@ -32,8 +32,15 @@ function assertQuery(params: unknown): void {
   }
 }
 
-/** /image-search and /video-search: exactly one input; text needs data, an image exactly one of url or data. */
-export function assertSingleInput(params: unknown): void {
+/**
+ * /image-search and /video-search: exactly one input of an allowed type (the descriptor's enum);
+ * text needs data, an image exactly one of url or data.
+ */
+export function singleInputCheck(allowedTypes: readonly string[]): (params: unknown) => void {
+  return (params) => assertSingleInput(params, allowedTypes);
+}
+
+function assertSingleInput(params: unknown, allowedTypes: readonly string[]): void {
   const inputs = field(params, 'inputs');
   if (!Array.isArray(inputs) || inputs.length !== 1) {
     throw new OctenValidationError('inputs', 'inputs is required and must be an array with exactly one input.');
@@ -41,8 +48,8 @@ export function assertSingleInput(params: unknown): void {
   const input: unknown = inputs[0];
   if (!isPlainObject(input)) throw new OctenValidationError('inputs[0]', 'inputs[0] must be an object.');
   const { type, url, data } = input;
-  if (typeof type !== 'string' || type === '') {
-    throw new OctenValidationError('inputs[0].type', 'inputs[0].type is required.');
+  if (typeof type !== 'string' || !allowedTypes.includes(type)) {
+    throw new OctenValidationError('inputs[0].type', `inputs[0].type must be one of: ${allowedTypes.join(', ')}.`);
   }
   if (type === 'text' && !isNonBlank(data)) {
     throw new OctenValidationError('inputs[0].data', 'A text input needs data: a non-empty query string.');

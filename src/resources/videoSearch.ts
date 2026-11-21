@@ -1,6 +1,8 @@
 import type { HttpCore, RequestOptions } from '../core/http';
 import { VideoSearchRequestDesc, type VideoSearchParams, type VideoSearchResponse } from '../schema/videoSearch';
-import { assertSingleInput, prepareCheckedBody } from './request';
+import { prepareCheckedBody, singleInputCheck } from './request';
+
+const checkInput = singleInputCheck(VideoSearchRequestDesc.fields.inputs.items.fields.type.enum);
 
 export class VideoSearchResource {
   private readonly http: HttpCore;
@@ -10,7 +12,7 @@ export class VideoSearchResource {
   }
 
   async search(params: VideoSearchParams, options?: RequestOptions): Promise<VideoSearchResponse> {
-    const body = prepareCheckedBody(VideoSearchRequestDesc, params, assertSingleInput);
+    const body = prepareCheckedBody(VideoSearchRequestDesc, params, checkInput);
     return await this.http.post('/video-search', body, options);
   }
 }

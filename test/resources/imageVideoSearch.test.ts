@@ -58,6 +58,7 @@ describe('ImageSearchResource.search', () => {
     ],
     ['an input that is not an object', { inputs: ['q'] }, 'inputs[0]'],
     ['an input without type', { inputs: [{ data: 'q' }] }, 'inputs[0].type'],
+    ['an input type the endpoint does not take', { inputs: [{ type: 'video', url: 'https://v.example.com/a.mp4' }] }, 'inputs[0].type'],
     ['a text input without data', { inputs: [{ type: 'text' }] }, 'inputs[0].data'],
     ['a text input with blank data', { inputs: [{ type: 'text', data: '  ' }] }, 'inputs[0].data'],
     ['an image input without url or data', { inputs: [{ type: 'image' }] }, 'inputs[0]'],
@@ -153,6 +154,7 @@ describe('VideoSearchResource.search', () => {
       'inputs',
     ],
     ['an input without type', { inputs: [{ data: 'q' }] }, 'inputs[0].type'],
+    ['an image input (video search takes text only)', { inputs: [{ type: 'image', data: 'x' }] }, 'inputs[0].type'],
     ['a text input with blank data', { inputs: [{ type: 'text', data: '' }] }, 'inputs[0].data'],
   ])('%s throws OctenValidationError without sending', async (_name, params, field) => {
     const { core, fetchImpl } = makeFetch();
