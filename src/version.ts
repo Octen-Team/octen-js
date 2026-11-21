@@ -1,2 +1,2 @@
 // Keep in sync with the version in package.json; guarded by test/smoke.test.ts.
-export const VERSION = '0.1.1';
+export const VERSION = '0.2.0';

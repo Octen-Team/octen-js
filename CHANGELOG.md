@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.2.0
+
 - New methods: `search.searchPremier` (`POST /search-premier`), `imageSearch.search` (`POST /image-search`), `videoSearch.search` (`POST /video-search`, invite-only beta) and `designSearch.search` (`POST /design-search`), with request and response types checked against the public OpenAPI spec.
 - Local checks for the new endpoints: Image and Video Search take exactly one input of a type the endpoint accepts (a text input needs `data` and takes no `url`; an image input exactly one of `url` or `data`); Design Search needs a `query` unless `images.group_id` is set.
 - `testdata/openapi.json` refreshed (2026-11-21) and `spec-drift` now covers the ten endpoints. The existing six endpoints' schemas are unchanged, and their requests are sent exactly as before.
