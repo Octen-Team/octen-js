@@ -2,13 +2,24 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { flattenSchema, type FlatSchema, type OpenAPI } from '../test/contract/flatten';
 
-// Weekly diff of the live OpenAPI against testdata/openapi.json: only the request and response schemas of the six endpoints, normalized via flattenSchema and compared item by item.
+// Weekly diff of the live OpenAPI against testdata/openapi.json: only the request and response schemas of the SDK's endpoints, normalized via flattenSchema and compared item by item.
 // Exits 1 on any difference, 2 if it cannot run (download failure, spec cannot be flattened); never rewrites the snapshot.
 const LIVE_URL = process.env.SPEC_DRIFT_URL ?? 'https://docs.octen.ai/api-reference/openapi.json';
 const SNAPSHOT_PATH =
   process.env.SPEC_DRIFT_SNAPSHOT ?? fileURLToPath(new URL('../testdata/openapi.json', import.meta.url));
 
-const ENDPOINTS = ['/search', '/broad-search', '/news-search', '/business-search', '/pulse-search', '/place-search'];
+const ENDPOINTS = [
+  '/search',
+  '/broad-search',
+  '/news-search',
+  '/business-search',
+  '/pulse-search',
+  '/place-search',
+  '/search-premier',
+  '/image-search',
+  '/video-search',
+  '/design-search',
+];
 
 type Raw = Record<string, unknown>;
 

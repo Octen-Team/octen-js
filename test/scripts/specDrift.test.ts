@@ -56,6 +56,30 @@ describe('scripts/spec-drift.ts', { timeout: 30_000 }, () => {
     expect(r.status).toBe(1);
   });
 
+  test.each([
+    ['ImageSearchRequest', 'count', '/image-search request.count'],
+    ['VideoSearchResult', 'cover_url', '/video-search response.data.results[].cover_url'],
+    ['DesignImageOptions', 'group_id', '/design-search request.images.group_id'],
+  ])('a property removed from %s.%s is reported as %s', (schema, prop, place) => {
+    const live = writeSpec(`removed-${schema}.json`, (s) => {
+      delete s.components.schemas[schema]!.properties[prop];
+    });
+    const r = run(live);
+    expect(r.out).toContain(`${place}: removed from live spec`);
+    expect(r.status).toBe(1);
+  });
+
+  test('/search-premier is compared on its own: repointing it at another schema is drift', () => {
+    type Post = { requestBody: { content: Record<string, { schema: { $ref: string } }> } };
+    const live = writeSpec('premier.json', (s) => {
+      const op = (s as unknown as { paths: Record<string, { post: Post }> }).paths['/search-premier']!.post;
+      op.requestBody.content['application/json']!.schema.$ref = '#/components/schemas/PulseSearchRequest';
+    });
+    const r = run(live);
+    expect(r.out).toMatch(/\/search-premier request\.mode: added in live spec/);
+    expect(r.status).toBe(1);
+  });
+
   test('garbage instead of JSON exits 2', () => {
     const live = join(dir, 'garbage.json');
     writeFileSync(live, '<html>not json</html>');
