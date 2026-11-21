@@ -1,5 +1,6 @@
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createOpenAI } from '@ai-sdk/openai';
+import { Octen } from '@octen.ai/sdk';
 import { generateText, stepCountIs, streamText } from 'ai';
 import { describe, expect, it } from 'vitest';
 import {
@@ -9,6 +10,7 @@ import {
   octenPlaceSearch,
   octenPulseSearch,
   octenWebSearch,
+  octenWebSearchPremier,
 } from '../../src/index.js';
 
 // Billed calls against production; test/live/setup.ts fails the run when OCTEN_API_KEY is unset.
@@ -138,5 +140,61 @@ describe('live: tools against production', () => {
     });
     const text = await result.text;
     checkSteps((await result.steps) as unknown as StepLike[], text);
+  });
+});
+
+// Records each request path, so a green run proves the call went to /search-premier and not /search.
+function premierClient(paths: string[]): Octen {
+  const fetchAndRecord: typeof fetch = async (input, init) => {
+    paths.push(new URL(String(input instanceof Request ? input.url : input)).pathname);
+    return await fetch(input, init);
+  };
+  return new Octen({ apiKey, fetch: fetchAndRecord });
+}
+
+const PREMIER_QUERY = 'solid-state battery breakthroughs';
+const onDomain = (url: unknown, domain: string) => {
+  const host = new URL(String(url)).hostname;
+  return host === domain || host.endsWith(`.${domain}`);
+};
+
+describe('live: web search premier against production', () => {
+  // Also the control for the next tests: tool defaults (count 5, no full_content) on the same query.
+  it('octenWebSearchPremier execute with the tool defaults', { timeout: TIMEOUT }, async () => {
+    const paths: string[] = [];
+    const out = await runTool(octenWebSearchPremier({ client: premierClient(paths) }), { query: PREMIER_QUERY, time_range: 'month' });
+    expect(paths).toEqual(['/search-premier']);
+    const results = out['results'] as Record<string, unknown>[];
+    expectNamed(first(out, 'results'), ['url', 'title']);
+    expect(results.length).toBeGreaterThan(2);
+    expect(results.some((r) => 'full_content' in r)).toBe(false);
+    console.log(`premier results ${results.length}, hosts ${results.map((r) => new URL(String(r['url'])).hostname).join(' ')}`);
+  });
+
+  it('octenWebSearchPremier honors include_domains against an unfiltered control', { timeout: TIMEOUT }, async () => {
+    const domain = 'nature.com';
+    const control = await runTool(octenWebSearchPremier({ client: premierClient([]) }), { query: PREMIER_QUERY });
+    const controlUrls = (control['results'] as Record<string, unknown>[]).map((r) => r['url']);
+    expect(controlUrls.some((u) => !onDomain(u, domain)), 'the control has a result outside the domain').toBe(true);
+    const filtered = await runTool(octenWebSearchPremier({ client: premierClient([]), defaults: { include_domains: [domain] } }), {
+      query: PREMIER_QUERY,
+    });
+    const urls = (filtered['results'] as Record<string, unknown>[]).map((r) => r['url']);
+    expect(urls.length).toBeGreaterThan(0);
+    expect(urls.every((u) => onDomain(u, domain)), urls.join(' ')).toBe(true);
+    console.log(`control ${controlUrls.length} results, filtered ${urls.length} results on ${domain}`);
+  });
+
+  it('octenWebSearchPremier honors developer count and full_content', { timeout: TIMEOUT }, async () => {
+    const t = octenWebSearchPremier({
+      client: premierClient([]),
+      defaults: { count: 2, full_content: { enable: true, max_tokens: 200 } },
+    });
+    const out = await runTool(t, { query: PREMIER_QUERY, time_range: 'month' });
+    const results = out['results'] as Record<string, unknown>[];
+    expect(results.length).toBeGreaterThan(0);
+    expect(results.length).toBeLessThanOrEqual(2);
+    expect(results.some((r) => typeof r['full_content'] === 'string' && r['full_content'] !== '')).toBe(true);
+    console.log(`premier count=2 results ${results.length}, with full_content ${results.filter((r) => 'full_content' in r).length}`);
   });
 });
