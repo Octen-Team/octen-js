@@ -14,7 +14,6 @@ const EIFFEL_IMAGE =
   'https://upload.wikimedia.org/wikipedia/commons/thumb/8/85/Tour_Eiffel_Wikimedia_Commons_%28cropped%29.jpg/500px-Tour_Eiffel_Wikimedia_Commons_%28cropped%29.jpg';
 
 const DAY_MS = 86_400_000;
-const YEAR_2025 = { start: '2025-01-01T00:00:00Z', end: '2025-12-31T23:59:59Z' } as const;
 
 function hostOf(u: string | undefined): string | undefined {
   if (!URL.canParse(u ?? '')) return undefined;
@@ -72,6 +71,26 @@ function expectSomeOutside(results: readonly Dated[], start: number, end: number
   console.log(`[live-family] ${name} control time_published=${JSON.stringify(dates)}`);
   const outside = dates.some((t) => Date.parse(t) < start || Date.parse(t) > end);
   expect(outside, `${name}: the control has a result outside the window`).toBe(true);
+}
+
+// A window strictly inside the control's dated results, so the control has results before start and after end:
+// dropping either bound would let one of them back in
+function innerWindow(control: readonly Dated[], name: string): { start: string; end: string } {
+  const times = control
+    .map((r) => r.time_published)
+    .filter((t): t is string => typeof t === 'string' && t !== '')
+    .map((t) => Date.parse(t))
+    .sort((a, b) => a - b);
+  const iso = JSON.stringify(times.map((t) => new Date(t).toISOString()));
+  console.log(`[live-family] ${name} control time_published=${iso}`);
+  const first = times[0] ?? 0;
+  const last = times[times.length - 1] ?? 0;
+  expect(last - first, `${name}: the control needs dated results more than two days apart`).toBeGreaterThan(2 * DAY_MS);
+  const start = first + DAY_MS;
+  const end = last - DAY_MS;
+  expect(times.some((t) => t < start), `${name}: a control result before start`).toBe(true);
+  expect(times.some((t) => t > end), `${name}: a control result after end`).toBe(true);
+  return { start: new Date(start).toISOString(), end: new Date(end).toISOString() };
 }
 
 type Texty = {
@@ -247,24 +266,30 @@ describe.skipIf(!enabled)('live: Web Search Premier', () => {
     expectAllWithin(res.data?.results ?? [], start, end, 'searchPremier month');
   });
 
-  it('start_time/end_time (2025) bound time_published; language de returns German results', async () => {
-    const start = Date.parse(YEAR_2025.start);
-    const end = Date.parse(YEAR_2025.end);
-    expectSomeOutside((await control()).data?.results ?? [], start, end, 'searchPremier 2025');
+  it('start_time and end_time each bound time_published (window inside the control)', async () => {
+    const w = innerWindow((await control()).data?.results ?? [], 'searchPremier start/end');
     const res = logged(
-      'searchPremier start/end+language=de',
+      'searchPremier start/end',
       await client().search.searchPremier({
         query,
-        count: 3,
-        language: ['de'],
+        count: 5,
+        format: 'text',
+        result_type: 'standard',
+        full_content: fullContent,
         time_basis: 'published',
-        start_time: YEAR_2025.start,
-        end_time: YEAR_2025.end,
+        start_time: w.start,
+        end_time: w.end,
       }),
     );
-    const results = res.data?.results ?? [];
-    expectAllWithin(results, start, end, 'searchPremier 2025');
-    expectMostlyGerman(results, 'searchPremier language=de');
+    expectAllWithin(res.data?.results ?? [], Date.parse(w.start), Date.parse(w.end), 'searchPremier start/end');
+  });
+
+  it('language de returns mostly German results', async () => {
+    const res = logged(
+      'searchPremier language=de',
+      await client().search.searchPremier({ query: 'renewable energy policy', count: 3, language: ['de'] }),
+    );
+    expectMostlyGerman(res.data?.results ?? [], 'searchPremier language=de');
   });
 });
 
@@ -379,15 +404,13 @@ describe.skipIf(!videoEnabled)('live: Video Search (invite-only beta, OCTEN_LIVE
     expectSomeOutside((await control()).data?.results ?? [], start, end, 'videoSearch year');
   });
 
-  it('start_time and end_time bound time_published, while the unfiltered control is outside', async () => {
-    const start = '2025-01-01T00:00:00Z';
-    const end = '2025-06-30T23:59:59Z';
+  it('start_time and end_time each bound time_published (window inside the control)', async () => {
+    const w = innerWindow((await control()).data?.results ?? [], 'videoSearch start/end');
     const res = logged(
       'videoSearch start/end',
-      await client().videoSearch.search({ inputs, count: 3, start_time: start, end_time: end }),
+      await client().videoSearch.search({ inputs, count: 5, start_time: w.start, end_time: w.end }),
     );
-    expectAllWithin(res.data?.results ?? [], Date.parse(start), Date.parse(end), 'videoSearch start/end');
-    expectSomeOutside((await control()).data?.results ?? [], Date.parse(start), Date.parse(end), 'videoSearch start/end');
+    expectAllWithin(res.data?.results ?? [], Date.parse(w.start), Date.parse(w.end), 'videoSearch start/end');
   });
 });
 
@@ -480,27 +503,34 @@ describe.skipIf(!enabled)('live: Design Search', () => {
     expectShorter('full_content', results, web0, 'designSearch full_content');
   });
 
-  it('web start_time/end_time (2025) bound time_published; language de returns German results', async () => {
-    const start = Date.parse(YEAR_2025.start);
-    const end = Date.parse(YEAR_2025.end);
-    expectSomeOutside((await control()).data?.results ?? [], start, end, 'designSearch 2025');
+  it('web start_time and end_time each bound time_published (window inside the control)', async () => {
+    const w = innerWindow((await control()).data?.results ?? [], 'designSearch web start/end');
     const res = logged(
-      'designSearch web start/end+language=de',
+      'designSearch web start/end',
       await client().designSearch.search({
         query,
         images: { enable: false },
         web_search: {
-          count: 3,
-          language: ['de'],
+          full_content: { enable: true, max_tokens: 2000 },
           time_basis: 'published',
-          start_time: YEAR_2025.start,
-          end_time: YEAR_2025.end,
+          start_time: w.start,
+          end_time: w.end,
         },
       }),
     );
-    const results = res.data?.results ?? [];
-    expectAllWithin(results, start, end, 'designSearch 2025');
-    expectMostlyGerman(results, 'designSearch web language=de');
+    expectAllWithin(res.data?.results ?? [], Date.parse(w.start), Date.parse(w.end), 'designSearch web start/end');
+  });
+
+  it('web language de returns mostly German results', async () => {
+    const res = logged(
+      'designSearch web language=de',
+      await client().designSearch.search({
+        query: 'SaaS pricing page',
+        images: { enable: false },
+        web_search: { count: 3, language: ['de'] },
+      }),
+    );
+    expectMostlyGerman(res.data?.results ?? [], 'designSearch web language=de');
   });
 
   // A seasonal query has fresh pages this month and older ones from past years
