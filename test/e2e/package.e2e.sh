@@ -86,7 +86,7 @@ JSON
 done
 # Run the compiled output (ESM)
 (cd "$TSE" && node "$TSC" -p tsconfig.exact.json --noEmit false --outDir out >/dev/null && node out/consumer.js) || fail "ts-esm emitted consumer run"
-pass "ts-esm: compiled consumer runs against fake server (six methods)"
+pass "ts-esm: compiled consumer runs against fake server (ten methods)"
 
 # 4. TypeScript, CJS project (NodeNext + type=commonjs, uses index.d.cts)
 TSC_DIR="$(new_project ts-cjs commonjs)"
@@ -95,14 +95,14 @@ cp "$FIX"/ts/*.ts "$FIX"/ts/tsconfig.nodenext.json "$TSC_DIR/"
 (cd "$TSC_DIR" && node "$TSE/node_modules/typescript/bin/tsc" -p tsconfig.nodenext.json) || fail "tsc ts-cjs nodenext"
 pass "tsc --noEmit ts-cjs nodenext (resolves index.d.cts)"
 (cd "$TSC_DIR" && node "$TSE/node_modules/typescript/bin/tsc" -p tsconfig.nodenext.json --noEmit false --outDir out >/dev/null && node out/consumer.js) || fail "ts-cjs emitted consumer run"
-pass "ts-cjs: compiled CommonJS consumer runs against fake server (six methods)"
+pass "ts-cjs: compiled CommonJS consumer runs against fake server (ten methods)"
 
 # 5. Every request the fake server received is well-formed (key / UA / content-type / body)
 node -e "
 fetch('$OCTEN_FAKE_BASE_URL/__requests').then(r => r.json()).then(seen => {
   const bad = seen.filter(s => s.problems.length);
   console.log('fake server saw ' + seen.length + ' requests, ' + bad.length + ' with problems');
-  if (bad.length || seen.length < 15) process.exit(1);
+  if (bad.length || seen.length < 23) process.exit(1);
 });
 " || fail "fake server request check"
 pass "fake server saw only well-formed requests"

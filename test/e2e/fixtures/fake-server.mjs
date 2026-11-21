@@ -26,7 +26,12 @@ const server = createServer((req, res) => {
     } catch {
       problems.push('body is not JSON');
     }
-    if (typeof body?.query !== 'string' || body.query === '') problems.push('body.query missing');
+    // A search needs a query, except image/video search (inputs[0]) and a design group lookup (images.group_id)
+    const nonEmpty = (v) => typeof v === 'string' && v !== '';
+    const input = body?.inputs?.[0];
+    if (!nonEmpty(body?.query) && !nonEmpty(input?.data) && !nonEmpty(input?.url) && !nonEmpty(body?.images?.group_id)) {
+      problems.push('body has no query, inputs or images.group_id');
+    }
     seen.push({ path: req.url, problems });
     res.setHeader('content-type', 'application/json');
     if (problems.length > 0) {

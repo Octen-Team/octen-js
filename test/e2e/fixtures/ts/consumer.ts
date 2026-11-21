@@ -1,11 +1,11 @@
 // Common user patterns: must pass tsc under both strict and exactOptionalPropertyTypes configs, and actually run.
 import Octen, { OctenAPIError, OctenRateLimitError, isOctenError } from '@octen.ai/sdk';
-import type { SearchResponse } from '@octen.ai/sdk';
+import type { DesignSearchResponse, ImageSearchParams, SearchPremierResponse, SearchResponse } from '@octen.ai/sdk';
 
 // Explicit undefined: must also compile under exactOptionalPropertyTypes (promised in the README)
 const client = new Octen({ apiKey: process.env.OCTEN_API_KEY, baseURL: process.env.OCTEN_FAKE_BASE_URL, maxRetries: 0 });
 
-export async function callAllSix(): Promise<string[]> {
+export async function callAll(): Promise<string[]> {
   const ids: string[] = [];
   const web: SearchResponse = await client.search.search({
     query: 'rust async runtimes',
@@ -42,6 +42,24 @@ export async function callAllSix(): Promise<string[]> {
     user_location: { type: 'approximate', city: 'San Francisco' },
   });
   ids.push(place.request_id);
+  const premier: SearchPremierResponse = await client.search.searchPremier({
+    query: 'q',
+    result_type: 'dynamic',
+    count: 1,
+  });
+  ids.push(premier.request_id);
+  const imageParams: ImageSearchParams = { inputs: [{ type: 'image', url: 'https://example.com/a.png' }], count: 1 };
+  const image = await client.imageSearch.search(imageParams);
+  ids.push(image.request_id);
+  const video = await client.videoSearch.search({ inputs: [{ type: 'text', data: 'q' }], time_range: 'week' });
+  ids.push(video.request_id);
+  const design: DesignSearchResponse = await client.designSearch.search({
+    images: { group_id: 'deck_1', count: 2, snippet: { enable: false } },
+    web_search: { enable: false },
+  });
+  ids.push(design.request_id);
+  const position: number | undefined = design.data?.images?.[0]?.group?.position;
+  void position;
   return ids;
 }
 
@@ -60,9 +78,9 @@ export async function errorHandling(): Promise<string> {
   }
 }
 
-callAllSix()
+callAll()
   .then((ids) => {
-    if (ids.length !== 6 || ids.some((id) => !id.startsWith('fake-'))) throw new Error(`unexpected ids ${ids.join(',')}`);
+    if (ids.length !== 10 || ids.some((id) => !id.startsWith('fake-'))) throw new Error(`unexpected ids ${ids.join(',')}`);
     return errorHandling();
   })
   .then((r) => {
