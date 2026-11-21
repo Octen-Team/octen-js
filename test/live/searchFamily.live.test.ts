@@ -14,6 +14,44 @@ const EIFFEL_IMAGE =
 const hostOf = (u: string | undefined) => new URL(u ?? 'http://invalid.invalid').hostname;
 const onDomain = (u: string | undefined, d: string) => hostOf(u) === d || hostOf(u).endsWith(`.${d}`);
 
+// A client that also records each request body, to show what a call carried
+function capturing(): { c: Octen; bodies: Record<string, unknown>[] } {
+  const bodies: Record<string, unknown>[] = [];
+  const c = new Octen({
+    apiKey,
+    fetch: (input, init) => {
+      bodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+      return globalThis.fetch(input, init);
+    },
+  });
+  return { c, bodies };
+}
+
+type Dated = { time_published?: string | undefined };
+const DAY_MS = 86_400_000;
+// Every result with a time_published ("" means none) is inside [start, end]; at least one must have one
+function expectPublishedWithin(results: readonly Dated[], start: number, end: number, name: string) {
+  const dates = results.map((r) => r.time_published).filter((t): t is string => typeof t === 'string' && t !== '');
+  console.log(`[live-family] ${name} time_published=${JSON.stringify(dates)}`);
+  expect(dates.length, `${name}: no result carries time_published`).toBeGreaterThanOrEqual(1);
+  for (const t of dates) {
+    expect(Date.parse(t), `${name}: ${t}`).toBeGreaterThanOrEqual(start);
+    expect(Date.parse(t), `${name}: ${t}`).toBeLessThanOrEqual(end);
+  }
+}
+
+type Texty = { title?: string | undefined; highlight?: string | undefined; full_content?: string | undefined };
+const textOf = (r: Texty) => `${r.title ?? ''} ${r.highlight ?? ''} ${r.full_content ?? ''}`;
+// Cheap language heuristic: common German function words
+const looksGerman = (s: string) => /\b(der|die|das|und|für|mit|nicht|ist|von|den|zu)\b/i.test(s);
+// German pages can carry English titles, so require a majority and log each result
+function expectMostlyGerman(results: readonly Texty[], name: string) {
+  const flags = results.map((r) => looksGerman(`${r.title ?? ''} ${r.highlight ?? ''}`));
+  const titles = JSON.stringify(results.map((r) => r.title));
+  console.log(`[live-family] ${name} german=${JSON.stringify(flags)} titles=${titles}`);
+  expect(flags.filter(Boolean).length * 2, `${name}: most results look German`).toBeGreaterThan(flags.length);
+}
+
 function logged<T extends { request_id?: string | undefined }>(name: string, res: T): T {
   console.log(`[live-family] OK ${name} request_id=${res.request_id}`);
   expect(typeof res.request_id).toBe('string');
@@ -39,19 +77,21 @@ describe.skipIf(!enabled)('live: Web Search Premier', () => {
     expect(res.meta?.result_type).toBe('dynamic');
   });
 
-  it('result_type standard is echoed and full_content is returned when enabled', async () => {
+  it('result_type standard is echoed, full_content is returned, include_text is in every result', async () => {
     const res = logged(
-      'searchPremier standard+full_content',
+      'searchPremier standard+full_content+include_text',
       await client().search.searchPremier({
         query: 'solid-state battery',
         count: 2,
         result_type: 'standard',
         full_content: { enable: true, max_tokens: 300 },
+        include_text: ['electrolyte'],
       }),
     );
     const results = res.data?.results ?? [];
     expect(results.length).toBeGreaterThanOrEqual(1);
     for (const r of results) expect(r.full_content, r.url).toBeTruthy();
+    for (const r of results) expect(textOf(r), r.url).toMatch(/electrolyte/i);
     expect(res.meta?.result_type).toBe('standard');
   });
 });
@@ -127,15 +167,39 @@ describe.skipIf(!enabled)('live: Image Search', () => {
 
 describe.skipIf(!enabled)('live: Video Search (invite-only beta)', () => {
   // The key used for these tests has beta access, so anything but results (including any 403) is a failure.
-  it('returns up to count video results for a text query', async () => {
+  it('returns up to count video results for a text query; time_range year bounds the dates', async () => {
+    const { c, bodies } = capturing();
     const res = logged(
-      'videoSearch',
-      await client().videoSearch.search({ inputs: [{ type: 'text', data: 'how to make fresh pasta' }], count: 2 }),
+      'videoSearch time_range=year safesearch=off',
+      await c.videoSearch.search({
+        inputs: [{ type: 'text', data: 'how to make fresh pasta' }],
+        count: 2,
+        time_range: 'year',
+        safesearch: 'off',
+      }),
     );
     const results = res.data?.results ?? [];
     expect(results.length).toBeGreaterThanOrEqual(1);
     expect(results.length).toBeLessThanOrEqual(2);
     for (const r of results) expect(r.url).toMatch(/^https?:\/\//);
+    expectPublishedWithin(results, Date.now() - 367 * DAY_MS, Date.now() + DAY_MS, 'videoSearch time_range=year');
+    // safesearch has no observable effect on a benign query; it is only shown to reach the wire
+    expect(bodies[0]?.safesearch).toBe('off');
+  });
+
+  it('start_time and end_time bound the publish dates', async () => {
+    const start = '2025-01-01T00:00:00Z';
+    const end = '2025-06-30T23:59:59Z';
+    const res = logged(
+      'videoSearch start/end',
+      await client().videoSearch.search({
+        inputs: [{ type: 'text', data: 'how to make fresh pasta' }],
+        count: 3,
+        start_time: start,
+        end_time: end,
+      }),
+    );
+    expectPublishedWithin(res.data?.results ?? [], Date.parse(start), Date.parse(end), 'videoSearch start/end');
   });
 });
 
@@ -231,6 +295,176 @@ describe.skipIf(!enabled)('live: Design Search', () => {
       console.log(`[live-family] NEG designSearch query>500 status=${err.status} msg=${err.message}`);
     }
     expect(err).toBeInstanceOf(OctenBadRequestError);
+  });
+});
+
+describe.skipIf(!enabled)('live: Web Search Premier parameter effects', () => {
+  // One unfiltered control and one filtered call on the same query and time_range. Probe on 2026-11-21: only
+  // electrek.co mentioned Tesla, so the excluded domain is picked among results that do not, keeping the two
+  // exclusions separable. The filtered call also flips format, include_images and highlight.
+  it('exclude_text, exclude_domains, time_range, format, include_images and highlight take effect', async () => {
+    const query = 'electric vehicle news';
+    const control = logged(
+      'searchPremier control',
+      await client().search.searchPremier({
+        query,
+        count: 5,
+        time_range: 'month',
+        format: 'text',
+        full_content: { enable: true, max_tokens: 500 },
+      }),
+    );
+    const before = control.data?.results ?? [];
+    expect(before.some((r) => /tesla/i.test(textOf(r))), 'control: some result mentions Tesla').toBe(true);
+    const dropHost = hostOf(before.find((r) => !/tesla/i.test(textOf(r)))?.url).replace(/^www\./, '');
+    expect(dropHost, 'control: a result without Tesla').not.toBe('invalid.invalid');
+    expect(before.some((r) => r.images !== undefined || r.cover_image !== undefined)).toBe(false);
+    expect(before.some((r) => /\]\(https?:\/\//.test(r.full_content ?? ''))).toBe(false);
+    expectPublishedWithin(before, Date.now() - 32 * DAY_MS, Date.now() + DAY_MS, 'searchPremier control month');
+
+    const { c, bodies } = capturing();
+    const res = logged(
+      'searchPremier filtered',
+      await c.search.searchPremier({
+        query,
+        count: 5,
+        time_range: 'month',
+        exclude_text: ['Tesla'],
+        exclude_domains: [dropHost],
+        format: 'markdown',
+        include_images: true,
+        highlight: { enable: true, max_tokens: 100 },
+        full_content: { enable: true, max_tokens: 500 },
+        safesearch: 'off',
+      }),
+    );
+    const after = res.data?.results ?? [];
+    const hosts = JSON.stringify(after.map((r) => hostOf(r.url)));
+    console.log(`[live-family] searchPremier excluded host=${dropHost} hosts=${hosts}`);
+    expect(after.length).toBeGreaterThanOrEqual(1);
+    for (const r of after) {
+      expect(textOf(r), r.url).not.toMatch(/tesla/i);
+      expect(onDomain(r.url, dropHost), r.url).toBe(false);
+      expect(r.highlight, r.url).toBeTruthy();
+      // The control's default 512-token highlights ran about 1,900 characters
+      expect((r.highlight ?? '').length, r.url).toBeLessThanOrEqual(600);
+    }
+    const markdown = /(^|\n)#{1,6} \S|\]\(https?:\/\/|\*\*\S/;
+    expect(after.some((r) => markdown.test(r.full_content ?? '')), 'markdown').toBe(true);
+    expect(after.some((r) => (r.images?.length ?? 0) > 0 || r.cover_image?.url !== undefined), 'images').toBe(true);
+    expectPublishedWithin(after, Date.now() - 32 * DAY_MS, Date.now() + DAY_MS, 'searchPremier filtered month');
+    expect(bodies[0]?.safesearch).toBe('off');
+  });
+
+  it('language de returns German results; start_time/end_time bound the dates', async () => {
+    const start = '2025-01-01T00:00:00Z';
+    const end = '2025-12-31T23:59:59Z';
+    const { c, bodies } = capturing();
+    const res = logged(
+      'searchPremier language=de start/end',
+      await c.search.searchPremier({
+        query: 'renewable energy policy',
+        count: 3,
+        language: ['de'],
+        time_basis: 'published',
+        start_time: start,
+        end_time: end,
+      }),
+    );
+    const results = res.data?.results ?? [];
+    expect(results.length).toBeGreaterThanOrEqual(1);
+    expectMostlyGerman(results, 'searchPremier language=de');
+    expectPublishedWithin(results, Date.parse(start), Date.parse(end), 'searchPremier start/end');
+    // time_basis published vs auto cannot be told apart from the response; it is only shown to reach the wire
+    expect(bodies[0]?.time_basis).toBe('published');
+  });
+});
+
+describe.skipIf(!enabled)('live: Image Search parameter effects', () => {
+  it('exclude_domains removes a source domain that the unfiltered control returns', async () => {
+    const inputs = [{ type: 'text', data: 'Eiffel Tower' }] as const;
+    const control = logged('imageSearch control', await client().imageSearch.search({ inputs, count: 5 }));
+    const before = control.data?.results ?? [];
+    expect(before.length).toBeGreaterThanOrEqual(1);
+    const dropHost = hostOf(before[0]?.source_page).replace(/^www\./, '');
+    const { c, bodies } = capturing();
+    const res = logged(
+      'imageSearch exclude_domains',
+      await c.imageSearch.search({ inputs, count: 5, exclude_domains: [dropHost], safesearch: 'off' }),
+    );
+    const after = res.data?.results ?? [];
+    const hosts = JSON.stringify(after.map((r) => hostOf(r.source_page)));
+    console.log(`[live-family] imageSearch excluded=${dropHost} hosts=${hosts}`);
+    expect(after.length).toBeGreaterThanOrEqual(1);
+    for (const r of after) expect(onDomain(r.source_page, dropHost), r.source_page).toBe(false);
+    // safesearch has no observable effect on a benign query; it is only shown to reach the wire
+    expect(bodies[0]?.safesearch).toBe('off');
+  });
+});
+
+describe.skipIf(!enabled)('live: Design Search parameter effects', () => {
+  it('images.count caps images; web highlight, full_content, time_range and exclude_domains take effect', async () => {
+    const query = 'SaaS pricing page';
+    const web = { count: 5, time_range: 'year', highlight: { enable: true, max_tokens: 100 } } as const;
+    const control = logged(
+      'designSearch control',
+      await client().designSearch.search({
+        query,
+        // The default is 5, and the hero section query returned 5 images
+        images: { count: 3 },
+        web_search: { ...web, full_content: { enable: true, max_tokens: 300 } },
+      }),
+    );
+    const images = control.data?.images ?? [];
+    expect(images.length).toBeGreaterThanOrEqual(1);
+    expect(images.length).toBeLessThanOrEqual(3);
+    const before = control.data?.results ?? [];
+    expect(before.length).toBeGreaterThanOrEqual(1);
+    for (const r of before) {
+      expect(r.highlight, r.url).toBeTruthy();
+      expect((r.highlight ?? '').length, r.url).toBeLessThanOrEqual(600);
+      expect(r.full_content, r.url).toBeTruthy();
+    }
+    expectPublishedWithin(before, Date.now() - 367 * DAY_MS, Date.now() + DAY_MS, 'designSearch web time_range=year');
+
+    const dropHost = hostOf(before[0]?.url).replace(/^www\./, '');
+    const res = logged(
+      'designSearch web exclude_domains',
+      await client().designSearch.search({
+        query,
+        images: { enable: false },
+        web_search: { ...web, exclude_domains: [dropHost] },
+      }),
+    );
+    const after = res.data?.results ?? [];
+    const hosts = JSON.stringify(after.map((r) => hostOf(r.url)));
+    console.log(`[live-family] designSearch excluded=${dropHost} hosts=${hosts}`);
+    expect(after.length).toBeGreaterThanOrEqual(1);
+    for (const r of after) {
+      expect(onDomain(r.url, dropHost), r.url).toBe(false);
+      // full_content was not enabled on this call
+      expect(r.full_content, r.url).toBeUndefined();
+    }
+  });
+
+  it('web language de returns German results; start_time/end_time bound the dates', async () => {
+    const start = '2025-01-01T00:00:00Z';
+    const end = '2025-12-31T23:59:59Z';
+    const { c, bodies } = capturing();
+    const res = logged(
+      'designSearch web language=de start/end',
+      await c.designSearch.search({
+        query: 'SaaS pricing page',
+        images: { enable: false },
+        web_search: { count: 3, language: ['de'], time_basis: 'published', start_time: start, end_time: end },
+      }),
+    );
+    const results = res.data?.results ?? [];
+    expect(results.length).toBeGreaterThanOrEqual(1);
+    expectMostlyGerman(results, 'designSearch web language=de');
+    expectPublishedWithin(results, Date.parse(start), Date.parse(end), 'designSearch web start/end');
+    // time_basis cannot be told apart from the response; it is only shown to reach the wire
+    expect((bodies[0]?.web_search as { time_basis?: string } | undefined)?.time_basis).toBe('published');
   });
 });
 
