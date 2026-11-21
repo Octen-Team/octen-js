@@ -197,4 +197,22 @@ describe('live: web search premier against production', () => {
     expect(results.some((r) => typeof r['full_content'] === 'string' && r['full_content'] !== '')).toBe(true);
     console.log(`premier count=2 results ${results.length}, with full_content ${results.filter((r) => 'full_content' in r).length}`);
   });
+
+  // time_basis is pinned to published in both calls, so every kept result must carry time_published.
+  it('octenWebSearchPremier filters by the model time_range against an unfiltered control', { timeout: TIMEOUT }, async () => {
+    const query = 'history of the lithium-ion battery';
+    const day = 24 * 60 * 60 * 1000;
+    const now = Date.now();
+    const published = (out: Out) =>
+      (out['results'] as Record<string, unknown>[]).map((r) => ({ url: r['url'], at: Date.parse(String(r['time_published'] ?? '')) }));
+    const make = () => octenWebSearchPremier({ client: premierClient([]), defaults: { time_basis: 'published' } });
+    const control = published(await runTool(make(), { query }));
+    // Clearly older than a month, so a pass below cannot come from the control already being recent.
+    expect(control.some((r) => r.at < now - 32 * day), JSON.stringify(control)).toBe(true);
+    const filtered = published(await runTool(make(), { query, time_range: 'month' }));
+    expect(filtered.length).toBeGreaterThan(0);
+    // An undated result parses to NaN and fails this check; one day of slack covers the window's time zone.
+    expect(filtered.every((r) => r.at >= now - 32 * day && r.at <= now + day), JSON.stringify(filtered)).toBe(true);
+    console.log(`time_range control ${control.length} results, oldest ${new Date(Math.min(...control.map((r) => r.at))).toISOString()}; month ${filtered.length} results`);
+  });
 });
