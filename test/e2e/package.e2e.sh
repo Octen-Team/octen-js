@@ -86,7 +86,7 @@ JSON
 done
 # Run the compiled output (ESM)
 (cd "$TSE" && node "$TSC" -p tsconfig.exact.json --noEmit false --outDir out >/dev/null && node out/consumer.js) || fail "ts-esm emitted consumer run"
-pass "ts-esm: compiled consumer runs against fake server (six methods)"
+pass "ts-esm: compiled consumer runs against fake server (ten methods)"
 
 # 4. TypeScript, CJS project (NodeNext + type=commonjs, uses index.d.cts)
 TSC_DIR="$(new_project ts-cjs commonjs)"
@@ -95,15 +95,47 @@ cp "$FIX"/ts/*.ts "$FIX"/ts/tsconfig.nodenext.json "$TSC_DIR/"
 (cd "$TSC_DIR" && node "$TSE/node_modules/typescript/bin/tsc" -p tsconfig.nodenext.json) || fail "tsc ts-cjs nodenext"
 pass "tsc --noEmit ts-cjs nodenext (resolves index.d.cts)"
 (cd "$TSC_DIR" && node "$TSE/node_modules/typescript/bin/tsc" -p tsconfig.nodenext.json --noEmit false --outDir out >/dev/null && node out/consumer.js) || fail "ts-cjs emitted consumer run"
-pass "ts-cjs: compiled CommonJS consumer runs against fake server (six methods)"
+pass "ts-cjs: compiled CommonJS consumer runs against fake server (ten methods)"
 
 # 5. Every request the fake server received is well-formed (key / UA / content-type / body)
 node -e "
 fetch('$OCTEN_FAKE_BASE_URL/__requests').then(r => r.json()).then(seen => {
   const bad = seen.filter(s => s.problems.length);
   console.log('fake server saw ' + seen.length + ' requests, ' + bad.length + ' with problems');
-  if (bad.length || seen.length < 15) process.exit(1);
+  if (bad.length || seen.length < 23) process.exit(1);
 });
 " || fail "fake server request check"
 pass "fake server saw only well-formed requests"
+
+# 6. The fake server checks the body shape per path, so a body sent to the wrong route is rejected
+node -e "
+const base = '$OCTEN_FAKE_BASE_URL';
+const headers = { 'x-api-key': 'fake-e2e-key', 'user-agent': 'octen-js-sdk/probe', 'content-type': 'application/json' };
+const shape = (path) => 'body shape not accepted by ' + path;
+const text = [{ type: 'text', data: 'q' }];
+// [path, body, the only reason the 400 may give]; the last five each hit one clause alone
+const probes = [
+  ['/image-search', { query: 'q' }],
+  ['/video-search', { inputs: [{ type: 'image', url: 'https://example.com/a.png' }] }],
+  ['/search', { inputs: text }],
+  ['/search-premier', { images: { group_id: 'deck_1' } }],
+  ['/design-search', { inputs: text }],
+  ['/image-search', { query: 'q', inputs: text }],
+  ['/design-search', { query: 'q', inputs: text }],
+  ['/image-search', { inputs: [{ type: 'image', url: 'https://example.com/a.png', data: 'aGVsbG8=' }] }],
+  ['/image-search', { inputs: [{ type: 'text', data: 'q', url: 'https://example.com/a.png' }] }],
+  ['/image-search', { inputs: [{ type: 'image', url: 'https://example.com/a.png', data: '' }] }],
+].map(([path, body]) => [path, body, shape(path)]);
+probes.push(['/not-an-endpoint', { query: 'q' }, 'unknown path /not-an-endpoint']);
+Promise.all(probes.map(([path, body, reason]) =>
+  fetch(base + path, { method: 'POST', headers, body: JSON.stringify(body) })
+    .then((r) => r.json().then((b) => ({ path, status: r.status, msg: b.msg, ok: r.status === 400 && b.msg === 'fake server rejected: ' + reason }))),
+)).then((results) => {
+  console.log('wrong-route probes: ' + JSON.stringify(results.map(({ path, status, ok }) => [path, status, ok])));
+  const wrong = results.filter((r) => !r.ok);
+  for (const r of wrong) console.error('probe not rejected for its shape: ' + JSON.stringify(r));
+  if (wrong.length) process.exit(1);
+});
+" || fail "fake server accepted a body on the wrong route"
+pass "fake server rejects bodies sent to the wrong route"
 echo "ALL PACKAGE CHECKS PASSED on node $(node -v)"

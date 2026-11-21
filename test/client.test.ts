@@ -92,11 +92,30 @@ describe('Octen client construction', () => {
     expect(thisValues[0] === undefined || thisValues[0] === globalThis).toBe(true);
   });
 
-  test('exposes search and placeSearch resources', () => {
+  test('exposes the search, placeSearch, imageSearch, videoSearch and designSearch resources', () => {
     const c = new Octen({ apiKey: 'sk-test' });
     expect(typeof c.search.search).toBe('function');
     expect(typeof c.search.broadSearch).toBe('function');
+    expect(typeof c.search.searchPremier).toBe('function');
     expect(typeof c.placeSearch.search).toBe('function');
+    expect(typeof c.imageSearch.search).toBe('function');
+    expect(typeof c.videoSearch.search).toBe('function');
+    expect(typeof c.designSearch.search).toBe('function');
+  });
+
+  test('the new resources post through the client to their paths', async () => {
+    const f = okFetch();
+    const c = new Octen({ apiKey: 'sk-test', fetch: f as unknown as FetchFn });
+    await c.search.searchPremier({ query: 'q' });
+    await c.imageSearch.search({ inputs: [{ type: 'text', data: 'q' }] });
+    await c.videoSearch.search({ inputs: [{ type: 'text', data: 'q' }] });
+    await c.designSearch.search({ images: { group_id: 'g' } });
+    expect(f.mock.calls.map((call) => call[0])).toEqual([
+      'https://api.octen.ai/search-premier',
+      'https://api.octen.ai/image-search',
+      'https://api.octen.ai/video-search',
+      'https://api.octen.ai/design-search',
+    ]);
   });
 
   test('sends the key and joins paths against a trailing-slash baseURL', async () => {

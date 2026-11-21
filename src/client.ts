@@ -2,8 +2,11 @@ import { isBrowser, readApiKeyFromEnv } from './core/env';
 import { OctenValidationError } from './core/errors';
 import { normalizeHeaders } from './core/headers';
 import { assertValidTimeout, HttpCore } from './core/http';
+import { DesignSearchResource } from './resources/designSearch';
+import { ImageSearchResource } from './resources/imageSearch';
 import { PlaceSearchResource } from './resources/placeSearch';
 import { SearchResource } from './resources/search';
+import { VideoSearchResource } from './resources/videoSearch';
 
 const DEFAULT_BASE_URL = 'https://api.octen.ai';
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -91,6 +94,10 @@ function resolveFetch(value: typeof fetch | undefined): typeof fetch {
 export default class Octen {
   readonly search: SearchResource;
   readonly placeSearch: PlaceSearchResource;
+  readonly imageSearch: ImageSearchResource;
+  /** Invite-only beta: without beta access the API rejects the call. */
+  readonly videoSearch: VideoSearchResource;
+  readonly designSearch: DesignSearchResource;
 
   constructor(opts: ClientOptions = {}) {
     if (isBrowser() && opts.dangerouslyAllowBrowser !== true) {
@@ -116,5 +123,8 @@ export default class Octen {
     });
     this.search = new SearchResource(http, opts.timeout !== undefined);
     this.placeSearch = new PlaceSearchResource(http);
+    this.imageSearch = new ImageSearchResource(http);
+    this.videoSearch = new VideoSearchResource(http);
+    this.designSearch = new DesignSearchResource(http);
   }
 }

@@ -30,3 +30,10 @@ export const SearchResponseDesc = {
 
 export type SearchParams = Infer<typeof SearchRequestDesc>;
 export type SearchResponse = InferResponse<typeof SearchResponseDesc>;
+
+// The spec points /search-premier at the /search schemas: the same body (no topic) and the same response shape.
+export const SearchPremierRequestDesc = SearchRequestDesc;
+export const SearchPremierResponseDesc = SearchResponseDesc;
+
+export type SearchPremierParams = SearchParams;
+export type SearchPremierResponse = SearchResponse;

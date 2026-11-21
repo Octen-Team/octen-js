@@ -5,6 +5,30 @@ import { createServer } from 'node:http';
 const EXPECTED_KEY = process.env.FAKE_EXPECTED_KEY ?? 'fake-e2e-key';
 const seen = [];
 
+const nonEmpty = (v) => typeof v === 'string' && v !== '';
+const hasQuery = (b) => nonEmpty(b?.query);
+// Exactly one input of an allowed type; text needs data and no url, an image exactly one of url or data
+const hasInput = (types) => (b) => {
+  const input = Array.isArray(b?.inputs) && b.inputs.length === 1 ? b.inputs[0] : undefined;
+  if (!types.includes(input?.type) || b?.query !== undefined) return false;
+  if (input.type === 'text') return nonEmpty(input.data) && input.url === undefined;
+  const given = [input.url, input.data].filter((v) => v !== undefined);
+  return given.length === 1 && nonEmpty(given[0]);
+};
+// The body shape each route accepts
+const ROUTES = {
+  '/search': hasQuery,
+  '/search-premier': hasQuery,
+  '/broad-search': hasQuery,
+  '/news-search': hasQuery,
+  '/business-search': hasQuery,
+  '/pulse-search': hasQuery,
+  '/place-search': hasQuery,
+  '/image-search': hasInput(['text', 'image']),
+  '/video-search': hasInput(['text']),
+  '/design-search': (b) => b?.inputs === undefined && (hasQuery(b) || nonEmpty(b?.images?.group_id)),
+};
+
 const server = createServer((req, res) => {
   if (req.method === 'GET' && req.url === '/__requests') {
     res.setHeader('content-type', 'application/json');
@@ -26,7 +50,9 @@ const server = createServer((req, res) => {
     } catch {
       problems.push('body is not JSON');
     }
-    if (typeof body?.query !== 'string' || body.query === '') problems.push('body.query missing');
+    const accepts = Object.hasOwn(ROUTES, req.url) ? ROUTES[req.url] : undefined;
+    if (accepts === undefined) problems.push(`unknown path ${req.url}`);
+    else if (!accepts(body)) problems.push(`body shape not accepted by ${req.url}`);
     seen.push({ path: req.url, problems });
     res.setHeader('content-type', 'application/json');
     if (problems.length > 0) {

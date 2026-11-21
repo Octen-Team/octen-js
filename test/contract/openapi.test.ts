@@ -1,13 +1,24 @@
 import { describe, expect, test } from 'vitest';
 import { BroadSearchRequestDesc, BroadSearchResponseDesc } from '../../src/schema/broadSearch';
 import { BusinessSearchRequestDesc, BusinessSearchResponseDesc } from '../../src/schema/businessSearch';
+import { DesignSearchRequestDesc, DesignSearchResponseDesc } from '../../src/schema/designSearch';
+import { ImageSearchRequestDesc, ImageSearchResponseDesc } from '../../src/schema/imageSearch';
 import { NewsSearchRequestDesc, NewsSearchResponseDesc } from '../../src/schema/newsSearch';
 import { PlaceSearchRequestDesc, PlaceSearchResponseDesc } from '../../src/schema/placeSearch';
 import { PulseSearchRequestDesc, PulseSearchResponseDesc } from '../../src/schema/pulseSearch';
-import { SearchRequestDesc, SearchResponseDesc } from '../../src/schema/search';
+import {
+  SearchPremierRequestDesc,
+  SearchPremierResponseDesc,
+  SearchRequestDesc,
+  SearchResponseDesc,
+} from '../../src/schema/search';
+import { VideoSearchRequestDesc, VideoSearchResponseDesc } from '../../src/schema/videoSearch';
 import type { ObjectDesc } from '../../src/schema/descriptor';
+import { DesignSearchResource } from '../../src/resources/designSearch';
+import { ImageSearchResource } from '../../src/resources/imageSearch';
 import { PlaceSearchResource } from '../../src/resources/placeSearch';
 import { SearchResource } from '../../src/resources/search';
+import { VideoSearchResource } from '../../src/resources/videoSearch';
 import { BASE, makeFetch } from '../resources/helpers';
 import { compareRequest, compareResponse, loadKnownDiffs } from './compare';
 import { flattenSchema, loadSnapshot } from './flatten';
@@ -61,6 +72,31 @@ const endpoints: Endpoint[] = [
     request: ['PlaceSearchRequest', PlaceSearchRequestDesc],
     response: ['PlaceSearchResponse', PlaceSearchResponseDesc],
     send: (core) => new PlaceSearchResource(core).search({ query: 'q' }),
+  },
+  {
+    // The spec points /search-premier at the /search schemas
+    name: 'search-premier',
+    request: ['SearchRequest', SearchPremierRequestDesc],
+    response: ['SearchResponse', SearchPremierResponseDesc],
+    send: (core) => new SearchResource(core).searchPremier({ query: 'q' }),
+  },
+  {
+    name: 'image-search',
+    request: ['ImageSearchRequest', ImageSearchRequestDesc],
+    response: ['ImageSearchResponse', ImageSearchResponseDesc],
+    send: (core) => new ImageSearchResource(core).search({ inputs: [{ type: 'text', data: 'q' }] }),
+  },
+  {
+    name: 'video-search',
+    request: ['VideoSearchRequest', VideoSearchRequestDesc],
+    response: ['VideoSearchResponse', VideoSearchResponseDesc],
+    send: (core) => new VideoSearchResource(core).search({ inputs: [{ type: 'text', data: 'q' }] }),
+  },
+  {
+    name: 'design-search',
+    request: ['DesignSearchRequest', DesignSearchRequestDesc],
+    response: ['DesignSearchResponse', DesignSearchResponseDesc],
+    send: (core) => new DesignSearchResource(core).search({ query: 'q' }),
   },
 ];
 

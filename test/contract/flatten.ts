@@ -74,6 +74,9 @@ function merge(ctx: Ctx, node: unknown, where: string, stack: readonly string[],
   if (!isRaw(node)) fail(where, 'schema is not an object');
   for (const key of Object.keys(node)) {
     if (STRUCTURAL.has(key) || IGNORED.has(key) || key.startsWith('x-')) continue;
+    // A free-form response map (no properties) equals a bare `type: object`; responses keep extra keys anyway
+    const freeFormMap = node[key] === true && node.properties === undefined;
+    if (key === 'additionalProperties' && ctx.context === 'response' && freeFormMap) continue;
     if (UNION_KEYWORDS.has(key) && ctx.context === 'response' && viaRef !== undefined && RESPONSE_UNIONS.has(viaRef)) continue;
     fail(where, `unsupported keyword "${key}" in ${ctx.context} schema`);
   }

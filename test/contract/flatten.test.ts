@@ -60,10 +60,24 @@ describe('flattenSchema', () => {
     expect(() => flattenSchema(s, '#/components/schemas/X', 'response')).toThrow(/oneOf/);
   });
 
-  test('response rejects anyOf / additionalProperties', () => {
-    expect(() =>
-      flattenSchema(specWith({ type: 'object', additionalProperties: true }), '#/components/schemas/X', 'response'),
-    ).toThrow(/additionalProperties/);
+  test('response accepts additionalProperties: true only on an object without properties (a free-form map)', () => {
+    const free = specWith({ type: 'object', properties: { m: { type: 'object', additionalProperties: true } } });
+    expect(flattenSchema(free, '#/components/schemas/X', 'response').properties.m).toEqual({
+      type: 'object',
+      nullable: false,
+      properties: {},
+      required: [],
+    });
+    const withProps = specWith({ type: 'object', properties: { a: { type: 'string' } }, additionalProperties: true });
+    expect(() => flattenSchema(withProps, '#/components/schemas/X', 'response')).toThrow(/additionalProperties/);
+    for (const value of [false, {}, { type: 'string' }]) {
+      const s = specWith({ type: 'object', additionalProperties: value });
+      expect(() => flattenSchema(s, '#/components/schemas/X', 'response')).toThrow(/additionalProperties/);
+    }
+    expect(() => flattenSchema(free, '#/components/schemas/X')).toThrow(/additionalProperties/);
+  });
+
+  test('response rejects anyOf', () => {
     expect(() =>
       flattenSchema(specWith({ type: 'object', properties: { a: { anyOf: [] } } }), '#/components/schemas/X', 'response'),
     ).toThrow(/anyOf/);
@@ -170,8 +184,18 @@ describe('flattenSchema', () => {
     expect(Object.keys(flattenSchema(s, '#/components/schemas/X').properties)).toEqual(['a', 'b']);
   });
 
-  test('the six endpoint schemas in the snapshot flatten in their context', () => {
-    for (const name of ['Search', 'BroadSearch', 'NewsSearch', 'BusinessSearch', 'PulseSearch', 'PlaceSearch']) {
+  test('the endpoint schemas in the snapshot flatten in their context', () => {
+    for (const name of [
+      'Search',
+      'BroadSearch',
+      'NewsSearch',
+      'BusinessSearch',
+      'PulseSearch',
+      'PlaceSearch',
+      'ImageSearch',
+      'VideoSearch',
+      'DesignSearch',
+    ]) {
       expect(() => flattenSchema(spec, `#/components/schemas/${name}Request`)).not.toThrow();
       expect(() => flattenSchema(spec, `#/components/schemas/${name}Response`, 'response')).not.toThrow();
     }

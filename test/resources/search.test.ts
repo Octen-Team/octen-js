@@ -5,7 +5,7 @@ import { SearchResource } from '../../src/resources/search';
 import { BASE, makeFetch } from './helpers';
 
 type Row = {
-  method: 'search' | 'broadSearch' | 'newsSearch' | 'businessSearch' | 'pulseSearch';
+  method: 'search' | 'broadSearch' | 'newsSearch' | 'businessSearch' | 'pulseSearch' | 'searchPremier';
   path: string;
   // Invalid fields: one at top level, one nested (undocumented fields)
   badTop: Record<string, unknown>;
@@ -42,6 +42,12 @@ const rows: Row[] = [
     path: '/pulse-search',
     badTop: { country: 'US' },
     badNested: { highlight: { enable: true, bogus: 1 } },
+  },
+  {
+    method: 'searchPremier',
+    path: '/search-premier',
+    badTop: { topic: 'news' },
+    badNested: { full_content: { enable: true, num_tokens: 2 } },
   },
 ];
 
@@ -110,7 +116,7 @@ describe('SearchResource request options', () => {
     return { core: { post } as unknown as HttpCore, post };
   }
 
-  test.each(['search', 'newsSearch', 'businessSearch', 'pulseSearch'] as const)(
+  test.each(['search', 'newsSearch', 'businessSearch', 'pulseSearch', 'searchPremier'] as const)(
     '%s passes RequestOptions through unchanged',
     async (method) => {
       const { core, post } = spyCore();
@@ -121,7 +127,7 @@ describe('SearchResource request options', () => {
     },
   );
 
-  test.each(['search', 'newsSearch', 'businessSearch', 'pulseSearch'] as const)(
+  test.each(['search', 'newsSearch', 'businessSearch', 'pulseSearch', 'searchPremier'] as const)(
     '%s adds no timeout of its own (client default applies)',
     async (method) => {
       const { core, post } = spyCore();
@@ -192,6 +198,60 @@ describe('SearchResource.businessSearch entities', () => {
   });
 });
 
+// Every documented SearchRequest field with a distinct non-default value (testdata/openapi.json, SearchRequest).
+const fullSearchParams = {
+  query: 'eu ai act',
+  result_type: 'dynamic',
+  count: 7,
+  include_domains: ['europa.eu'],
+  exclude_domains: ['example.com'],
+  include_text: ['compliance'],
+  exclude_text: ['draft'],
+  time_basis: 'published',
+  time_range: 'year',
+  start_time: '2025-01-01T00:00:00Z',
+  end_time: '2025-12-31T00:00:00Z',
+  language: ['en', 'de'],
+  highlight: { enable: false, max_tokens: 300 },
+  full_content: { enable: true, max_tokens: 1500 },
+  format: 'markdown',
+  safesearch: 'off',
+  include_images: true,
+} as const;
+
+describe('SearchResource.searchPremier', () => {
+  test('sends every SearchRequest field unchanged to /search-premier', async () => {
+    const { core, calls } = makeFetch();
+    await new SearchResource(core).searchPremier(fullSearchParams);
+    expect(calls).toEqual([{ url: `${BASE}/search-premier`, body: fullSearchParams }]);
+  });
+
+  test('adds no defaults: a query-only call sends only the query', async () => {
+    const { core, calls } = makeFetch();
+    await new SearchResource(core).searchPremier({ query: 'q' });
+    expect(calls[0]?.body).toEqual({ query: 'q' });
+  });
+
+  test('search keeps sending the same body to /search', async () => {
+    const { core, calls } = makeFetch();
+    await new SearchResource(core).search(fullSearchParams);
+    await new SearchResource(core).search({ query: 'q' });
+    expect(calls).toEqual([
+      { url: `${BASE}/search`, body: fullSearchParams },
+      { url: `${BASE}/search`, body: { query: 'q' } },
+    ]);
+  });
+
+  test('returns the response untouched, including a null warning and missing data', async () => {
+    const body = { code: 0, request_id: 'req_1', meta: { result_type: 'dynamic', warning: null } };
+    const { core } = makeFetch(body);
+    const res = await new SearchResource(core).searchPremier({ query: 'q', result_type: 'dynamic' });
+    expect(res).toEqual(body);
+    expect(res.data).toBeUndefined();
+    expect(res.meta?.result_type).toBe('dynamic');
+  });
+});
+
 describe('SearchResource request-side validation details', () => {
   test('nested unknown field path is dotted', async () => {
     const { core } = makeFetch();
@@ -218,6 +278,10 @@ export function typeLevelChecks(res: SearchResource) {
   void res.broadSearch({ query: 'q', search_options: { include_videos: true } });
   // @ts-expect-error num_highlights is not in the public spec
   void res.search({ query: 'q', highlight: { num_highlights: 1 } });
+  // @ts-expect-error searchPremier takes no topic
+  void res.searchPremier({ query: 'q', topic: 'news' });
+  // @ts-expect-error result_type is standard or dynamic
+  void res.searchPremier({ query: 'q', result_type: 'deep' });
 }
 
 // JSON.stringify would turn these into null and send them; the path format matches checkUnknownFields.

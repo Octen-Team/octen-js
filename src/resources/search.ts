@@ -3,7 +3,14 @@ import { BroadSearchRequestDesc, type BroadSearchParams, type BroadSearchRespons
 import { BusinessSearchRequestDesc, type BusinessSearchParams, type BusinessSearchResponse } from '../schema/businessSearch';
 import { NewsSearchRequestDesc, type NewsSearchParams, type NewsSearchResponse } from '../schema/newsSearch';
 import { PulseSearchRequestDesc, type PulseSearchParams, type PulseSearchResponse } from '../schema/pulseSearch';
-import { SearchRequestDesc, type SearchParams, type SearchResponse } from '../schema/search';
+import {
+  SearchPremierRequestDesc,
+  SearchRequestDesc,
+  type SearchParams,
+  type SearchPremierParams,
+  type SearchPremierResponse,
+  type SearchResponse,
+} from '../schema/search';
 import { prepareBody } from './request';
 
 // broadSearch runs several searches in parallel, so the 30 s default is too short; precedence: per-call timeout > explicit client timeout > 120 s
@@ -20,6 +27,10 @@ export class SearchResource {
 
   async search(params: SearchParams, options?: RequestOptions): Promise<SearchResponse> {
     return await this.http.post('/search', prepareBody(SearchRequestDesc, params), options);
+  }
+
+  async searchPremier(params: SearchPremierParams, options?: RequestOptions): Promise<SearchPremierResponse> {
+    return await this.http.post('/search-premier', prepareBody(SearchPremierRequestDesc, params), options);
   }
 
   async broadSearch(params: BroadSearchParams, options?: RequestOptions): Promise<BroadSearchResponse> {

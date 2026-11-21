@@ -2,10 +2,12 @@
 
 ## openapi.json
 
-Snapshot of the public Octen OpenAPI spec, saved byte-for-byte as downloaded.
+Snapshot of the public Octen OpenAPI spec, saved byte-for-byte as downloaded, with one exception:
+the Chinese example text in the `/v1/messages` `streamContentDelta` response example is replaced with an
+English translation, to keep the repository English-only. That example is not compared by any test.
 
 - Source: https://docs.octen.ai/api-reference/openapi.json
-- Downloaded: 2026-11-17
+- Downloaded: 2026-11-21
 
 The contract tests in `test/contract/` compare the SDK descriptors in `src/schema/` against this file.
 Update it by hand (download again, update the date above, then fix the descriptors or `known_diffs.json`);

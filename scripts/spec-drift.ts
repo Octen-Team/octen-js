@@ -2,13 +2,30 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { flattenSchema, type FlatSchema, type OpenAPI } from '../test/contract/flatten';
 
-// Weekly diff of the live OpenAPI against testdata/openapi.json: only the request and response schemas of the six endpoints, normalized via flattenSchema and compared item by item.
+// Weekly diff of the live OpenAPI against testdata/openapi.json: only the request and response schemas of the SDK's endpoints, normalized via flattenSchema and compared item by item.
 // Exits 1 on any difference, 2 if it cannot run (download failure, spec cannot be flattened); never rewrites the snapshot.
 const LIVE_URL = process.env.SPEC_DRIFT_URL ?? 'https://docs.octen.ai/api-reference/openapi.json';
 const SNAPSHOT_PATH =
   process.env.SPEC_DRIFT_SNAPSHOT ?? fileURLToPath(new URL('../testdata/openapi.json', import.meta.url));
 
-const ENDPOINTS = ['/search', '/broad-search', '/news-search', '/business-search', '/pulse-search', '/place-search'];
+const ENDPOINTS = [
+  '/search',
+  '/broad-search',
+  '/news-search',
+  '/business-search',
+  '/pulse-search',
+  '/place-search',
+  '/search-premier',
+  '/image-search',
+  '/video-search',
+  '/design-search',
+];
+
+// flattenSchema drops minItems/maxItems; these arrays are checked locally (exactly one input), so compare their bounds too
+const CARDINALITY = [
+  ['/image-search', 'inputs'],
+  ['/video-search', 'inputs'],
+] as const;
 
 type Raw = Record<string, unknown>;
 
@@ -59,6 +76,45 @@ function diffFlat(a: FlatSchema | undefined, b: FlatSchema | undefined, where: s
   }
 }
 
+type Bounds = { minItems: string; maxItems: string };
+
+// A schema node plus every node it pulls in through $ref and allOf, as flattenSchema resolves them
+function expand(spec: OpenAPI, node: unknown, stack: readonly string[] = []): Raw[] {
+  if (!isRaw(node)) return [];
+  const out: Raw[] = [node];
+  if (typeof node.$ref === 'string') {
+    const name = node.$ref.replace('#/components/schemas/', '');
+    if (stack.includes(name)) throw new Error(`$ref cycle at ${[...stack, name].join(' -> ')}`);
+    out.push(...expand(spec, spec.components?.schemas?.[name], [...stack, name]));
+  }
+  if (Array.isArray(node.allOf)) for (const member of node.allOf) out.push(...expand(spec, member, stack));
+  return out;
+}
+
+// minItems / maxItems of a request property ("none" when absent), resolved through $ref and allOf
+function cardinality(spec: OpenAPI, path: string, prop: string): Bounds {
+  const schema = expand(spec, { $ref: schemaRef(spec, path, 'request') });
+  const defs = schema.map((n) => (isRaw(n.properties) ? n.properties[prop] : undefined)).filter(isRaw);
+  if (defs.length === 0) throw new Error(`${path}: request property "${prop}" not found`);
+  const nodes = defs.flatMap((d) => expand(spec, d));
+  const bound = (k: string) => {
+    const values = [...new Set(nodes.map((n) => n[k]).filter((v) => typeof v === 'number'))];
+    if (values.length > 1) throw new Error(`${path}: conflicting ${k} for "${prop}": ${values.join(', ')}`);
+    return values.length === 1 ? String(values[0]) : 'none';
+  };
+  return { minItems: bound('minItems'), maxItems: bound('maxItems') };
+}
+
+function cardinalityAll(spec: OpenAPI): Map<string, Bounds> {
+  return new Map(CARDINALITY.map(([path, prop]) => [`${path} request.${prop}`, cardinality(spec, path, prop)]));
+}
+
+function diffCardinality(a: Bounds, b: Bounds, where: string, out: string[]): void {
+  for (const k of ['minItems', 'maxItems'] as const) {
+    if (a[k] !== b[k]) out.push(`${where}: ${k} ${a[k]} -> ${b[k]}`);
+  }
+}
+
 function flattenAll(spec: OpenAPI): Map<string, FlatSchema> {
   const flat = new Map<string, FlatSchema>();
   for (const path of ENDPOINTS) {
@@ -86,14 +142,20 @@ async function fetchText(url: string): Promise<string> {
 async function main(): Promise<number> {
   let snapshot: Map<string, FlatSchema>;
   let live: Map<string, FlatSchema>;
+  let snapshotBounds: Map<string, Bounds>;
+  let liveBounds: Map<string, Bounds>;
   try {
-    snapshot = flattenAll(JSON.parse(readFileSync(SNAPSHOT_PATH, 'utf8')) as OpenAPI);
+    const spec = JSON.parse(readFileSync(SNAPSHOT_PATH, 'utf8')) as OpenAPI;
+    snapshot = flattenAll(spec);
+    snapshotBounds = cardinalityAll(spec);
   } catch (err) {
     console.error(`cannot read the snapshot (${SNAPSHOT_PATH}): ${String(err)}`);
     return 2;
   }
   try {
-    live = flattenAll(await downloadLive());
+    const spec = await downloadLive();
+    live = flattenAll(spec);
+    liveBounds = cardinalityAll(spec);
   } catch (err) {
     // A structure flattenSchema does not recognize in the live spec also needs a human look
     console.error(`cannot read the live spec (${LIVE_URL}): ${String(err)}`);
@@ -103,6 +165,9 @@ async function main(): Promise<number> {
   const differences: string[] = [];
   for (const [name, snap] of snapshot) {
     diffFlat(snap, live.get(name), name, differences);
+  }
+  for (const [name, bounds] of snapshotBounds) {
+    diffCardinality(bounds, liveBounds.get(name) as Bounds, name, differences);
   }
   if (differences.length === 0) {
     console.log(`No drift: ${snapshot.size} request/response schemas match the snapshot.`);

@@ -18,7 +18,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      # Compares the six endpoints' request/response schemas with testdata/openapi.json and
+      # Compares the SDK endpoints' request/response schemas with testdata/openapi.json and
       # fails on any difference. It never rewrites the snapshot; update that by hand.
       - name: Compare live OpenAPI with the snapshot
         run: npm run spec-drift
