@@ -1,10 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import Octen, { OctenAPIError, OctenAuthenticationError, OctenBadRequestError } from '../../src/index';
 
-// Web Search Premier, Image, Video and Design Search against production https://api.octen.ai (billed, small counts).
-// Runs only with OCTEN_LIVE=1 and OCTEN_API_KEY; Video Search (invite-only beta) also needs OCTEN_LIVE_VIDEO=1.
-// Each option is checked for its effect against an unfiltered control on the same query; a control that does not
-// show what the option should change fails the test.
+// Premier, Image, Video and Design Search against production https://api.octen.ai (billed, small counts).
+// Runs with OCTEN_LIVE=1 and OCTEN_API_KEY; Video Search (invite-only beta) also needs OCTEN_LIVE_VIDEO=1.
+// Options are checked against an unfiltered control on the same query, and a control that cannot fail a check fails.
 const apiKey = process.env.OCTEN_API_KEY ?? '';
 const enabled = process.env.OCTEN_LIVE === '1' && apiKey !== '';
 const videoEnabled = enabled && process.env.OCTEN_LIVE_VIDEO === '1';
@@ -130,7 +129,13 @@ describe.skipIf(!enabled)('live: Web Search Premier', () => {
   const control = once(async () =>
     logged(
       'searchPremier control',
-      await client().search.searchPremier({ query, count: 5, format: 'text', full_content: fullContent }),
+      await client().search.searchPremier({
+        query,
+        count: 5,
+        format: 'text',
+        result_type: 'standard',
+        full_content: fullContent,
+      }),
     ),
   );
 
@@ -174,7 +179,10 @@ describe.skipIf(!enabled)('live: Web Search Premier', () => {
     );
     const results = res.data?.results ?? [];
     expect(results.length).toBeGreaterThanOrEqual(1);
-    for (const r of results) expect(hasWord(textOf(r), word as string), `${r.url} lacks ${word}`).toBe(true);
+    for (const r of results) {
+      expect(r.full_content, r.url).toBeTruthy();
+      expect(hasWord(textOf(r), word as string), `${r.url} lacks ${word}`).toBe(true);
+    }
     // standard is also the default, so this echo alone does not show the option took effect; dynamic does above
     expect(res.meta?.result_type).toBe('standard');
   });
@@ -420,20 +428,28 @@ describe.skipIf(!enabled)('live: Design Search', () => {
     expect(res.data?.images ?? []).toEqual([]);
     const results = res.data?.results ?? [];
     expect(results.length).toBeGreaterThanOrEqual(1);
-    for (const r of results) expect(onDomain(r.url, keep), r.url).toBe(true);
+    for (const r of results) {
+      expect(onDomain(r.url, keep), r.url).toBe(true);
+      // full_content was not enabled on this call
+      expect(r.full_content, r.url).toBeUndefined();
+    }
   });
 
   it('counts, design_facts/snippet off, exclude_domains, highlight/full_content max_tokens take effect', async () => {
     const control_ = await control();
     const images0 = control_.data?.images ?? [];
     const web0 = control_.data?.results ?? [];
-    // Preconditions on the control: more than the caps below, and the fields that are turned off
+    const drop = (await webHosts())[0] as string;
+    // Preconditions on the control: more than the caps below (web: even after the excluded host is removed),
+    // the fields that are turned off, and full_content where it was enabled
     expect(images0.length, 'control images').toBeGreaterThan(3);
-    expect(web0.length, 'control web results').toBeGreaterThan(4);
+    for (const i of images0) expect(i.url).toMatch(/^https?:\/\//);
+    const kept = web0.filter((r) => !onDomain(r.url, drop)).length;
+    expect(kept, 'control web results besides the excluded host').toBeGreaterThan(3);
+    for (const r of web0) expect(r.full_content, r.url).toBeTruthy();
     console.log(`[live-family] designSearch control snippet=${images0.filter((i) => i.snippet).length}/${images0.length}`);
     expect(images0.filter((i) => i.snippet !== undefined).length).toBeGreaterThanOrEqual(2);
     expect(images0.filter((i) => i.design_facts !== undefined).length).toBeGreaterThanOrEqual(2);
-    const drop = (await webHosts())[0] as string;
 
     const res = logged(
       'designSearch caps+off+exclude_domains',
@@ -441,7 +457,7 @@ describe.skipIf(!enabled)('live: Design Search', () => {
         query,
         images: { count: 3, design_facts: false, snippet: { enable: false } },
         web_search: {
-          count: 4,
+          count: 2,
           exclude_domains: [drop],
           highlight: { enable: true, max_tokens: 100 },
           full_content: { enable: true, max_tokens: 100 },
@@ -452,12 +468,13 @@ describe.skipIf(!enabled)('live: Design Search', () => {
     expect(images.length).toBeGreaterThanOrEqual(1);
     expect(images.length).toBeLessThanOrEqual(3);
     for (const i of images) {
+      expect(i.url).toMatch(/^https?:\/\//);
       expect(i.design_facts, i.url).toBeUndefined();
       expect(i.snippet, i.url).toBeUndefined();
     }
     const results = res.data?.results ?? [];
     expect(results.length).toBeGreaterThanOrEqual(1);
-    expect(results.length).toBeLessThanOrEqual(4);
+    expect(results.length).toBeLessThanOrEqual(2);
     for (const r of results) expect(onDomain(r.url, drop), r.url).toBe(false);
     expectShorter('highlight', results, web0, 'designSearch highlight');
     expectShorter('full_content', results, web0, 'designSearch full_content');
