@@ -147,28 +147,25 @@ describe.skipIf(!enabled)('live: Design Search', () => {
     for (const i of members) expect(i.group?.group_id).toBe(groupId);
   });
 
-  it('design_facts and snippet off remove those fields; web include_domains restricts hosts', async () => {
-    const query = 'SaaS pricing page';
-    // Control: with defaults the same query returns images that carry both fields
+  it('design_facts and snippet off remove those fields (control: the same query with defaults has them)', async () => {
+    // Page-section query: on 2026-11-21 all 5 default images were web_section results with a snippet
+    const query = 'SaaS landing page hero section';
     const control = logged(
       'designSearch options control (defaults)',
       await client().designSearch.search({ query, images: { count: 5 }, web_search: { enable: false } }),
     );
     const withDefaults = control.data?.images ?? [];
-    console.log(
-      `[live-family] designSearch control types=${JSON.stringify(withDefaults.map((i) => i.type))} ` +
-        `snippet=${withDefaults.filter((i) => i.snippet !== undefined).length} ` +
-        `design_facts=${withDefaults.filter((i) => i.design_facts !== undefined).length}`,
-    );
-    expect(withDefaults.some((i) => i.snippet !== undefined)).toBe(true);
+    const withSnippet = withDefaults.filter((i) => i.snippet !== undefined).length;
+    console.log(`[live-family] designSearch control snippet=${withSnippet}/${withDefaults.length}`);
+    expect(withSnippet).toBeGreaterThanOrEqual(2);
     expect(withDefaults.some((i) => i.design_facts !== undefined)).toBe(true);
 
     const res = logged(
       'designSearch options off',
       await client().designSearch.search({
         query,
-        images: { count: 3, design_facts: false, snippet: { enable: false } },
-        web_search: { count: 2, include_domains: ['stripe.com'] },
+        images: { count: 5, design_facts: false, snippet: { enable: false } },
+        web_search: { enable: false },
       }),
     );
     const images = res.data?.images ?? [];
@@ -177,6 +174,17 @@ describe.skipIf(!enabled)('live: Design Search', () => {
       expect(i.design_facts, i.url).toBeUndefined();
       expect(i.snippet, i.url).toBeUndefined();
     }
+  });
+
+  it('web_search include_domains restricts the web result hosts', async () => {
+    const res = logged(
+      'designSearch web include_domains',
+      await client().designSearch.search({
+        query: 'SaaS pricing page',
+        images: { enable: false },
+        web_search: { count: 2, include_domains: ['stripe.com'] },
+      }),
+    );
     const results = res.data?.results ?? [];
     expect(results.length).toBeGreaterThanOrEqual(1);
     for (const r of results) expect(onDomain(r.url, 'stripe.com'), r.url).toBe(true);
