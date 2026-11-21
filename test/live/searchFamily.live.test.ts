@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import Octen, { OctenAuthenticationError } from '../../src/index';
+import Octen, { OctenAPIError, OctenAuthenticationError, OctenBadRequestError } from '../../src/index';
 
 // Web Search Premier, Image, Video and Design Search against production https://api.octen.ai (billed, small counts).
 // Runs only with OCTEN_LIVE=1 and OCTEN_API_KEY; Video Search (invite-only beta) also needs OCTEN_LIVE_VIDEO=1.
@@ -334,6 +334,16 @@ describe.skipIf(!enabled)('live: Image Search', () => {
     console.log(`[live-family] imageSearch image data bytes=${data.length} titles=${titles}`);
     expect(results.some((r) => /eiffel/i.test(`${r.title ?? ''} ${r.description ?? ''}`))).toBe(true);
   });
+
+  it('count 1000 -> OctenBadRequestError', async () => {
+    const err = await client()
+      .imageSearch.search({ inputs: [{ type: 'text', data: 'cat' }], count: 1000 })
+      .catch((e: unknown) => e);
+    if (err instanceof OctenAPIError) {
+      console.log(`[live-family] NEG imageSearch count=1000 status=${err.status} msg=${err.message}`);
+    }
+    expect(err).toBeInstanceOf(OctenBadRequestError);
+  });
 });
 
 // Opt-in: the key must have beta access, and then any error (a 403 included) is a failure.
@@ -495,6 +505,16 @@ describe.skipIf(!enabled)('live: Design Search', () => {
       }),
     );
     expectAllWithin(res.data?.results ?? [], start, end, 'designSearch month');
+  });
+
+  it('a query over 500 characters -> OctenBadRequestError', async () => {
+    const err = await client()
+      .designSearch.search({ query: 'landing page '.repeat(40), web_search: { enable: false } })
+      .catch((e: unknown) => e);
+    if (err instanceof OctenAPIError) {
+      console.log(`[live-family] NEG designSearch query>500 status=${err.status} msg=${err.message}`);
+    }
+    expect(err).toBeInstanceOf(OctenBadRequestError);
   });
 });
 
