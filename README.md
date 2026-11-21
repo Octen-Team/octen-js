@@ -324,6 +324,7 @@ npm ci
 npm run typecheck && npm test && npm run build
 npm run test:e2e     # builds dist, runs real-socket fault injection and a packed-tarball smoke test
 OCTEN_LIVE=1 OCTEN_API_KEY=... npm run test:live   # real, billed calls
+OCTEN_LIVE=1 OCTEN_LIVE_VIDEO=1 OCTEN_API_KEY=... npm run test:live   # also Video Search; the key needs beta access
 npm run spec-drift   # compares the live OpenAPI spec with testdata/openapi.json
 ```
 
