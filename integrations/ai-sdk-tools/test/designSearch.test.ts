@@ -527,3 +527,17 @@ describe('octenDesignSearch group_id length', () => {
     expect(schema).toMatchObject({ anyOf: [{ type: 'string', minLength: 1, maxLength: 127 }, { type: 'null' }] });
   });
 });
+
+describe('octenDesignSearch blank group_id', () => {
+  it('treats a whitespace-only group_id with no query as missing, a model-facing error with no request', async () => {
+    const { t, calls } = build();
+    for (const groupId of [' ', '\t\n']) {
+      const err = await run(t, { group_id: groupId }).catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(OctenValidationError);
+      expect((err as OctenValidationError).field).toBe('query');
+      expect((err as Error).message).toMatch(/^Pass `query` to search for design references, or `group_id`.*No request was made\.$/);
+      expect(await validateInput(t, { group_id: groupId })).toBe(false);
+    }
+    expect(calls).toHaveLength(0);
+  });
+});

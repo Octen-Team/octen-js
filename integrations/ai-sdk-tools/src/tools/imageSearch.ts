@@ -66,14 +66,15 @@ function withoutQuery(value: string): string {
 // The raw string is sent as given, so ASCII whitespace and controls are refused; other characters go to the parser.
 function isHttpsUrl(value: string): boolean {
   if (/[\u0000-\u0020\u007f]/.test(value)) return false;
-  // ASCII in the raw authority must be an RFC 3986 authority character (the parser reads a backslash as a slash);
-  // non-ASCII is left to the parser, so internationalized hosts pass. Percent escapes must be well formed.
   const authority = /^https:\/\/([^/?#]*)/i.exec(value)?.[1] ?? '';
-  if (authority === '' || /[\u0000-\u007f]/.test(authority.replace(/[A-Za-z0-9\-._~%!$&'()*+,;=:@[\]]/g, ''))) return false;
-  if (/%(?![0-9A-Fa-f]{2})/.test(withoutQuery(value))) return false;
-  // In the host the API takes an escape only for %25 or a non-ASCII byte, so %65 for "e" is refused.
+  if (authority === '' || /%(?![0-9A-Fa-f]{2})/.test(withoutQuery(value))) return false;
   const at = authority.lastIndexOf('@') + 1;
   const host = authority.slice(at);
+  // Userinfo is ASCII unreserved, sub-delims, ':', '@' and escapes; the host's ASCII is unreserved, sub-delims and
+  // escapes (the parser reads a backslash as a slash), while non-ASCII hosts are left to the parser (IDN).
+  if (!/^[A-Za-z0-9\-._~!$&'()*+,;=:@%]*$/.test(authority.slice(0, Math.max(at - 1, 0)))) return false;
+  if (/[\u0000-\u007f]/.test(host.replace(/:\d*$/, '').replace(/[A-Za-z0-9\-._~!$&'()*+,;=%]/g, ''))) return false;
+  // In the host the API takes an escape only for %25 or a non-ASCII byte, so %65 for "e" is refused.
   if (/%(?!25|[89A-Fa-f][0-9A-Fa-f])/.test(host)) return false;
   // The WHATWG parser refuses %25 in a host, which the API accepts; it cannot be part of an IP, so parse a stand-in.
   const start = 'https://'.length + at;
