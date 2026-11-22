@@ -405,8 +405,9 @@ describe('live: extract against production', () => {
 
 // Image Search: 6 billed calls per run; no model is called. Each option is compared with a control on the same query.
 const IMAGE_QUERY = 'red vintage sports car';
-// A stable public photo on Wikimedia Commons, also in test/fixtures/image-search.json.
-const IMAGE_URL = 'https://upload.wikimedia.org/wikipedia/commons/7/72/Golden_Gate_Birdge-San_Francisco.JPG';
+// The photo of the Eiffel Tower used by the SDK's own reverse image live test.
+const IMAGE_URL =
+  'https://upload.wikimedia.org/wikipedia/commons/thumb/8/85/Tour_Eiffel_Wikimedia_Commons_%28cropped%29.jpg/500px-Tour_Eiffel_Wikimedia_Commons_%28cropped%29.jpg';
 
 type Sent = { path: string; body: Record<string, unknown> };
 
@@ -440,12 +441,13 @@ describe('live: image search against production', () => {
     console.log(`[live-image] control ${out.results.length} results, hosts ${sources(out).map(hostOf).join(' ')}`);
   });
 
-  it('searches by image URL', { timeout: TIMEOUT }, async () => {
+  // Results about the pictured subject show the image was used, not ignored.
+  it('searches by image URL and returns results about the pictured subject', { timeout: TIMEOUT }, async () => {
     const log: Sent[] = [];
     const out = (await runTool(octenImageSearch({ client: sentClient(log) }), { image_url: IMAGE_URL, query: null })) as ImageSearchToolResult;
     expect(log[0]?.body).toEqual({ inputs: [{ type: 'image', url: IMAGE_URL }] });
-    expect(out.results.length).toBeGreaterThan(0);
     console.log(`[live-image] by URL ${out.results.length} results, titles ${JSON.stringify(out.results.map((r) => r.title))}`);
+    expect(out.results.some((r) => /eiffel/i.test(`${r.title ?? ''} ${r.description ?? ''}`))).toBe(true);
   });
 
   it('honors the model include_domains and exclude_domains against the unfiltered control', { timeout: TIMEOUT }, async () => {
@@ -522,15 +524,20 @@ describe('live: design search against production', () => {
   });
 
   it('returns the images of a group from an earlier result, in group order', { timeout: TIMEOUT }, async () => {
-    const group = (await designControl()).out.images.find((i) => i.group?.group_id !== undefined)!.group!;
+    // A group of at least three images, so the order check covers several concrete positions.
+    const group = (await designControl()).out.images.map((i) => i.group).find((g) => (g?.total ?? 0) >= 3);
+    expect(group?.group_id, 'the control has a group of three or more images').toBeTruthy();
     const log: Sent[] = [];
-    const out = (await runTool(octenDesignSearch({ client: sentClient(log) }), { group_id: group.group_id })) as DesignSearchToolResult;
-    expect(log[0]?.body).toEqual({ images: { group_id: group.group_id } });
-    expect(out.images.length).toBeGreaterThan(0);
-    expect(out.images.every((i) => i.group?.group_id === group.group_id), JSON.stringify(out.images.map((i) => i.group))).toBe(true);
-    const positions = out.images.map((i) => i.group?.position ?? 0);
-    expect(positions).toEqual([...positions].sort((a, b) => a - b));
-    console.log(`[live-design] group ${group.group_id} total ${group.total}: positions ${positions.join(',')}, web results ${out.results.length}`);
+    const out = (await runTool(octenDesignSearch({ client: sentClient(log) }), { group_id: group!.group_id })) as DesignSearchToolResult;
+    expect(log[0]?.body).toEqual({ images: { group_id: group!.group_id } });
+    const ids = out.images.map((i) => i.group?.group_id);
+    expect(ids.length).toBeGreaterThanOrEqual(3);
+    expect(ids.every((id) => id === group!.group_id), JSON.stringify(ids)).toBe(true);
+    const positions = out.images.map((i) => i.group?.position);
+    // The API default count is 5, so the first min(5, total) positions in order.
+    const expected = Array.from({ length: Math.min(5, group!.total!) }, (_, i) => i + 1);
+    expect(positions).toEqual(expected);
+    console.log(`[live-design] group ${group!.group_id} total ${group!.total}: positions ${positions.join(',')}, web results ${out.results.length}`);
   });
 
   it('honors a developer images.count above the default', { timeout: TIMEOUT }, async () => {
@@ -541,13 +548,20 @@ describe('live: design search against production', () => {
     console.log(`[live-design] images.count 8: ${out.images.length}, control ${control}`);
   });
 
+  // Same query and count as the control, which has snippets on; image URLs are signed, so they match by path.
   it('turns off design facts and snippets, where the control has them', { timeout: TIMEOUT }, async () => {
     const control = (await designControl()).out;
-    expect(withSnippet(control).length, 'the control has a snippet').toBeGreaterThan(0);
+    const path = (url: unknown) => new URL(String(url)).pathname;
+    const snippetPaths = withSnippet(control).map((i) => path(i.url));
+    expect(snippetPaths.length, 'the control has a snippet').toBeGreaterThan(0);
     const out = (await runTool(octenDesignSearch({ images: { designFacts: false, snippet: { enable: false } } }), { query: DESIGN_QUERY })) as DesignSearchToolResult;
-    expect(out.images.length).toBeGreaterThan(0);
-    expect(out.images.some((i) => i.design_facts !== undefined)).toBe(false);
+    expect(out.images.length).toBe(control.images.length);
+    const same = out.images.filter((i) => snippetPaths.includes(path(i.url)));
+    console.log(`[live-design] snippets off: ${same.length} of ${snippetPaths.length} control snippet images returned again`);
+    expect(same.length, 'the control snippet images come back').toBeGreaterThan(0);
+    expect(same.some((i) => i.snippet !== undefined)).toBe(false);
     expect(withSnippet(out)).toHaveLength(0);
+    expect(out.images.some((i) => i.design_facts !== undefined)).toBe(false);
   });
 
   it('caps snippet code with images.snippet.maxTokens, where the control is longer', { timeout: TIMEOUT }, async () => {
