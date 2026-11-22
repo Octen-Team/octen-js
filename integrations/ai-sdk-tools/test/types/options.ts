@@ -2,6 +2,7 @@
 import { Octen } from '@octen.ai/sdk';
 import {
   octenBusinessSearch,
+  octenExtract,
   octenNewsSearch,
   octenPlaceSearch,
   octenWebSearch,
@@ -9,6 +10,8 @@ import {
 } from '@octen.ai/ai-sdk-tools';
 import type {
   BusinessSearchToolResult,
+  ExtractInput,
+  ExtractToolResult,
   ModelCompany,
   ModelEntity,
   ModelPerson,
@@ -72,4 +75,26 @@ export function premierOptions(): WebSearchPremierToolResult['results'] {
   octenWebSearchPremier({ client, defaults: { topic: 'news' } });
   const input: WebSearchPremierInput = { query: 'q', time_range: null };
   return input.query === '' ? [] : [{ title: 't', url: 'u' }];
+}
+
+// Extract takes its own named options instead of `defaults`, so a misspelt or out-of-type option fails to compile.
+export function extractOptions(out: ExtractToolResult): string[] {
+  octenExtract();
+  octenExtract({ client, maxUrls: 10, mode: 'auto', format: 'text', maxAgeSeconds: 3600, urlTimeout: 45 });
+  octenExtract({ apiKey: 'k', timeout: 120_000, includeImages: true, includeVideos: false, includeAudio: true });
+  octenExtract({ client, includeLinks: {} });
+  octenExtract({ client, includeLinks: { scope: 'prefer_external', maxLinks: 50 } });
+  // @ts-expect-error client already carries its own timeout
+  octenExtract({ client, timeout: 1000 });
+  // @ts-expect-error mode is standard, advanced or auto
+  octenExtract({ client, mode: 'fast' });
+  // @ts-expect-error options use camelCase names
+  octenExtract({ client, max_age_seconds: 600 });
+  // @ts-expect-error includeLinks takes maxLinks, not max_links
+  octenExtract({ client, includeLinks: { max_links: 3 } });
+  // @ts-expect-error Extract has no defaults option
+  octenExtract({ client, defaults: { mode: 'advanced' } });
+  const input: ExtractInput = { urls: ['https://example.com/'], query: null };
+  const urls = out.results.map((r) => (r.status === 'failed' ? `${r.url}: ${r.error_message}` : (r.full_content ?? '')));
+  return [...input.urls, ...urls, ...(out.results[0]?.links?.map((l) => l.url) ?? [])];
 }

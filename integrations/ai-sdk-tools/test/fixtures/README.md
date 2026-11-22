@@ -11,3 +11,4 @@ Long free-text values (highlights, content, summaries) were replaced with placeh
 - `place-search.json`: `POST /place-search` with `{"query":"coffee shops","latitude":35.6812,"longitude":139.7671,"radius":1000,"places":{"count":3}}`, recorded 2026-11-18.
 - `pulse-search.json`: `POST /pulse-search` with `{"query":"github docs","count":3}`, recorded 2026-11-18.
 - `search-premier.json`: `POST /search-premier` with `{"query":"solid-state battery breakthroughs","count":3,"time_range":"month","highlight":{"enable":true,"max_tokens":300}}`, recorded 2026-11-21 with `@octen.ai/sdk@0.2.0`; only the highlights were replaced with placeholders.
+- `extract.json`: `POST /extract` with `{"urls":["https://octen.ai/","https://octen-tools-live-check.invalid/"],"include_images":true,"include_links":{"max_links":3}}`, recorded 2026-11-22 with `@octen.ai/sdk@0.3.0`; only the page content was replaced with a placeholder.

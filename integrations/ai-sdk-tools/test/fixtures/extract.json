@@ -1,0 +1,110 @@
+{
+  "code": 0,
+  "msg": "success",
+  "request_id": "20261122022842537IYYTG7HZ9M",
+  "data": {
+    "results": [
+      {
+        "url": "https://octen.ai/",
+        "status": "success",
+        "title": "Real-Time Web Search API for AI | Octen",
+        "full_content": "Page content placeholder.",
+        "time_last_crawled": "2026-11-22T01:15:58Z",
+        "category": {
+          "primary": "Computers, Electronics & Technology",
+          "secondary": "Programming and Developer Software"
+        },
+        "page_structure": {
+          "primary": "Content Page",
+          "secondary": "Information Display"
+        },
+        "favicon": "https://octen.ai/favicon.ico?61c18f53744654a7",
+        "cover_image": {
+          "url": "https://octen.ai/_next/static/media/octen-cover.dc74905e.png"
+        },
+        "images": [
+          {
+            "url": "https://octen.ai/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Fmulti-modal-bottom-light.7004d871.png&w=3840&q=75"
+          },
+          {
+            "url": "https://octen.ai/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Fmultimodal-ascii.ca1adcba.png&w=3840&q=75"
+          },
+          {
+            "url": "https://octen.ai/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Fmulti-modal-img.ccffddff.png&w=750&q=75"
+          },
+          {
+            "url": "https://octen.ai/_next/static/media/multi-modal-text.a18e331e.svg"
+          },
+          {
+            "url": "https://octen.ai/_next/static/media/multi-modal-chart.12dcbf26.svg"
+          },
+          {
+            "url": "https://octen.ai/_next/static/media/multi-modal-code.409bb5bd.svg"
+          },
+          {
+            "url": "https://octen.ai/_next/static/media/showcase-entry-bg.4c36cd9a.svg"
+          },
+          {
+            "url": "https://octen.ai/_next/static/media/showcase-entry-broad-bg.2d575a3f.svg"
+          },
+          {
+            "url": "https://octen.ai/_next/static/media/showcase-entry-research-bg.3458177b.svg"
+          },
+          {
+            "url": "https://octen.ai/_next/static/media/showcase-entry-chat-bg.29d3c992.svg"
+          },
+          {
+            "url": "https://octen.ai/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Fgrounded-image-1.10e05b47.png&w=3840&q=75"
+          },
+          {
+            "url": "https://octen.ai/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Fgrounded-image-2.d70f4d8d.png&w=3840&q=75"
+          },
+          {
+            "url": "https://octen.ai/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Fgrounded-image-3.22ab9f0a.png&w=3840&q=75"
+          },
+          {
+            "url": "https://octen.ai/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Fgrounded-image-4.db3af954.png&w=3840&q=75"
+          },
+          {
+            "url": "https://octen.ai/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Fgrounded-image-5.22013834.png&w=750&q=75"
+          }
+        ],
+        "links": [
+          {
+            "url": "https://octen.ai/pricing",
+            "anchor_text": "NewOcten Subscription: unlimited Web Search API calls for $20/month.Unlimited Web Search API calls for $20/month.See plans",
+            "is_external": false
+          },
+          {
+            "url": "https://octen.ai/",
+            "anchor_text": "",
+            "is_external": false
+          },
+          {
+            "url": "https://octen.ai/blog",
+            "anchor_text": "Blog",
+            "is_external": false
+          }
+        ],
+        "resolved_mode": "standard"
+      },
+      {
+        "url": "https://octen-tools-live-check.invalid/",
+        "status": "failed",
+        "error_message": "Failed to resolve domain"
+      }
+    ]
+  },
+  "meta": {
+    "usage": {
+      "total_urls": 2,
+      "successful_urls": 1,
+      "successful_by_mode": {
+        "standard_urls": 1,
+        "advanced_urls": 0
+      }
+    },
+    "latency": 660,
+    "warning": "1 URL(s) failed and were not billed"
+  }
+}

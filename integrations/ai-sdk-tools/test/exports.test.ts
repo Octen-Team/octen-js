@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   octenBroadSearch,
   octenBusinessSearch,
+  octenExtract,
   octenNewsSearch,
   octenPlaceSearch,
   octenPulseSearch,
@@ -19,10 +20,11 @@ const FACTORIES = {
   octenBusinessSearch,
   octenPlaceSearch,
   octenPulseSearch,
+  octenExtract,
 };
 
 describe('public entry point', () => {
-  it('exports exactly the seven factories at runtime', async () => {
+  it('exports exactly the eight factories at runtime', async () => {
     const mod = await import('../src/index.js');
     expect(Object.keys(mod).sort()).toEqual(Object.keys(FACTORIES).sort());
   });
