@@ -54,16 +54,23 @@ const IMAGE_ADVICE: Record<number, string> = {
   415: 'The image format is not supported by Image Search. Try an image in JPEG, PNG, WEBP, BMP, TIFF, ICO, DIB, ICNS or SGI format, or a different image URL.',
 };
 
+// The API rejects a malformed % escape anywhere but the query (first ? up to the next #), which it keeps raw.
+function withoutQuery(value: string): string {
+  const hash = value.indexOf('#');
+  const question = value.indexOf('?');
+  if (question === -1 || (hash !== -1 && hash < question)) return value;
+  return value.slice(0, question) + (hash === -1 ? '' : value.slice(hash));
+}
+
 // The API takes only https URLs whose host is a domain name, not an IP address. Parsing never throws out of here.
 // The raw string is sent as given, so ASCII whitespace and controls are refused; other characters go to the parser.
 function isHttpsUrl(value: string): boolean {
   if (/[\u0000-\u0020\u007f]/.test(value)) return false;
   // ASCII in the raw authority must be an RFC 3986 authority character (the parser reads a backslash as a slash);
   // non-ASCII is left to the parser, so internationalized hosts pass. Percent escapes must be well formed.
-  const [, authority = '', path = ''] = /^https:\/\/([^/?#]*)([^?#]*)/i.exec(value) ?? [];
+  const authority = /^https:\/\/([^/?#]*)/i.exec(value)?.[1] ?? '';
   if (authority === '' || /[\u0000-\u007f]/.test(authority.replace(/[A-Za-z0-9\-._~%!$&'()*+,;=:@[\]]/g, ''))) return false;
-  // The API rejects a malformed escape in the host or path but keeps the query and fragment as written.
-  if (/%(?![0-9A-Fa-f]{2})/.test(authority + path)) return false;
+  if (/%(?![0-9A-Fa-f]{2})/.test(withoutQuery(value))) return false;
   try {
     const { protocol, hostname } = new URL(value);
     // The parser normalizes every IPv4 form to dotted decimal and wraps IPv6 in brackets.

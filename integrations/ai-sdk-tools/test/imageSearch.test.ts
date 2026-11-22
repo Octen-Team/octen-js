@@ -651,9 +651,14 @@ describe('octenImageSearch server URL rule', () => {
 });
 
 describe('octenImageSearch percent escapes by URL part', () => {
-  // The API checks escapes in the host and path but keeps the query and fragment as written.
-  it.each(['https://example.com/photo.png?label=50%', 'https://example.com/photo.png?q=%zz&x=1', 'https://example.com/photo.png#50%'])(
-    'accepts a stray %% in the query or fragment of %s and sends it unchanged',
+  // The API checks escapes everywhere except the query, which it keeps as written.
+  it.each([
+    'https://example.com/photo.png?label=50%',
+    'https://example.com/photo.png?q=%zz&x=1',
+    'https://example.com/photo.png?q=%zz#ok',
+    'https://example.com/photo.png#50%25',
+  ])(
+    'accepts a stray %% only in the query of %s and sends it unchanged',
     async (url) => {
       const { t, calls } = build();
       expect(await validateInput(t, { image_url: url })).toBe(true);
@@ -662,8 +667,17 @@ describe('octenImageSearch percent escapes by URL part', () => {
     },
   );
 
-  it.each(['https://example.com/a%zz.png', 'https://example.com/50%/a.png', 'https://example.com/a%4.png', 'https://ex%zzample.com/a.png'])(
-    'refuses a malformed escape in the host or path of %s without a request',
+  it.each([
+    'https://example.com/a%zz.png',
+    'https://example.com/50%/a.png',
+    'https://example.com/a%4.png',
+    'https://ex%zzample.com/a.png',
+    'https://example.com/photo%;ab',
+    'https://example.com/photo.png#50%',
+    'https://example.com/photo.png#a?b=50%',
+    'https://example.com/photo.png?q=1#50%',
+  ])(
+    'refuses a malformed escape outside the query of %s without a request',
     async (url) => {
       const { t, calls } = build();
       const err = await run(t, { image_url: url }).catch((e: unknown) => e);
