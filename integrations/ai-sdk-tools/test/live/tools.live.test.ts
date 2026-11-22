@@ -3,11 +3,19 @@ import { createOpenAI } from '@ai-sdk/openai';
 import { Octen, OctenValidationError } from '@octen.ai/sdk';
 import { generateText, stepCountIs, streamText } from 'ai';
 import { describe, expect, it } from 'vitest';
-import type { ExtractToolResult, ModelExtractResult, OctenExtractOptions } from '../../src/index.js';
+import type {
+  DesignSearchToolResult,
+  ExtractToolResult,
+  ImageSearchToolResult,
+  ModelExtractResult,
+  OctenExtractOptions,
+} from '../../src/index.js';
 import {
   octenBroadSearch,
   octenBusinessSearch,
+  octenDesignSearch,
   octenExtract,
+  octenImageSearch,
   octenNewsSearch,
   octenPlaceSearch,
   octenPulseSearch,
@@ -392,5 +400,200 @@ describe('live: extract against production', () => {
     const { sent, items } = await extract('model options', {}, input as unknown as { urls: string[] });
     expect(sent).toEqual({ urls: [EXTRACT_BROKEN] });
     expect(items.get(EXTRACT_BROKEN)?.status).toBe('failed');
+  });
+});
+
+// Image Search: 6 billed calls per run; no model is called. Each option is compared with a control on the same query.
+const IMAGE_QUERY = 'red vintage sports car';
+// A stable public photo on Wikimedia Commons, also in test/fixtures/image-search.json.
+const IMAGE_URL = 'https://upload.wikimedia.org/wikipedia/commons/7/72/Golden_Gate_Birdge-San_Francisco.JPG';
+
+type Sent = { path: string; body: Record<string, unknown> };
+
+// Records the path and body of every request, so a check can prove what reached the server.
+function sentClient(log: Sent[]): Octen {
+  const fetchAndRecord: typeof fetch = async (input, init) => {
+    log.push({ path: new URL(String(input)).pathname, body: JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown> });
+    return await fetch(input, init);
+  };
+  return new Octen({ apiKey, fetch: fetchAndRecord });
+}
+
+const imageControl = once(async () => {
+  const log: Sent[] = [];
+  // The extra keys are developer-only fields a non-strict model might send; none may reach the request.
+  const input = { query: IMAGE_QUERY, count: 10, safesearch: 'off', inputs: [{ type: 'text', data: 'x' }] };
+  const out = (await runTool(octenImageSearch({ client: sentClient(log) }), input)) as ImageSearchToolResult;
+  return { out, log };
+});
+
+const sources = (out: ImageSearchToolResult) => out.results.map((r) => r.source_page);
+
+describe('live: image search against production', () => {
+  it('searches by text with the API defaults and sends none of the model extras', { timeout: TIMEOUT }, async () => {
+    const { out, log } = await imageControl();
+    expect(log.map((l) => l.path)).toEqual(['/image-search']);
+    expect(log[0]?.body).toEqual({ inputs: [{ type: 'text', data: IMAGE_QUERY }] });
+    expect(out.results.length).toBeGreaterThan(2);
+    expect(out.results.length).toBeLessThanOrEqual(5);
+    for (const r of out.results) expectNamed(r as Record<string, unknown>, ['url']);
+    console.log(`[live-image] control ${out.results.length} results, hosts ${sources(out).map(hostOf).join(' ')}`);
+  });
+
+  it('searches by image URL', { timeout: TIMEOUT }, async () => {
+    const log: Sent[] = [];
+    const out = (await runTool(octenImageSearch({ client: sentClient(log) }), { image_url: IMAGE_URL, query: null })) as ImageSearchToolResult;
+    expect(log[0]?.body).toEqual({ inputs: [{ type: 'image', url: IMAGE_URL }] });
+    expect(out.results.length).toBeGreaterThan(0);
+    console.log(`[live-image] by URL ${out.results.length} results, titles ${JSON.stringify(out.results.map((r) => r.title))}`);
+  });
+
+  it('honors the model include_domains and exclude_domains against the unfiltered control', { timeout: TIMEOUT }, async () => {
+    const control = sources((await imageControl()).out);
+    const domain = 'wikimedia.org';
+    expect(control.some((u) => !onDomain(u, domain)), 'the control has a result outside the domain').toBe(true);
+    const included = sources((await runTool(octenImageSearch(), { query: IMAGE_QUERY, include_domains: [domain] })) as ImageSearchToolResult);
+    expect(included.length).toBeGreaterThan(0);
+    expect(included.every((u) => onDomain(u, domain)), included.join(' ')).toBe(true);
+    const dropped = hostOf(control[0])!;
+    expect(dropped).toBeTruthy();
+    const excluded = sources((await runTool(octenImageSearch(), { query: IMAGE_QUERY, exclude_domains: [dropped] })) as ImageSearchToolResult);
+    expect(excluded.length).toBeGreaterThan(0);
+    expect(excluded.some((u) => onDomain(u, dropped)), excluded.join(' ')).toBe(false);
+    console.log(`[live-image] include ${domain}: ${included.length}; exclude ${dropped}: ${excluded.map(hostOf).join(' ')}`);
+  });
+
+  it('honors a developer count above the default and sends safesearch', { timeout: TIMEOUT }, async () => {
+    const control = (await imageControl()).out.results.length;
+    const log: Sent[] = [];
+    const out = (await runTool(octenImageSearch({ client: sentClient(log), count: 8, safesearch: 'strict' }), { query: IMAGE_QUERY })) as ImageSearchToolResult;
+    expect(log[0]?.body).toEqual({ inputs: [{ type: 'text', data: IMAGE_QUERY }], count: 8, safesearch: 'strict' });
+    expect(out.results.length).toBeGreaterThan(control);
+    expect(out.results.length).toBeLessThanOrEqual(8);
+    console.log(`[live-image] count 8: ${out.results.length} results, control ${control}`);
+  });
+
+  it('keeps a developer include_domains when the model sends its own', { timeout: TIMEOUT }, async () => {
+    const log: Sent[] = [];
+    const t = octenImageSearch({ client: sentClient(log), includeDomains: ['wikimedia.org'] });
+    const out = (await runTool(t, { query: IMAGE_QUERY, include_domains: ['example.com'] })) as ImageSearchToolResult;
+    expect(log[0]?.body).toEqual({ inputs: [{ type: 'text', data: IMAGE_QUERY }], include_domains: ['wikimedia.org'] });
+    expect(out.results.length).toBeGreaterThan(0);
+    expect(sources(out).every((u) => onDomain(u, 'wikimedia.org')), sources(out).join(' ')).toBe(true);
+  });
+
+  it('sends nothing when the model breaks the one-input rule', async () => {
+    const log: Sent[] = [];
+    const t = octenImageSearch({ client: sentClient(log) });
+    const execute = t.execute as (input: unknown, options: unknown) => Promise<unknown>;
+    for (const input of [{ query: IMAGE_QUERY, image_url: IMAGE_URL }, {}, { image_url: 'data:image/png;base64,iVBORw0KGgo=' }]) {
+      const err = await execute(input, { toolCallId: 'live-1', messages: [], context: undefined }).catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(OctenValidationError);
+    }
+    expect(log).toHaveLength(0);
+  });
+});
+
+// Design Search: 8 billed calls per run; no model is called.
+const DESIGN_QUERY = 'pricing section for a SaaS landing page';
+
+const designControl = once(async () => {
+  const log: Sent[] = [];
+  const input = { query: DESIGN_QUERY, images: { count: 50 }, web_search: { enable: false }, count: 50 };
+  const out = (await runTool(octenDesignSearch({ client: sentClient(log) }), input)) as DesignSearchToolResult;
+  return { out, log };
+});
+
+const withSnippet = (out: DesignSearchToolResult) => out.images.filter((i) => i.snippet !== undefined);
+
+describe('live: design search against production', () => {
+  it('searches by query with the API defaults and sends none of the model extras', { timeout: TIMEOUT }, async () => {
+    const { out, log } = await designControl();
+    expect(log.map((l) => l.path)).toEqual(['/design-search']);
+    expect(log[0]?.body).toEqual({ query: DESIGN_QUERY });
+    expect(out.images.length).toBeGreaterThan(2);
+    expect(out.images.length).toBeLessThanOrEqual(5);
+    expect(out.results.length).toBeGreaterThan(0);
+    expect(out.images.some((i) => i.design_facts !== undefined), 'design_facts on by default').toBe(true);
+    expect(out.images.some((i) => i.group?.group_id !== undefined), 'an image with a group').toBe(true);
+    console.log(
+      `[live-design] control images ${out.images.length} (types ${out.images.map((i) => i.type).join(' ')}, with snippet ${withSnippet(out).length}), web ${out.results.length}`,
+    );
+  });
+
+  it('returns the images of a group from an earlier result, in group order', { timeout: TIMEOUT }, async () => {
+    const group = (await designControl()).out.images.find((i) => i.group?.group_id !== undefined)!.group!;
+    const log: Sent[] = [];
+    const out = (await runTool(octenDesignSearch({ client: sentClient(log) }), { group_id: group.group_id })) as DesignSearchToolResult;
+    expect(log[0]?.body).toEqual({ images: { group_id: group.group_id } });
+    expect(out.images.length).toBeGreaterThan(0);
+    expect(out.images.every((i) => i.group?.group_id === group.group_id), JSON.stringify(out.images.map((i) => i.group))).toBe(true);
+    const positions = out.images.map((i) => i.group?.position ?? 0);
+    expect(positions).toEqual([...positions].sort((a, b) => a - b));
+    console.log(`[live-design] group ${group.group_id} total ${group.total}: positions ${positions.join(',')}, web results ${out.results.length}`);
+  });
+
+  it('honors a developer images.count above the default', { timeout: TIMEOUT }, async () => {
+    const control = (await designControl()).out.images.length;
+    const out = (await runTool(octenDesignSearch({ images: { count: 8 } }), { query: DESIGN_QUERY })) as DesignSearchToolResult;
+    expect(out.images.length).toBeGreaterThan(control);
+    expect(out.images.length).toBeLessThanOrEqual(8);
+    console.log(`[live-design] images.count 8: ${out.images.length}, control ${control}`);
+  });
+
+  it('turns off design facts and snippets, where the control has them', { timeout: TIMEOUT }, async () => {
+    const control = (await designControl()).out;
+    expect(withSnippet(control).length, 'the control has a snippet').toBeGreaterThan(0);
+    const out = (await runTool(octenDesignSearch({ images: { designFacts: false, snippet: { enable: false } } }), { query: DESIGN_QUERY })) as DesignSearchToolResult;
+    expect(out.images.length).toBeGreaterThan(0);
+    expect(out.images.some((i) => i.design_facts !== undefined)).toBe(false);
+    expect(withSnippet(out)).toHaveLength(0);
+  });
+
+  it('caps snippet code with images.snippet.maxTokens, where the control is longer', { timeout: TIMEOUT }, async () => {
+    const controlCode = Math.max(...withSnippet((await designControl()).out).map((i) => i.snippet!.code.length));
+    const out = (await runTool(octenDesignSearch({ images: { snippet: { maxTokens: 100 } } }), { query: DESIGN_QUERY })) as DesignSearchToolResult;
+    const codes = withSnippet(out).map((i) => i.snippet!.code.length);
+    console.log(`[live-design] snippet maxTokens 100: code lengths ${codes.join(',')}, control longest ${controlCode}`);
+    expect(codes.length).toBeGreaterThan(0);
+    expect(Math.max(...codes)).toBeLessThan(controlCode);
+    expect(Math.max(...codes)).toBeLessThan(1000);
+  });
+
+  it('turns off web results with webSearch.enable false', { timeout: TIMEOUT }, async () => {
+    expect((await designControl()).out.results.length).toBeGreaterThan(0);
+    const out = (await runTool(octenDesignSearch({ webSearch: { enable: false } }), { query: DESIGN_QUERY })) as DesignSearchToolResult;
+    expect(out.results).toHaveLength(0);
+    expect(out.images.length).toBeGreaterThan(0);
+  });
+
+  it('honors webSearch count, highlight and fullContent against the control', { timeout: TIMEOUT }, async () => {
+    const control = (await designControl()).out.results;
+    expect(control.length).toBeLessThanOrEqual(5);
+    expect(control.some((r) => r.highlight !== undefined), 'the control has highlights').toBe(true);
+    const t = octenDesignSearch({ webSearch: { count: 8, highlight: { enable: false }, fullContent: { enable: true, maxTokens: 200 } } });
+    const out = (await runTool(t, { query: DESIGN_QUERY })) as DesignSearchToolResult;
+    console.log(`[live-design] web count 8: ${out.results.length}, control ${control.length}`);
+    expect(out.results.length).toBeGreaterThan(control.length);
+    expect(out.results.some((r) => r.highlight !== undefined)).toBe(false);
+    expect(out.results.some((r) => (r.full_content ?? '') !== '')).toBe(true);
+  });
+
+  it('honors webSearch.includeDomains against the unfiltered control', { timeout: TIMEOUT }, async () => {
+    const domain = 'dribbble.com';
+    const control = (await designControl()).out.results.map((r) => r.url);
+    expect(control.some((u) => !onDomain(u, domain)), 'the control has a result outside the domain').toBe(true);
+    const out = (await runTool(octenDesignSearch({ webSearch: { includeDomains: [domain] } }), { query: DESIGN_QUERY })) as DesignSearchToolResult;
+    const urls = out.results.map((r) => r.url);
+    expect(urls.length).toBeGreaterThan(0);
+    expect(urls.every((u) => onDomain(u, domain)), urls.join(' ')).toBe(true);
+  });
+
+  it('sends nothing when the model gives neither query nor group_id', async () => {
+    const log: Sent[] = [];
+    const execute = octenDesignSearch({ client: sentClient(log) }).execute as (input: unknown, options: unknown) => Promise<unknown>;
+    const err = await execute({ query: ' ', group_id: null }, { toolCallId: 'live-1', messages: [], context: undefined }).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(OctenValidationError);
+    expect(log).toHaveLength(0);
   });
 });
