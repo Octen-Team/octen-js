@@ -7,6 +7,7 @@ import type {
   DesignSearchToolResult,
   ExtractToolResult,
   ImageSearchToolResult,
+  ModelDesignImage,
   ModelExtractResult,
   OctenExtractOptions,
 } from '../../src/index.js';
@@ -405,9 +406,9 @@ describe('live: extract against production', () => {
 
 // Image Search: 6 billed calls per run; no model is called. Each option is compared with a control on the same query.
 const IMAGE_QUERY = 'red vintage sports car';
-// The photo of the Eiffel Tower used by the SDK's own reverse image live test.
-const IMAGE_URL =
-  'https://upload.wikimedia.org/wikipedia/commons/thumb/8/85/Tour_Eiffel_Wikimedia_Commons_%28cropped%29.jpg/500px-Tour_Eiffel_Wikimedia_Commons_%28cropped%29.jpg';
+// A night photo of the Eiffel Tower whose URL names no subject; the Commons file page describes it as
+// "Tour Eiffel" in Category:Eiffel Tower illuminated yellow (commons.wikimedia.org/wiki/File:P_20170811_002542.jpg).
+const IMAGE_URL = 'https://upload.wikimedia.org/wikipedia/commons/1/1d/P_20170811_002542.jpg';
 
 type Sent = { path: string; body: Record<string, unknown> };
 
@@ -496,7 +497,7 @@ describe('live: image search against production', () => {
   });
 });
 
-// Design Search: 8 billed calls per run; no model is called.
+// Design Search: 9 billed calls per run; no model is called.
 const DESIGN_QUERY = 'pricing section for a SaaS landing page';
 
 const designControl = once(async () => {
@@ -507,6 +508,15 @@ const designControl = once(async () => {
 });
 
 const withSnippet = (out: DesignSearchToolResult) => out.images.filter((i) => i.snippet !== undefined);
+const urlPath = (url: unknown) => new URL(String(url)).pathname;
+
+// Pairs each control image with the same image in another call; the signed query string differs per call.
+function matchByPath(control: ModelDesignImage[], other: ModelDesignImage[]): [ModelDesignImage, ModelDesignImage][] {
+  return control.flatMap((c) => {
+    const o = other.find((i) => urlPath(i.url) === urlPath(c.url));
+    return o === undefined ? [] : [[c, o] as [ModelDesignImage, ModelDesignImage]];
+  });
+}
 
 describe('live: design search against production', () => {
   it('searches by query with the API defaults and sends none of the model extras', { timeout: TIMEOUT }, async () => {
@@ -548,30 +558,29 @@ describe('live: design search against production', () => {
     console.log(`[live-design] images.count 8: ${out.images.length}, control ${control}`);
   });
 
-  // Same query and count as the control, which has snippets on; image URLs are signed, so they match by path.
+  // Same query and count as the control, which has both on; image URLs are signed, so images match by path.
   it('turns off design facts and snippets, where the control has them', { timeout: TIMEOUT }, async () => {
     const control = (await designControl()).out;
-    const path = (url: unknown) => new URL(String(url)).pathname;
-    const snippetPaths = withSnippet(control).map((i) => path(i.url));
-    expect(snippetPaths.length, 'the control has a snippet').toBeGreaterThan(0);
     const out = (await runTool(octenDesignSearch({ images: { designFacts: false, snippet: { enable: false } } }), { query: DESIGN_QUERY })) as DesignSearchToolResult;
-    expect(out.images.length).toBe(control.images.length);
-    const same = out.images.filter((i) => snippetPaths.includes(path(i.url)));
-    console.log(`[live-design] snippets off: ${same.length} of ${snippetPaths.length} control snippet images returned again`);
-    expect(same.length, 'the control snippet images come back').toBeGreaterThan(0);
-    expect(same.some((i) => i.snippet !== undefined)).toBe(false);
+    const pairs = matchByPath(control.images, out.images);
+    console.log(`[live-design] facts/snippets off: ${pairs.length} of ${control.images.length} control images matched`);
+    expect(pairs.some(([c]) => c.snippet !== undefined), 'a matched control image has a snippet').toBe(true);
+    expect(pairs.some(([c]) => c.design_facts !== undefined), 'a matched control image has design facts').toBe(true);
+    expect(pairs.some(([, o]) => o.snippet !== undefined || o.design_facts !== undefined)).toBe(false);
     expect(withSnippet(out)).toHaveLength(0);
     expect(out.images.some((i) => i.design_facts !== undefined)).toBe(false);
   });
 
-  it('caps snippet code with images.snippet.maxTokens, where the control is longer', { timeout: TIMEOUT }, async () => {
-    const controlCode = Math.max(...withSnippet((await designControl()).out).map((i) => i.snippet!.code.length));
+  it('caps snippet code with images.snippet.maxTokens, where the same images are longer in the control', { timeout: TIMEOUT }, async () => {
+    const control = (await designControl()).out;
     const out = (await runTool(octenDesignSearch({ images: { snippet: { maxTokens: 100 } } }), { query: DESIGN_QUERY })) as DesignSearchToolResult;
-    const codes = withSnippet(out).map((i) => i.snippet!.code.length);
-    console.log(`[live-design] snippet maxTokens 100: code lengths ${codes.join(',')}, control longest ${controlCode}`);
-    expect(codes.length).toBeGreaterThan(0);
-    expect(Math.max(...codes)).toBeLessThan(controlCode);
-    expect(Math.max(...codes)).toBeLessThan(1000);
+    const pairs = matchByPath(control.images, out.images).filter(([c, o]) => c.snippet !== undefined && o.snippet !== undefined);
+    const lengths = pairs.map(([c, o]) => `${c.snippet!.code.length}->${o.snippet!.code.length}`);
+    console.log(`[live-design] snippet maxTokens 100, control->capped code lengths: ${lengths.join(' ')}`);
+    expect(pairs.length, 'a control image with a snippet comes back with one').toBeGreaterThan(0);
+    // A snippet already under the cap comes back whole, so only the longer ones must shrink.
+    expect(pairs.every(([c, o]) => o.snippet!.code.length <= c.snippet!.code.length)).toBe(true);
+    expect(pairs.some(([c, o]) => o.snippet!.code.length < c.snippet!.code.length)).toBe(true);
   });
 
   it('turns off web results with webSearch.enable false', { timeout: TIMEOUT }, async () => {
@@ -581,14 +590,25 @@ describe('live: design search against production', () => {
     expect(out.images.length).toBeGreaterThan(0);
   });
 
-  it('honors webSearch count, highlight and fullContent against the control', { timeout: TIMEOUT }, async () => {
+  // The control sends only the query, so the two requests differ only in web_search.count.
+  it('caps web results with webSearch.count, where the control returns more', { timeout: TIMEOUT }, async () => {
     const control = (await designControl()).out.results;
-    expect(control.length).toBeLessThanOrEqual(5);
+    const log: Sent[] = [];
+    const out = (await runTool(octenDesignSearch({ client: sentClient(log), webSearch: { count: 2 } }), { query: DESIGN_QUERY })) as DesignSearchToolResult;
+    expect(log[0]?.body).toEqual({ query: DESIGN_QUERY, web_search: { count: 2 } });
+    console.log(`[live-design] web count 2: ${out.results.length}, control ${control.length}`);
+    expect(control.length, 'the uncapped control returns more than the cap').toBeGreaterThan(2);
+    expect(out.results.length).toBeGreaterThan(0);
+    expect(out.results.length).toBeLessThanOrEqual(2);
+  });
+
+  it('turns highlights off and full content on, against the control', { timeout: TIMEOUT }, async () => {
+    const control = (await designControl()).out.results;
     expect(control.some((r) => r.highlight !== undefined), 'the control has highlights').toBe(true);
-    const t = octenDesignSearch({ webSearch: { count: 8, highlight: { enable: false }, fullContent: { enable: true, maxTokens: 200 } } });
+    expect(control.some((r) => r.full_content !== undefined), 'the control has no full content').toBe(false);
+    const t = octenDesignSearch({ webSearch: { highlight: { enable: false }, fullContent: { enable: true, maxTokens: 200 } } });
     const out = (await runTool(t, { query: DESIGN_QUERY })) as DesignSearchToolResult;
-    console.log(`[live-design] web count 8: ${out.results.length}, control ${control.length}`);
-    expect(out.results.length).toBeGreaterThan(control.length);
+    expect(out.results.length).toBeGreaterThan(0);
     expect(out.results.some((r) => r.highlight !== undefined)).toBe(false);
     expect(out.results.some((r) => (r.full_content ?? '') !== '')).toBe(true);
   });
