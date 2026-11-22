@@ -2,7 +2,9 @@
 import { Octen } from '@octen.ai/sdk';
 import {
   octenBusinessSearch,
+  octenDesignSearch,
   octenExtract,
+  octenImageSearch,
   octenNewsSearch,
   octenPlaceSearch,
   octenWebSearch,
@@ -10,8 +12,12 @@ import {
 } from '@octen.ai/ai-sdk-tools';
 import type {
   BusinessSearchToolResult,
+  DesignSearchInput,
+  DesignSearchToolResult,
   ExtractInput,
   ExtractToolResult,
+  ImageSearchInput,
+  ImageSearchToolResult,
   ModelCompany,
   ModelEntity,
   ModelPerson,
@@ -97,4 +103,44 @@ export function extractOptions(out: ExtractToolResult): string[] {
   const input: ExtractInput = { urls: ['https://example.com/'], query: null };
   const urls = out.results.map((r) => (r.status === 'failed' ? `${r.url}: ${r.error_message}` : (r.full_content ?? '')));
   return [...input.urls, ...urls, ...(out.results[0]?.links?.map((l) => l.url) ?? [])];
+}
+
+// Image Search takes named options; the model-facing input is query or image_url, never base64 data.
+export function imageOptions(out: ImageSearchToolResult): string[] {
+  octenImageSearch();
+  octenImageSearch({ client, count: 10, safesearch: 'off', includeDomains: ['unsplash.com'], excludeDomains: ['pinterest.com'] });
+  // @ts-expect-error client already carries its own apiKey
+  octenImageSearch({ client, apiKey: 'k' });
+  // @ts-expect-error safesearch is off or strict
+  octenImageSearch({ client, safesearch: 'moderate' });
+  // @ts-expect-error options use camelCase names
+  octenImageSearch({ client, include_domains: ['a.com'] });
+  // @ts-expect-error Image Search has no defaults option
+  octenImageSearch({ client, defaults: { count: 3 } });
+  const byText: ImageSearchInput = { query: 'q', image_url: null };
+  const byUrl: ImageSearchInput = { image_url: 'https://example.com/a.png', include_domains: ['a.com'] };
+  // @ts-expect-error the model input has no base64 field
+  const byData: ImageSearchInput = { image_data: 'AAAA' };
+  return [byText.query ?? '', byUrl.image_url ?? '', String(byData), ...out.results.map((r) => `${r.url} ${r.source_page} ${r.width}`)];
+}
+
+// Design Search takes images and webSearch sections whose keys are camelCase; group_id is the model's.
+export function designOptions(out: DesignSearchToolResult): string[] {
+  octenDesignSearch();
+  octenDesignSearch({
+    client,
+    images: { enable: true, count: 20, designFacts: false, snippet: { enable: true, maxTokens: 1000 } },
+    webSearch: { count: 3, highlight: { maxTokens: 300 }, fullContent: { enable: false }, language: ['en'], timeBasis: 'published', timeRange: 'month' },
+  });
+  octenDesignSearch({ apiKey: 'k', webSearch: { includeDomains: ['dribbble.com'], startTime: '2025-01-01T00:00:00Z', endTime: '2026-01-01T00:00:00Z' } });
+  // @ts-expect-error group_id comes from the model, not from the developer
+  octenDesignSearch({ client, images: { groupId: 'pg_1' } });
+  // @ts-expect-error webSearch takes maxTokens, not max_tokens
+  octenDesignSearch({ client, webSearch: { highlight: { max_tokens: 300 } } });
+  // @ts-expect-error language takes the documented ISO 639-1 codes
+  octenDesignSearch({ client, webSearch: { language: ['xx'] } });
+  // @ts-expect-error timeRange takes the four long spellings
+  octenDesignSearch({ client, webSearch: { timeRange: 'w' } });
+  const followUp: DesignSearchInput = { group_id: out.images[0]?.group?.group_id ?? null, query: null };
+  return [followUp.group_id ?? '', ...out.images.map((i) => `${i.url} ${i.snippet?.code ?? ''}`), ...out.results.map((r) => r.url ?? '')];
 }
