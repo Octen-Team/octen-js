@@ -228,7 +228,36 @@ function trimResult(r: Record<string, unknown>): ModelExtractResult {
   return out;
 }
 
-export function octenExtract(options: OctenExtractOptions = {}): Tool<ExtractInput, ExtractToolResult> {
+const OPTION_KEYS = [
+  'description',
+  'maxUrls',
+  'mode',
+  'format',
+  'maxAgeSeconds',
+  'urlTimeout',
+  'includeImages',
+  'includeVideos',
+  'includeAudio',
+  'includeLinks',
+  'client',
+  'apiKey',
+  'baseURL',
+  'timeout',
+  'maxRetries',
+] as const;
+
+// Reads each option once, so validation, the schema and the requests all see the same values.
+function snapshot(options: OctenExtractOptions): OctenExtractOptions {
+  const copy: Record<string, unknown> = {};
+  for (const key of OPTION_KEYS) {
+    const value = (options as Record<string, unknown>)[key];
+    if (value !== undefined) copy[key] = value;
+  }
+  return copy as OctenExtractOptions;
+}
+
+export function octenExtract(given: OctenExtractOptions = {}): Tool<ExtractInput, ExtractToolResult> {
+  const options = snapshot(given);
   const maxUrls = intIn(options.maxUrls, 1, API_MAX_URLS, 'maxUrls') ?? DEFAULT_MAX_URLS;
   const fixed = developerParams(options);
   // One client per tool, reused by every call; with no client timeout the SDK derives one from urlTimeout.

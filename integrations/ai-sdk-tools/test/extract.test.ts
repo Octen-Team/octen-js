@@ -264,6 +264,42 @@ describe('octenExtract construction', () => {
     expect((err as OctenValidationError).field).toBe(field);
   });
 
+  // Construction validates one snapshot, which the schema, the cap and the request all use afterwards.
+  it('ignores changes to the options object after the tool is built', async () => {
+    const rec = recordingFetch(() => jsonResponse(extractFixture));
+    const links: Record<string, unknown> = { maxLinks: 3 };
+    const options: Record<string, unknown> = { client: clientFor(rec.fakeFetch), maxUrls: 2, mode: 'standard', urlTimeout: 10, includeLinks: links };
+    const t = octenExtract(options as OctenExtractOptions);
+    Object.assign(options, { maxUrls: 20, mode: 'fast', urlTimeout: 999, format: 'html', description: 'changed' });
+    Object.assign(links, { maxLinks: 5000, max_links: 1 });
+    expect(((await modelJsonSchema(t)).properties?.['urls'] as { maxItems?: number }).maxItems).toBe(2);
+    expect(t.description).toMatch(/at most 2 URLs per call/);
+    expect(await validateInput(t, { urls: urlsOf(3) })).toBe(false);
+    await expect(run(t, { urls: urlsOf(3) })).rejects.toThrow(/at most 2 per call/);
+    await run(t, { urls: [A] });
+    expect(rec.calls.map((c) => c.body)).toEqual([{ urls: [A], mode: 'standard', timeout: 10, include_links: { max_links: 3 } }]);
+  });
+
+  it('reads each option once, so a getter cannot pass validation with one value and send another', async () => {
+    const rec = recordingFetch(() => jsonResponse(extractFixture));
+    const reads: Record<string, number> = {};
+    const counted = <T extends object>(target: T, prefix: string): T =>
+      new Proxy(target, {
+        get(obj, key, receiver) {
+          if (typeof key === 'string') reads[prefix + key] = (reads[prefix + key] ?? 0) + 1;
+          return Reflect.get(obj, key, receiver) as unknown;
+        },
+      });
+    const options = counted(
+      { client: clientFor(rec.fakeFetch), maxUrls: 2, mode: 'advanced', maxAgeSeconds: 600, includeLinks: counted({ maxLinks: 3 }, 'includeLinks.') },
+      '',
+    );
+    const t = octenExtract(options as OctenExtractOptions);
+    await run(t, { urls: [A] });
+    expect(Object.entries(reads).filter(([, n]) => n > 1)).toEqual([]);
+    expect(rec.calls[0]?.body).toEqual({ urls: [A], mode: 'advanced', max_age_seconds: 600, include_links: { max_links: 3 } });
+  });
+
   it('rejects client together with a client option, like the other tools', () => {
     const err = thrown(() => octenExtract({ client, timeout: 1000 } as unknown as OctenExtractOptions));
     expect((err as OctenValidationError).field).toBe('timeout');
