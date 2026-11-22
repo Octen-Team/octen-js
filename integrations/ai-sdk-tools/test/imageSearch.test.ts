@@ -129,18 +129,18 @@ describe('octenImageSearch exactly one input', () => {
       expect(err).toBeInstanceOf(OctenValidationError);
       expect((err as OctenValidationError).field).toBe('query');
       expect((err as Error).message).toBe(
-        'Pass one of `query` (text describing the images) or `image_url` (a public http(s) URL of an image, to find similar images). No request was made.',
+        'Pass one of `query` (text describing the images) or `image_url` (a public https URL of an image, to find similar images). No request was made.',
       );
     }
     expect(calls).toHaveLength(0);
   });
 
-  it('refuses an image_url that is not an http(s) URL, such as base64 data, without a request', async () => {
+  it('refuses an image_url that is not an https URL, such as base64 data, without a request', async () => {
     const { t, calls } = build();
     for (const url of ['data:image/png;base64,iVBORw0KGgo=', 'iVBORw0KGgo=', 'ftp://example.com/a.png']) {
       const err = await run(t, { image_url: url }).catch((e: unknown) => e);
       expect(err).toBeInstanceOf(OctenValidationError);
-      expect((err as Error).message).toMatch(/image_url must be a public http\(s\) URL/);
+      expect((err as Error).message).toMatch(/image_url must be a public https URL/);
     }
     expect(calls).toHaveLength(0);
   });
@@ -152,7 +152,7 @@ describe('octenImageSearch exactly one input', () => {
     const neither = await rejection({ query: null });
     expect(neither.success).toBe(false);
     expect(neither.message).toMatch(/Pass one of `query`/);
-    expect((await rejection({ image_url: 'data:image/png;base64,AAAA' })).message).toMatch(/http\(s\) URL/);
+    expect((await rejection({ image_url: 'data:image/png;base64,AAAA' })).message).toMatch(/https URL/);
   });
 
   it('accepts one input of the allowed shape, as the AI SDK validates the input', async () => {
@@ -162,7 +162,7 @@ describe('octenImageSearch exactly one input', () => {
     expect(await validateInput(t, { query: '\u{1F600}'.repeat(500) })).toBe(true);
     expect(await validateInput(t, { query: 'q'.repeat(501) })).toBe(false);
     expect(await validateInput(t, { image_url: IMG, query: null })).toBe(true);
-    expect(await validateInput(t, { image_url: 'HTTP://EXAMPLE.COM/A.PNG' })).toBe(true);
+    expect(await validateInput(t, { image_url: 'HTTPS://EXAMPLE.COM/A.PNG' })).toBe(true);
     expect(await validateInput(t, { query: 'q', include_domains: Array.from({ length: 10 }, (_, i) => `d${i}.com`) })).toBe(true);
     expect(await validateInput(t, { query: 'q', include_domains: Array.from({ length: 11 }, (_, i) => `d${i}.com`) })).toBe(false);
     expect(await validateInput(t, { query: 'q', exclude_domains: [''] })).toBe(false);
@@ -341,12 +341,12 @@ describe('octenImageSearch review fixes', () => {
     const err = await run(t, { image_url: url }).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(OctenValidationError);
     expect((err as OctenValidationError).field).toBe('image_url');
-    expect((err as Error).message).toMatch(/image_url must be a public http\(s\) URL of an image, with a host name/);
+    expect((err as Error).message).toMatch(/image_url must be a public https URL of an image with a domain name \(no IP address\)/);
     expect(calls).toHaveLength(0);
-    expect((await rejection({ image_url: url })).message).toMatch(/with a host name/);
+    expect((await rejection({ image_url: url })).message).toMatch(/with a domain name/);
   });
 
-  it('still sends an http(s) URL with a host, port, path and query string', async () => {
+  it('still sends an https URL with a domain name, port, path and query string', async () => {
     const { t, calls } = build();
     const url = 'https://images.example.com:8443/a/b.jpg?w=200';
     await run(t, { image_url: url });
@@ -520,9 +520,9 @@ describe('octenImageSearch review round 5', () => {
     },
   );
 
-  it('still accepts userinfo, ports and IPv6 hosts', async () => {
+  it('still accepts userinfo, ports and subdomains', async () => {
     const { t, calls } = build();
-    for (const url of ['https://user:pa%20ss@example.com:8443/a.png', 'http://[2001:db8::1]/a.png', 'https://sub-1.example.co.uk/a.png']) {
+    for (const url of ['https://user:pa%20ss@example.com:8443/a.png', 'https://example.com:8443/a.png', 'https://sub-1.example.co.uk/a.png']) {
       await run(t, { image_url: url });
     }
     expect(calls).toHaveLength(3);
@@ -610,5 +610,42 @@ describe('octenImageSearch review round 8', () => {
     const err = await run(t, { image_url: url }).catch((e: unknown) => e);
     expect((err as OctenValidationError).field).toBe('image_url');
     expect(calls).toHaveLength(0);
+  });
+});
+
+describe('octenImageSearch server URL rule', () => {
+  // The API accepts only https URLs whose host is a domain name; anything else gets HTTP 400.
+  it.each(['http://example.com/a.png', 'https://1.2.3.4/a.png', 'https://[2001:db8::1]/a.png', 'https://0x7f.1/a.png', 'https://example.com /a.png', 'https://example.com/a b.png'])(
+    'refuses %j without a request, with the domain-name rule in the message',
+    async (url) => {
+      const { t, calls } = build();
+      const err = await run(t, { image_url: url }).catch((e: unknown) => e);
+      expect((err as OctenValidationError).field).toBe('image_url');
+      expect((err as Error).message).toMatch(/public https URL of an image with a domain name \(no IP address\)/);
+      expect(calls).toHaveLength(0);
+      expect((await rejection({ image_url: url })).success).toBe(false);
+    },
+  );
+
+  it.each([
+    'HTTPS://example.com/a.png',
+    'https://\u0909\u0926\u093e\u0939\u0930\u0923.\u092d\u093e\u0930\u0924/a.png',
+    'https://xn--p1b6ci4b4b3a.xn--h2brj9c/a.png',
+    'https://example.com:8443/a.png',
+    'https://user:pass@example.com/a.png',
+    // A no-break space (U+00A0) in the path is left to the URL parser; only ASCII whitespace is refused.
+    'https://example.com/caf\u00e9\u00a0menu.png',
+  ])('accepts %s and sends it unchanged', async (url) => {
+    const { t, calls } = build();
+    expect(await validateInput(t, { image_url: url })).toBe(true);
+    await run(t, { image_url: url });
+    expect(calls[0]?.body).toEqual({ inputs: [{ type: 'image', url }] });
+  });
+
+  it('says https and domain name in the default description and the image_url schema', async () => {
+    const t = octenImageSearch({ client: new Octen({ apiKey: 'test-key' }) });
+    expect(t.description).toMatch(/public https image URL with a domain name/);
+    const schema = (await modelJsonSchema(t)).properties?.['image_url'] as { description?: string };
+    expect(schema.description).toMatch(/public https URL of an image with a domain name \(no IP address\)/);
   });
 });

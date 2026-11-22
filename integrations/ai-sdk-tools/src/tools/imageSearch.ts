@@ -39,14 +39,14 @@ const MAX_DOMAINS = 10;
 // Wording follows the hosted Octen MCP image tool, without the inputs this tool does not take.
 const DESCRIPTION =
   'Find images on the web by a text query or by a reference image. Returns ranked images, each with the image URL, the page that hosts it (`source_page`), a title, a text description, its size and a thumbnail URL. ' +
-  'Pass exactly one of `query` (text describing the images) or `image_url` (a public image URL, to find visually similar images), never both. ' +
+  'Pass exactly one of `query` (text describing the images) or `image_url` (a public https image URL with a domain name, not an IP address, to find visually similar images), never both. ' +
   'Use this when the user wants pictures, photos, diagrams, screenshots or other visual references, not for general text web search.';
 
 const BOTH = 'Pass exactly one of `query` or `image_url`, not both: this search takes a single input. No request was made.';
 const NEITHER =
-  'Pass one of `query` (text describing the images) or `image_url` (a public http(s) URL of an image, to find similar images). No request was made.';
+  'Pass one of `query` (text describing the images) or `image_url` (a public https URL of an image, to find similar images). No request was made.';
 const NOT_HTTP =
-  'image_url must be a public http(s) URL of an image, with a host name; this tool does not take base64 or data: URIs. No request was made.';
+  'image_url must be a public https URL of an image with a domain name (no IP address); this tool does not take base64 or data: URIs. No request was made.';
 
 // The API rejects these statuses for the image itself, so the model is told to try another image.
 const IMAGE_ADVICE: Record<number, string> = {
@@ -54,18 +54,20 @@ const IMAGE_ADVICE: Record<number, string> = {
   415: 'The image format is not supported by Image Search. Try an image in JPEG, PNG, WEBP, BMP, TIFF, ICO, DIB, ICNS or SGI format, or a different image URL.',
 };
 
-// Parsing never throws out of here: a URL that does not parse is just not acceptable.
-// The raw string needs a non-empty // authority and no whitespace or control characters: it is sent as given.
-function isHttpUrl(value: string): boolean {
-  if (/[\s\u0000-\u001f\u007f]/.test(value)) return false;
+// The API takes only https URLs whose host is a domain name, not an IP address. Parsing never throws out of here.
+// The raw string is sent as given, so ASCII whitespace and controls are refused; other characters go to the parser.
+function isHttpsUrl(value: string): boolean {
+  if (/[\u0000-\u0020\u007f]/.test(value)) return false;
   // ASCII in the raw authority must be an RFC 3986 authority character (the parser reads a backslash as a slash);
   // non-ASCII is left to the parser, so internationalized hosts pass. Percent escapes must be well formed.
-  const authority = /^https?:\/\/([^/?#]*)/i.exec(value)?.[1] ?? '';
+  const authority = /^https:\/\/([^/?#]*)/i.exec(value)?.[1] ?? '';
   if (authority === '' || /[\u0000-\u007f]/.test(authority.replace(/[A-Za-z0-9\-._~%!$&'()*+,;=:@[\]]/g, ''))) return false;
   if (/%(?![0-9A-Fa-f]{2})/.test(authority)) return false;
   try {
-    const url = new URL(value);
-    return (url.protocol === 'http:' || url.protocol === 'https:') && url.hostname !== '';
+    const { protocol, hostname } = new URL(value);
+    // The parser normalizes every IPv4 form to dotted decimal and wraps IPv6 in brackets.
+    const ip = hostname.startsWith('[') || /^\d+\.\d+\.\d+\.\d+$/.test(hostname);
+    return protocol === 'https:' && hostname !== '' && !ip;
   } catch {
     return false;
   }
@@ -94,7 +96,7 @@ function inputProblem(input: { query?: unknown; image_url?: unknown }): { field:
   const image = isNonBlank(input.image_url);
   if (query && image) return { field: 'image_url', message: BOTH };
   if (!query && !image) return { field: 'query', message: NEITHER };
-  if (image && !isHttpUrl(String(input.image_url))) return { field: 'image_url', message: NOT_HTTP };
+  if (image && !isHttpsUrl(String(input.image_url))) return { field: 'image_url', message: NOT_HTTP };
   return undefined;
 }
 
@@ -122,7 +124,8 @@ function inputSchema(domainFields: readonly DomainField[]) {
     },
     image_url: {
       anyOf: [{ type: 'string', minLength: 1 }, { type: 'null' }],
-      description: 'A public http(s) URL of an image, to find visually similar images. Set exactly one of `query` or `image_url`.',
+      description:
+        'A public https URL of an image with a domain name (no IP address), to find visually similar images. Set exactly one of `query` or `image_url`.',
     },
   };
   for (const field of domainFields) {
