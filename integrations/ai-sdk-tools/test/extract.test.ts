@@ -166,6 +166,24 @@ describe('octenExtract model input', () => {
     expect(await validateInput(t, { urls: [A], query: null })).toBe(true);
   });
 
+  // JSON Schema maxLength and the SDK's own URL check count code points, so an emoji counts once, not twice.
+  it('counts URL and query length in code points, like the JSON schema and the SDK', async () => {
+    const t = octenExtract({ client: new Octen({ apiKey: 'test-key' }) });
+    const emojiUrl = (n: number) => `https://e.com/${'\u{1F600}'.repeat(n - 14)}`;
+    expect(emojiUrl(2048).length).toBe(4082);
+    expect(await validateInput(t, { urls: [emojiUrl(2048)] })).toBe(true);
+    expect(await validateInput(t, { urls: [emojiUrl(2049)] })).toBe(false);
+    expect(await validateInput(t, { urls: [A], query: '\u{1F600}'.repeat(500) })).toBe(true);
+    expect(await validateInput(t, { urls: [A], query: '\u{1F600}'.repeat(501) })).toBe(false);
+  });
+
+  it('sends a URL of 2048 code points that the SDK accepts', async () => {
+    const { t, calls } = build();
+    const url = `https://e.com/${'\u{1F600}'.repeat(2034)}`;
+    await run(t, { urls: [url] });
+    expect(calls[0]?.body).toEqual({ urls: [url] });
+  });
+
   it('refuses more URLs than maxUrls without a request, naming the count, the cap and the split', async () => {
     const { t, calls } = build({ maxUrls: 2 });
     const err = await run(t, { urls: urlsOf(3) }).catch((e: unknown) => e);

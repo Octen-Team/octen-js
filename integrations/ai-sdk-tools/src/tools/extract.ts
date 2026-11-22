@@ -1,6 +1,6 @@
 import { OctenValidationError } from '@octen.ai/sdk';
 import type { ExtractParams } from '@octen.ai/sdk';
-import { tool } from 'ai';
+import { jsonSchema, tool } from 'ai';
 import type { Tool } from 'ai';
 import { z } from 'zod';
 import { asList, isRecord, nonEmpty, requestOptions, resolveClient, warningOf } from '../shared.js';
@@ -111,24 +111,52 @@ function developerParams(options: OctenExtractOptions): DeveloperParams {
   return Object.fromEntries(entries.filter(([, value]) => value !== undefined)) as DeveloperParams;
 }
 
-function inputSchema(maxUrls: number): z.ZodType<ExtractInput> {
-  const urls = z
-    .array(z.string().min(1).max(MAX_URL_LENGTH))
-    .min(1, 'Pass at least one URL.')
-    .max(maxUrls, `Pass at most ${maxUrls} URLs per call; split a longer list into several calls.`)
-    .describe(`URLs of the pages to read, e.g. 'https://example.com/article'. 1 to ${maxUrls} per call, each at most 2048 characters.`);
-  const query = z
-    .string()
-    .min(1)
-    .max(MAX_QUERY_LENGTH)
+const URLS_DESCRIPTION = (maxUrls: number) =>
+  `URLs of the pages to read, e.g. 'https://example.com/article'. 1 to ${maxUrls} per call, each at most 2048 characters.`;
+const QUERY_DESCRIPTION =
+  "Optional; leave it unset in the normal case, and each result returns the page's full content. Set it only to get ranked excerpts about one specific topic: each result then returns `highlights` and omits `full_content`. Max 500 characters.";
+
+// JSON Schema lengths and the SDK's URL check count code points; zod 3.25 and 4.1 count UTF-16 units in .max.
+const codePoints = (s: string) => [...s].length;
+
+// The JSON schema is written out so its lengths keep their code-point meaning; zod only validates.
+function inputSchema(maxUrls: number) {
+  const validator = z.object({
+    urls: z
+      .array(z.string().min(1).refine((url) => codePoints(url) <= MAX_URL_LENGTH, 'Each URL must be at most 2048 characters.'))
+      .min(1, 'Pass at least one URL.')
+      .max(maxUrls, `Pass at most ${maxUrls} URLs per call; split a longer list into several calls.`),
     // Strict-mode providers send null for an optional field; execute drops it.
-    .nullable()
-    .optional()
-    .describe(
-      "Optional; leave it unset in the normal case, and each result returns the page's full content. Set it only to get ranked excerpts about one specific topic: each result then returns `highlights` and omits `full_content`. Max 500 characters.",
-    );
-  // The shape is built at runtime, so the tool's declared input type is asserted here, once.
-  return z.object({ urls, query }) as unknown as z.ZodType<ExtractInput>;
+    query: z
+      .string()
+      .min(1)
+      .refine((q) => codePoints(q) <= MAX_QUERY_LENGTH, 'query must be at most 500 characters.')
+      .nullable()
+      .optional(),
+  });
+  return jsonSchema<ExtractInput>(
+    {
+      type: 'object',
+      properties: {
+        urls: {
+          type: 'array',
+          items: { type: 'string', minLength: 1, maxLength: MAX_URL_LENGTH },
+          minItems: 1,
+          maxItems: maxUrls,
+          description: URLS_DESCRIPTION(maxUrls),
+        },
+        query: { anyOf: [{ type: 'string', minLength: 1, maxLength: MAX_QUERY_LENGTH }, { type: 'null' }], description: QUERY_DESCRIPTION },
+      },
+      required: ['urls'],
+      additionalProperties: false,
+    },
+    {
+      validate: (value) => {
+        const result = validator.safeParse(value);
+        return result.success ? { success: true, value: result.data as ExtractInput } : { success: false, error: result.error };
+      },
+    },
+  );
 }
 
 // The AI SDK validates the schema first; this repeats the count check for callers that run execute directly.

@@ -321,6 +321,11 @@ async function extractInput(failures) {
   check(failures, (await validate({ urls: [] })) === false, 'extract empty list accepted');
   check(failures, JSON.stringify(prompts[1]?.prompt ?? '').includes('at most 2 URLs'), 'extract cap message not sent to the model');
   check(failures, http.calls.length === 0, `extract sent ${http.calls.length} requests over the cap`);
+  // Lengths count code points, as the JSON schema says: an emoji is one character, not two UTF-16 units.
+  const emojiUrl = (n) => `https://e.com/${'\u{1F600}'.repeat(n - 14)}`;
+  check(failures, (await validate({ urls: [emojiUrl(2048)] })) === true, 'extract URL of 2048 code points rejected');
+  check(failures, (await validate({ urls: [emojiUrl(2049)] })) === false, 'extract URL of 2049 code points accepted');
+  check(failures, (await validate({ urls: ['u'], query: '\u{1F600}'.repeat(500) })) === true, 'extract query of 500 code points rejected');
 }
 
 // Observation only: what generateText does after a tool-call step when stopWhen is not set.
