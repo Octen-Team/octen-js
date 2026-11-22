@@ -12,7 +12,15 @@ const TSX = join(ROOT, 'node_modules/.bin/tsx');
 const dir = mkdtempSync(join(tmpdir(), 'octen-spec-drift-'));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
-type Property = { enum?: string[]; minItems?: number; maxItems?: number };
+type Property = {
+  enum?: string[];
+  minItems?: number;
+  maxItems?: number;
+  items?: Record<string, unknown>;
+  default?: number;
+  minimum?: number;
+  maximum?: number;
+};
 type Spec = { components: { schemas: Record<string, { properties: Record<string, Property> }> } };
 
 function writeSpec(name: string, mutate: (s: Spec) => void): string {
@@ -102,6 +110,33 @@ describe('scripts/spec-drift.ts', { timeout: 30_000 }, () => {
     });
     const r = run(live);
     expect(r.out).toContain('/extract request.urls: maxItems none -> 20');
+    expect(r.status).toBe(1);
+  });
+
+  // The SDK checks each URL against 2048 characters, so an item length bound in the spec must not change silently
+  test('a urls item maxLength added to /extract exits 1, with nothing else changed', () => {
+    const live = writeSpec('extract-urls-item-maxlength.json', (s) => {
+      const urls = s.components.schemas.ExtractRequest!.properties.urls!;
+      urls.items = { ...urls.items, maxLength: 4096 };
+    });
+    const r = run(live);
+    expect(r.out).toContain('/extract request.urls[].maxLength: none -> 4096');
+    expect(r.out).toMatch(/Spec drift in 1 place/);
+    expect(r.status).toBe(1);
+  });
+
+  // The default HTTP timeout of extract derives from the per-URL timeout's default and range
+  test.each([
+    ['default', 45, '/extract request.timeout.default: 30 -> 45'],
+    ['minimum', 5, '/extract request.timeout.minimum: 1 -> 5'],
+    ['maximum', 120, '/extract request.timeout.maximum: 60 -> 120'],
+  ] as const)('a changed /extract timeout %s exits 1', (key, value, expected) => {
+    const live = writeSpec(`extract-timeout-${key}.json`, (s) => {
+      s.components.schemas.ExtractRequest!.properties.timeout![key] = value;
+    });
+    const r = run(live);
+    expect(r.out).toContain(expected);
+    expect(r.out).toMatch(/Spec drift in 1 place/);
     expect(r.status).toBe(1);
   });
 

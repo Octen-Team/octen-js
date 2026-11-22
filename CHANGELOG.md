@@ -7,7 +7,7 @@
 - New method: `extract.extract` (`POST /extract`), with request and response types checked against the public OpenAPI spec. Results are per URL (`status`, `error_message`, `resolved_mode`), and `meta.usage.successful_by_mode` gives what the call is billed for.
 - Local checks for Extract: `urls` must hold 1 to 20 URLs, each a non-blank string of at most 2048 characters. Other ranges are left to the server, as for the other endpoints.
 - Extract's default HTTP timeout is its per-URL `timeout` (clamped to 1 to 60 s, default 30) plus 90 s, so 120 s by default; an explicit client `timeout` or a per-request `timeout` takes precedence, as for `broadSearch`. Retries follow the existing policy; the README states what a retry can cost on a per-URL billed call.
-- `spec-drift` now covers the eleven endpoints, including the `urls` limits of Extract. `page_structure` and `category` are typed nullable, as the spec's descriptions say, and recorded in `testdata/known_diffs.json`.
+- `spec-drift` now covers the eleven endpoints, including the `urls` limits and the per-URL `timeout` default and range of Extract, which the SDK's checks and default HTTP timeout rely on. `page_structure` and `category` are typed nullable, as the spec's descriptions say, and recorded in `testdata/known_diffs.json`.
 
 ## 0.2.0
 
