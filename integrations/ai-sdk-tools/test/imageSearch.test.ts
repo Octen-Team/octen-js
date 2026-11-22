@@ -421,11 +421,14 @@ describe('octenImageSearch review round 3', () => {
     expect(exposed).not.toContain('cannot use');
   });
 
-  it('keeps the upstream message and body for a text query call', async () => {
-    const rec = recordingFetch(() => jsonResponse({ code: 413, msg: 'query too large', request_id: 'r' }, 413));
+  // Image advice is only for a call by image_url; a text query gets the SDK error as it was raised.
+  it.each([413, 415])('leaves HTTP %i on a text query call unchanged, without image advice', async (status) => {
+    const rec = recordingFetch(() => jsonResponse({ code: status, msg: 'query too large', request_id: 'r' }, status));
     const err = (await run(octenImageSearch({ client: clientFor(rec.fakeFetch) }), { query: 'q' }).catch((e: unknown) => e)) as OctenAPIError;
-    expect(err.message).toMatch(/Try a smaller image.*query too large/s);
-    expect(err.body).toEqual({ code: 413, msg: 'query too large', request_id: 'r' });
+    expect(err).toBeInstanceOf(OctenAPIError);
+    expect(err.status).toBe(status);
+    expect(err.message).toBe('query too large');
+    expect(err.body).toEqual({ code: status, msg: 'query too large', request_id: 'r' });
   });
 
   it.each(['\u0000https://example.com/a.png', 'https://example.com/a\u0001.png', 'https://example.com/a.png\u007f', 'https:///example.com/a.png', 'http://?x=1'])(
@@ -574,6 +577,38 @@ describe('octenImageSearch review round 6', () => {
     expect(err).toBeInstanceOf(OctenValidationError);
     expect((err as OctenValidationError).field).toBe(field);
     expect((err as Error).message).toMatch(/No request was made\.$/);
+    expect(calls).toHaveLength(0);
+  });
+});
+
+describe('octenImageSearch review round 8', () => {
+  // Internationalized hosts: an Arabic label ending in a digit and a Devanagari host with combining vowel signs.
+  const ARABIC = 'https://\u0645\u062b\u0627\u06441.com/a.png';
+  const DEVANAGARI = 'https://\u0909\u0926\u093e\u0939\u0930\u0923.\u092d\u093e\u0930\u0924/a.png?x=1';
+  const PUNYCODE = ['https://xn--1-ymcl5hc.com/a.png', 'https://xn--p1b6ci4b4b3a.xn--h2brj9c/a.png?x=1'];
+
+  it.each([ARABIC, DEVANAGARI, ...PUNYCODE])('accepts %s and sends it unchanged', async (url) => {
+    const { t, calls } = build();
+    expect(await validateInput(t, { image_url: url })).toBe(true);
+    await run(t, { image_url: url });
+    expect(calls[0]?.body).toEqual({ inputs: [{ type: 'image', url }] });
+  });
+
+  it.each([
+    'https://exa<mple.com/a.png',
+    'https://exa>mple.com/a.png',
+    'https://exa{mple.com/a.png',
+    'https://ex%zzample.com/a.png',
+    'https://ex%4gample.com/a.png',
+    'https://ex%4.com/a.png',
+    // The URL parser keeps a malformed escape in userinfo, so these two rest on the tool's own escape check.
+    'https://us%zzer@example.com/a.png',
+    'https://user:p%4@example.com/a.png',
+    'https://\u0645\u062b\\x.com/a.png',
+  ])('still refuses %j without a request', async (url) => {
+    const { t, calls } = build();
+    const err = await run(t, { image_url: url }).catch((e: unknown) => e);
+    expect((err as OctenValidationError).field).toBe('image_url');
     expect(calls).toHaveLength(0);
   });
 });

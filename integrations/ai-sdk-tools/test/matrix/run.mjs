@@ -342,6 +342,9 @@ async function inputRules(failures) {
     ['design', octenDesignSearch({ client }), { query: null }, 'Pass `query` to search', 'group_id,query'],
   ];
   for (const [name, t, input, advice, properties] of cases) {
+    // execute repeats the rule, so a spy proves the AI SDK's own input check refused the call first.
+    let executed = 0;
+    const spied = { ...t, execute: async (...args) => ((executed += 1), await t.execute(...args)) };
     const prompts = [];
     const call = { type: 'tool-call', toolCallId: 'call-r', toolName: name, input: JSON.stringify(input) };
     const model = new Mock({
@@ -352,7 +355,8 @@ async function inputRules(failures) {
           : { content: [{ type: 'text', text: FINAL_TEXT }], finishReason: finishReason('stop'), usage: usage(), warnings: [] };
       },
     });
-    await ai.generateText({ model, tools: { [name]: t }, stopWhen: stepCount(2), prompt: 'q' });
+    await ai.generateText({ model, tools: { [name]: spied }, stopWhen: stepCount(2), prompt: 'q' });
+    check(failures, executed === 0, `${name} execute ran ${executed} times for ${JSON.stringify(input)}`);
     const schema = (prompts[0]?.tools ?? [])[0]?.inputSchema;
     check(failures, Object.keys(schema?.properties ?? {}).sort().join(',') === properties, `${name} properties`);
     check(failures, JSON.stringify(schema?.required ?? []) === '[]', `${name} required ${JSON.stringify(schema?.required)}`);

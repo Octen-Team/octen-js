@@ -58,9 +58,11 @@ const IMAGE_ADVICE: Record<number, string> = {
 // The raw string needs a non-empty // authority and no whitespace or control characters: it is sent as given.
 function isHttpUrl(value: string): boolean {
   if (/[\s\u0000-\u001f\u007f]/.test(value)) return false;
-  // The raw authority may hold only RFC 3986 authority characters; the parser would read a backslash as a slash.
+  // ASCII in the raw authority must be an RFC 3986 authority character (the parser reads a backslash as a slash);
+  // non-ASCII is left to the parser, so internationalized hosts pass. Percent escapes must be well formed.
   const authority = /^https?:\/\/([^/?#]*)/i.exec(value)?.[1] ?? '';
-  if (!/^[A-Za-z0-9\-._~%!$&'()*+,;=:@[\]]+$/.test(authority)) return false;
+  if (authority === '' || /[\u0000-\u007f]/.test(authority.replace(/[A-Za-z0-9\-._~%!$&'()*+,;=:@[\]]/g, ''))) return false;
+  if (/%(?![0-9A-Fa-f]{2})/.test(authority)) return false;
   try {
     const url = new URL(value);
     return (url.protocol === 'http:' || url.protocol === 'https:') && url.hostname !== '';
@@ -168,19 +170,15 @@ const TRANSPORT_MESSAGES: Record<string, string> = {
 // Keeps the class, status and request id; isOctenError also matches an error from a client of another SDK copy.
 // On an image-URL call every API error drops the upstream text and body: they can hold a copy of a signed URL.
 function imageError(err: unknown, byUrl: boolean): unknown {
-  const transport = isOctenError(err) ? TRANSPORT_MESSAGES[err.name] : undefined;
-  if (byUrl && transport !== undefined) return new ((err as Error).constructor as new (message: string) => Error)(transport);
-  if (!isOctenError(err) || !('status' in err)) return err;
+  // A text-query call gets every error as the SDK raised it.
+  if (!byUrl || !isOctenError(err)) return err;
+  const transport = TRANSPORT_MESSAGES[err.name];
+  if (transport !== undefined) return new ((err as Error).constructor as new (message: string) => Error)(transport);
+  if (!('status' in err)) return err;
   const api = err as OctenAPIError & { retryAfter?: number | null };
   const { status, code, requestId } = api;
-  const advice = IMAGE_ADVICE[status];
-  if (byUrl) {
-    const Cls = api.constructor as APIErrorClass;
-    const message = `${advice ?? 'Image Search failed.'} (HTTP ${status}, request ${requestId ?? 'unknown'})`;
-    return new Cls({ status, code, requestId, body: null, message, retryAfter: api.retryAfter ?? null });
-  }
-  if (advice === undefined) return err;
-  return new OctenAPIError({ status, code, requestId, body: api.body, message: `${advice} (HTTP ${status}: ${api.message})` });
+  const message = `${IMAGE_ADVICE[status] ?? 'Image Search failed.'} (HTTP ${status}, request ${requestId ?? 'unknown'})`;
+  return new (api.constructor as APIErrorClass)({ status, code, requestId, body: null, message, retryAfter: api.retryAfter ?? null });
 }
 
 const OPTION_KEYS = [
