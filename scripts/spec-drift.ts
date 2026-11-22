@@ -32,9 +32,9 @@ const CARDINALITY = [
 // The spec states the urls limits (20 URLs, 2048 characters each) only in the description, so compare it verbatim
 const LIMIT_TEXT = [['/extract', 'urls']] as const;
 
-// Value bounds the SDK relies on: the per-URL length it checks, and the timeout range and default its HTTP timeout derives from
+// Value bounds the SDK relies on: the per-URL length bounds it checks, and the timeout range and default its HTTP timeout derives from
 const VALUE_BOUNDS = [
-  ['/extract', 'urls', 'items', ['maxLength']],
+  ['/extract', 'urls', 'items', ['minLength', 'maxLength']],
   ['/extract', 'timeout', 'self', ['default', 'minimum', 'maximum']],
 ] as const;
 

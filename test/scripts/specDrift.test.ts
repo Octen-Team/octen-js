@@ -125,6 +125,18 @@ describe('scripts/spec-drift.ts', { timeout: 30_000 }, () => {
     expect(r.status).toBe(1);
   });
 
+  // The SDK and the tools reject an empty URL, so an item minLength added upstream must not go unnoticed
+  test('a urls item minLength added to /extract exits 1, with nothing else changed', () => {
+    const live = writeSpec('extract-urls-item-minlength.json', (s) => {
+      const urls = s.components.schemas.ExtractRequest!.properties.urls!;
+      urls.items = { ...urls.items, minLength: 1 };
+    });
+    const r = run(live);
+    expect(r.out).toContain('/extract request.urls[].minLength: none -> 1');
+    expect(r.out).toMatch(/Spec drift in 1 place/);
+    expect(r.status).toBe(1);
+  });
+
   // The default HTTP timeout of extract derives from the per-URL timeout's default and range
   test.each([
     ['default', 45, '/extract request.timeout.default: 30 -> 45'],
