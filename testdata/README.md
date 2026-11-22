@@ -15,6 +15,7 @@ it is never overwritten automatically.
 
 ## known_diffs.json
 
-Fields the SDK has but the snapshot lacks. Each entry is `{ "path": "<SchemaName>.<dotted.path>", "reason": "..." }`
+Fields the SDK has but the snapshot lacks, and response fields the SDK types as nullable where the snapshot
+documents `null` only in a description. Each entry is `{ "path": "<SchemaName>.<dotted.path>", "reason": "..." }`
 and must carry a non-empty reason. Array items are written `field[]`, union variants `field[]{tag}`.
 An entry that no longer matches an SDK-only field fails the contract test and must be removed.
