@@ -439,3 +439,31 @@ describe('octenDesignSearch group follow-up wording', () => {
     expect(schema).toMatch(/returns up to 30 images/);
   });
 });
+
+describe('octenDesignSearch review round 3', () => {
+  const client = new Octen({ apiKey: 'test-key' });
+
+  it('rejects a startTime after the endTime by less than a millisecond', () => {
+    const err = thrown(() =>
+      octenDesignSearch({ client, webSearch: { startTime: '2026-01-01T00:00:00.0005Z', endTime: '2026-01-01T00:00:00.0001Z' } }),
+    );
+    expect((err as OctenValidationError).field).toBe('webSearch.startTime');
+  });
+
+  it('accepts equal and sub-millisecond ordered bounds, including different offsets for the same instant', () => {
+    for (const [startTime, endTime] of [
+      ['2026-01-01T00:00:00.0001Z', '2026-01-01T00:00:00.0005Z'],
+      ['2026-01-01T00:00:00.5Z', '2026-01-01T00:00:00.500Z'],
+      ['2026-01-01T08:00:00.0001+08:00', '2026-01-01T00:00:00.00010Z'],
+    ] as const) {
+      expect(() => octenDesignSearch({ client, webSearch: { startTime, endTime } })).not.toThrow();
+    }
+  });
+
+  it('with images off, promises an excerpt only when web highlights are on', () => {
+    expect(octenDesignSearch({ client, images: { enable: false } }).description).toMatch(/query-relevant excerpt/);
+    const d = octenDesignSearch({ client, images: { enable: false }, webSearch: { highlight: { enable: false } } }).description ?? '';
+    expect(d).not.toMatch(/excerpt/);
+    expect(d).toMatch(/`results`/);
+  });
+});

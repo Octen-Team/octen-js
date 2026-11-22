@@ -394,3 +394,46 @@ describe('octenImageSearch review fixes', () => {
     expect((err as OctenValidationError).field).toBe('excludeDomains[1]');
   });
 });
+
+describe('octenImageSearch review round 3', () => {
+  const SIGNED = 'https://cdn.example.com/a.png?sig=SECRET-TOKEN%2Bx&se=2026-11-22';
+
+  it.each([413, 415])('redacts the submitted image URL from the HTTP %i message and body', async (status) => {
+    const echo = `cannot use ${SIGNED}`;
+    const rec = recordingFetch(() => jsonResponse({ code: status, msg: echo, request_id: `req-${status}`, detail: { url: SIGNED } }, status));
+    const err = (await run(octenImageSearch({ client: clientFor(rec.fakeFetch) }), { image_url: SIGNED }).catch((e: unknown) => e)) as OctenAPIError;
+    expect(err).toBeInstanceOf(OctenAPIError);
+    expect(err.status).toBe(status);
+    expect(err.requestId).toBe(`req-${status}`);
+    expect(err.message).toMatch(/Try a smaller image|supported format|Try an image/);
+    expect(err.message).toMatch(/cannot use \[image URL\]/);
+    const exposed = `${err.message} ${JSON.stringify(err.body)}`;
+    expect(exposed).not.toContain('SECRET-TOKEN');
+    expect(exposed).not.toContain('cdn.example.com');
+  });
+
+  it('redacts a query string the API echoes on its own', async () => {
+    const rec = recordingFetch(() => jsonResponse({ code: 413, msg: 'bad query sig=SECRET-TOKEN%2Bx&se=2026-11-22', request_id: 'r' }, 413));
+    const err = (await run(octenImageSearch({ client: clientFor(rec.fakeFetch) }), { image_url: SIGNED }).catch((e: unknown) => e)) as Error;
+    expect(err.message).not.toContain('SECRET-TOKEN');
+  });
+
+  it.each(['https:example.com/a.png', 'http:/example.com/a.png', 'https://exa mple.com/photo.png', ' https://example.com/a.png', 'https://example.com/a.png\n'])(
+    'refuses %j without a request',
+    async (url) => {
+      const { t, calls } = build();
+      const err = await run(t, { image_url: url }).catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(OctenValidationError);
+      expect((err as OctenValidationError).field).toBe('image_url');
+      expect(calls).toHaveLength(0);
+      expect((await rejection({ image_url: url })).success).toBe(false);
+    },
+  );
+
+  it('sends exactly the URL string it validated, without normalizing it', async () => {
+    const { t, calls } = build();
+    const url = 'HTTPS://Example.COM/a/../b.png?sig=a%2Bb%3D&x=1#frag';
+    await run(t, { image_url: url });
+    expect(calls[0]?.body).toEqual({ inputs: [{ type: 'image', url }] });
+  });
+});

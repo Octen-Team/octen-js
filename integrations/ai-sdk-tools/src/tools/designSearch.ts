@@ -9,6 +9,7 @@ import {
   intIn,
   invalid,
   isNonBlank,
+  compareRfc3339,
   isRfc3339,
   objectWith,
   oneOf,
@@ -128,7 +129,7 @@ function webParams(value: unknown): WebParams | undefined {
   if (o === undefined) return undefined;
   const start = dateTime(o['startTime'], 'webSearch.startTime');
   const end = dateTime(o['endTime'], 'webSearch.endTime');
-  if (start !== undefined && end !== undefined && Date.parse(start) > Date.parse(end)) {
+  if (start !== undefined && end !== undefined && compareRfc3339(start, end) > 0) {
     invalid('webSearch.startTime', `webSearch.startTime (${start}) is after webSearch.endTime (${end}).`);
   }
   return defined<WebParams>([
@@ -149,7 +150,8 @@ function webParams(value: unknown): WebParams | undefined {
 // The default description drops what the developer turned off, so the model is not promised it.
 function defaultDescription(images: ImagesParams | undefined, web: WebParams | undefined): string {
   if (images?.enable === false) {
-    return 'Search for web pages on a design topic, such as articles and galleries about web, app or slide design. Returns ranked pages as `results`, with title, URL and a query-relevant excerpt.';
+    const excerpt = web?.highlight?.enable === false ? '' : ' and a query-relevant excerpt';
+    return `Search for web pages on a design topic, such as articles and galleries about web, app or slide design. Returns ranked pages as \`results\`, with title, URL${excerpt}.`;
   }
   const values = images?.design_facts === false ? '' : ', each with its design values such as colors, fonts and font sizes';
   const code = images?.snippet?.enable === false ? '' : ', and reusable HTML code when the image has it';

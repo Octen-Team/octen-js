@@ -55,7 +55,9 @@ const IMAGE_ADVICE: Record<number, string> = {
 };
 
 // Parsing never throws out of here: a URL that does not parse is just not acceptable.
+// The raw string must have an explicit // authority and no whitespace, because it is sent as given, not normalized.
 function isHttpUrl(value: string): boolean {
+  if (!/^https?:\/\//i.test(value) || /\s/.test(value)) return false;
   try {
     const url = new URL(value);
     return (url.protocol === 'http:' || url.protocol === 'https:') && url.hostname !== '';
@@ -151,13 +153,32 @@ function trimImage(r: Record<string, unknown>): ModelImageResult {
   return out;
 }
 
+// A signed image URL can carry a token, so the URL and its query string are removed wherever the API echoes them.
+function redactor(imageUrl: string | undefined): (text: string) => string {
+  if (imageUrl === undefined) return (text) => text;
+  const query = imageUrl.includes('?') ? (imageUrl.slice(imageUrl.indexOf('?') + 1).split('#')[0] ?? '') : '';
+  return (text) => {
+    const out = text.split(imageUrl).join('[image URL]');
+    return query === '' ? out : out.split(query).join('[redacted]');
+  };
+}
+
+function redactDeep(value: unknown, redact: (text: string) => string): unknown {
+  if (typeof value === 'string') return redact(value);
+  if (Array.isArray(value)) return value.map((v) => redactDeep(v, redact));
+  if (isRecord(value)) return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, redactDeep(v, redact)]));
+  return value;
+}
+
 // Keeps the class, status and request id; isOctenError also matches an error from a client of another SDK copy.
-function withImageAdvice(err: unknown): unknown {
+function withImageAdvice(err: unknown, imageUrl: string | undefined): unknown {
   if (!isOctenError(err) || !('status' in err)) return err;
   const { status, code, requestId, body } = err as OctenAPIError;
   const advice = IMAGE_ADVICE[status];
   if (advice === undefined) return err;
-  return new OctenAPIError({ status, code, requestId, body, message: `${advice} (HTTP ${status}: ${err.message})` });
+  const redact = redactor(imageUrl);
+  const message = `${advice} (HTTP ${status}: ${redact(err.message)})`;
+  return new OctenAPIError({ status, code, requestId, body: redactDeep(body, redact), message });
 }
 
 const OPTION_KEYS = [
@@ -197,7 +218,7 @@ export function octenImageSearch(given: OctenImageSearchOptions = {}): Tool<Imag
       }
       const params: ImageSearchParams = { inputs, ...fromModel, ...fixed };
       const res = await client.imageSearch.search(params, requestOptions(abortSignal)).catch((err: unknown) => {
-        throw withImageAdvice(err);
+        throw withImageAdvice(err, isNonBlank(input.query) ? undefined : String(input.image_url));
       });
       return {
         request_id: res.request_id,

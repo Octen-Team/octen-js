@@ -87,6 +87,17 @@ export function isRfc3339(value: string): boolean {
   return month >= 1 && month <= 12 && day >= 1 && day <= daysInMonth && hour <= 23 && minute <= 59 && second <= 59 && offsetOk;
 }
 
+// Orders two valid RFC 3339 strings, using fraction digits beyond the millisecond that Date.parse drops.
+export function compareRfc3339(a: string, b: string): number {
+  const diff = Date.parse(a) - Date.parse(b);
+  if (diff !== 0) return Math.sign(diff);
+  const tail = (s: string) => (/\.(\d+)/.exec(s)?.[1] ?? '').slice(3);
+  const [ta, tb] = [tail(a), tail(b)];
+  const width = Math.max(ta.length, tb.length);
+  const [pa, pb] = [ta.padEnd(width, '0'), tb.padEnd(width, '0')];
+  return pa === pb ? 0 : pa > pb ? 1 : -1;
+}
+
 // Reads each option once, so validation, the schema and the requests all see the same values.
 export function snapshot<T>(options: T, keys: readonly string[]): T {
   const copy: Record<string, unknown> = {};
