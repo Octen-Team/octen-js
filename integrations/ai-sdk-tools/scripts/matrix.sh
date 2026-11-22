@@ -7,6 +7,7 @@ set -euo pipefail
 PKG_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MATRIX_DIR="$PKG_DIR/test/matrix"
 FIXTURE="$PKG_DIR/test/fixtures/search.json"
+EXTRACT_FIXTURE="$PKG_DIR/test/fixtures/extract.json"
 SDK_SPEC="${MATRIX_SDK:-@octen.ai/sdk@0.2.0}"
 NODE20="${MATRIX_NODE20:-npx -y node@20}"
 # Type-check toolchain, pinned so results do not drift between runs. With skipLibCheck off,
@@ -105,7 +106,7 @@ for combo in "${COMBOS[@]}"; do
 
   if [[ "$node_label" == "20" ]]; then runner=($NODE20); else runner=(node); fi
   run_ok=1
-  (cd "$dir" && "${runner[@]}" run.mjs "$FIXTURE") >"$log" 2>&1 || run_ok=0
+  (cd "$dir" && "${runner[@]}" run.mjs "$FIXTURE" "$EXTRACT_FIXTURE") >"$log" 2>&1 || run_ok=0
   cat "$log"
 
   cjs=PASS
