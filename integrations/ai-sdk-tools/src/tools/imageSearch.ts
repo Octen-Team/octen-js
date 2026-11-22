@@ -60,9 +60,10 @@ function isHttpsUrl(value: string): boolean {
   if (/[\u0000-\u0020\u007f]/.test(value)) return false;
   // ASCII in the raw authority must be an RFC 3986 authority character (the parser reads a backslash as a slash);
   // non-ASCII is left to the parser, so internationalized hosts pass. Percent escapes must be well formed.
-  const authority = /^https:\/\/([^/?#]*)/i.exec(value)?.[1] ?? '';
+  const [, authority = '', path = ''] = /^https:\/\/([^/?#]*)([^?#]*)/i.exec(value) ?? [];
   if (authority === '' || /[\u0000-\u007f]/.test(authority.replace(/[A-Za-z0-9\-._~%!$&'()*+,;=:@[\]]/g, ''))) return false;
-  if (/%(?![0-9A-Fa-f]{2})/.test(authority)) return false;
+  // The API rejects a malformed escape in the host or path but keeps the query and fragment as written.
+  if (/%(?![0-9A-Fa-f]{2})/.test(authority + path)) return false;
   try {
     const { protocol, hostname } = new URL(value);
     // The parser normalizes every IPv4 form to dotted decimal and wraps IPv6 in brackets.

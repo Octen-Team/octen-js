@@ -649,3 +649,26 @@ describe('octenImageSearch server URL rule', () => {
     expect(schema.description).toMatch(/public https URL of an image with a domain name \(no IP address\)/);
   });
 });
+
+describe('octenImageSearch percent escapes by URL part', () => {
+  // The API checks escapes in the host and path but keeps the query and fragment as written.
+  it.each(['https://example.com/photo.png?label=50%', 'https://example.com/photo.png?q=%zz&x=1', 'https://example.com/photo.png#50%'])(
+    'accepts a stray %% in the query or fragment of %s and sends it unchanged',
+    async (url) => {
+      const { t, calls } = build();
+      expect(await validateInput(t, { image_url: url })).toBe(true);
+      await run(t, { image_url: url });
+      expect(calls[0]?.body).toEqual({ inputs: [{ type: 'image', url }] });
+    },
+  );
+
+  it.each(['https://example.com/a%zz.png', 'https://example.com/50%/a.png', 'https://example.com/a%4.png', 'https://ex%zzample.com/a.png'])(
+    'refuses a malformed escape in the host or path of %s without a request',
+    async (url) => {
+      const { t, calls } = build();
+      const err = await run(t, { image_url: url }).catch((e: unknown) => e);
+      expect((err as OctenValidationError).field).toBe('image_url');
+      expect(calls).toHaveLength(0);
+    },
+  );
+});
