@@ -144,9 +144,10 @@ console.log(gallery);
 | `safesearch` | `safesearch` | `'off'` or `'strict'` (drops adult content) | not sent; the API uses `strict` |
 | `includeDomains`, `excludeDomains` | `include_domains`, `exclude_domains` | 1 to 10 domains. Setting one pins it: that filter is removed from the model's schema and a value the model sends for it is ignored | not sent, unless the model sets the filter |
 
-`client`, `apiKey`, `baseURL`, `timeout`, `maxRetries` and `description` work as for the other tools. Image Search takes no `defaults`.
+`client`, `apiKey`, `baseURL`, `timeout`, `maxRetries` and `description` work as for the other tools. Image Search takes no `defaults`; an option it does not know, such as `defaults` or a snake_case name, throws `OctenValidationError` with `field` naming it, and so does a list with an empty slot.
 
-- **Exactly one input.** A call with both `query` and `image_url`, or with neither (a blank string counts as missing), never reaches the API: the AI SDK's input check rejects it, and the model receives a tool error telling it to pass exactly one (checked by the version matrix in `ai` 5, 6 and 7). An `image_url` that is not an http(s) URL, such as base64 data or a `data:` URI, is refused the same way. `execute`, if called directly, throws `OctenValidationError`.
+- **Exactly one input.** A call with both `query` and `image_url`, or with neither (a blank string counts as missing), never reaches the API: the AI SDK's input check rejects it, and the model receives a tool error telling it to pass exactly one (checked by the version matrix in `ai` 5, 6 and 7). An `image_url` that is not an http(s) URL with a host name, such as base64 data, a `data:` URI or a string that does not parse as a URL, is refused the same way. `execute`, if called directly, throws `OctenValidationError`.
+- **An image the API cannot use.** When the API answers HTTP 413 (image too large) or 415 (unsupported format), the tool throws an `OctenAPIError` with the same `status`, `code`, `requestId` and `body`, whose message tells the model to try a smaller image (at most 5 MB) or one in a supported format (JPEG, PNG, WEBP, BMP, TIFF, ICO, DIB, ICNS or SGI), followed by the API's own message. The AI SDK passes that message to the model as the tool error. Every other error, such as 401 or 403, is thrown unchanged.
 - **No base64 input.** The API can also take an image as base64 data, but a model cannot reliably write out an image that way, so the tool does not offer it. To search by an image you hold, call `imageSearch.search` in `@octen.ai/sdk` directly.
 
 ## Design Search
@@ -184,11 +185,12 @@ console.log(ideas);
 | `webSearch.language` | `web_search.language` | ISO 639-1 codes: `ar`, `de`, `en`, `es`, `fr`, `hi`, `id`, `it`, `ja`, `ko`, `nl`, `pl`, `pt`, `ru`, `th`, `tr`, `vi`, `zh` | not sent; no language filter |
 | `webSearch.timeBasis` | `web_search.time_basis` | `'auto'`, `'published'` or `'crawled'` | not sent; `auto` |
 | `webSearch.timeRange` | `web_search.time_range` | `'day'`, `'week'`, `'month'` or `'year'` | not sent; no time filter |
-| `webSearch.startTime`, `webSearch.endTime` | `web_search.start_time`, `web_search.end_time` | ISO 8601 date-time with a time zone, e.g. `'2025-01-01T00:00:00Z'` | not sent |
+| `webSearch.startTime`, `webSearch.endTime` | `web_search.start_time`, `web_search.end_time` | RFC 3339 date-time with seconds and a time zone, e.g. `'2025-01-01T00:00:00Z'`; every field must be in range (no `2025-02-30` or `+24:00`), and `startTime` may not be after `endTime` | not sent |
 
-A key the table does not list, such as a snake_case name, throws `OctenValidationError` with `field` naming it. `client`, `apiKey`, `baseURL`, `timeout`, `maxRetries` and `description` work as for the other tools. Design Search takes no `defaults`.
+A key the table does not list, at the top level or inside `images` and `webSearch`, such as a snake_case name, throws `OctenValidationError` with `field` naming it, and so does a list with an empty slot. Turning off both `images.enable` and `webSearch.enable` throws too, because the tool would return nothing. `client`, `apiKey`, `baseURL`, `timeout`, `maxRetries` and `description` work as for the other tools. Design Search takes no `defaults`.
 
 - **Query or group.** A call with neither `query` nor `group_id` (a blank string counts as missing) never reaches the API: the AI SDK's input check rejects it and the model receives a tool error that explains both inputs (checked by the version matrix in `ai` 5, 6 and 7). `execute`, if called directly, throws `OctenValidationError`.
+- **With `images.enable: false`** the tool only returns web results: its default description no longer mentions screenshots or groups, `group_id` is removed from the model's schema, `query` becomes required, and a `group_id` the model sends anyway is not sent.
 - **The `webSearch` options apply to the web results only**; they do not filter the images. The domain, language and time filters are therefore yours to set, not the model's.
 - **Size.** With the API defaults each image carries its design values and up to 5000 tokens of snippet code, and all of it goes into the model's context. Lower `images.snippet.maxTokens`, or turn snippets or design values off, if the model does not need them. The default description stops mentioning design values, code or web results when you turn them off.
 
