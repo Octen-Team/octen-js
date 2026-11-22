@@ -87,6 +87,19 @@ export function isRfc3339(value: string): boolean {
   return month >= 1 && month <= 12 && day >= 1 && day <= daysInMonth && hour <= 23 && minute <= 59 && second <= 59 && offsetOk;
 }
 
+type Issue = { path: readonly PropertyKey[]; message: string };
+type SafeParse = { safeParse(value: unknown): { success: true; data: unknown } | { success: false; error: { issues: readonly Issue[] } } };
+
+// Runs the model-facing input check for a direct execute call, so both paths enforce the same limits.
+export function checkInput<T>(validator: SafeParse, input: unknown): T {
+  const result = validator.safeParse(input);
+  if (result.success) return result.data as T;
+  const issue = result.error.issues[0];
+  const field = issue?.path[0] === undefined ? 'input' : String(issue.path[0]);
+  const message = issue?.message ?? 'Invalid input.';
+  return invalid(field, message.endsWith('No request was made.') ? message : `${message} No request was made.`);
+}
+
 // Orders two valid RFC 3339 strings, using fraction digits beyond the millisecond that Date.parse drops.
 export function compareRfc3339(a: string, b: string): number {
   const diff = Date.parse(a) - Date.parse(b);

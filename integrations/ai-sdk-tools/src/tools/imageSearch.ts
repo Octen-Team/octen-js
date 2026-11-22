@@ -3,7 +3,7 @@ import type { ImageSearchParams } from '@octen.ai/sdk';
 import { jsonSchema, tool } from 'ai';
 import type { Tool } from 'ai';
 import { z } from 'zod';
-import { codePoints, defined, intIn, invalid, isNonBlank, oneOf, rejectUnknown, snapshot, stringList } from '../options.js';
+import { checkInput, codePoints, defined, intIn, isNonBlank, oneOf, rejectUnknown, snapshot, stringList } from '../options.js';
 import { asList, isRecord, nonEmpty, requestOptions, resolveClient, warningOf } from '../shared.js';
 import type { OctenClientOptions } from '../shared.js';
 
@@ -129,7 +129,7 @@ function inputSchema(domainFields: readonly DomainField[]) {
       description: DOMAIN_DESCRIPTIONS[field],
     };
   }
-  return jsonSchema<ImageSearchInput>(
+  const schema = jsonSchema<ImageSearchInput>(
     { type: 'object', properties, additionalProperties: false },
     {
       validate: (value) => {
@@ -138,6 +138,7 @@ function inputSchema(domainFields: readonly DomainField[]) {
       },
     },
   );
+  return { schema, validator };
 }
 
 const STRING_FIELDS = ['title', 'url', 'source_page', 'description', 'thumbnail'] as const;
@@ -158,9 +159,17 @@ function trimImage(r: Record<string, unknown>): ModelImageResult {
 
 type APIErrorClass = new (init: ConstructorParameters<typeof OctenAPIError>[0] & { retryAfter: number | null }) => OctenAPIError;
 
+// Transport errors can quote the request payload; an abort keeps its cause, which is the caller's own reason.
+const TRANSPORT_MESSAGES: Record<string, string> = {
+  OctenConnectionError: 'Connection error on an Image Search request by image URL.',
+  OctenTimeoutError: 'Request timed out.',
+};
+
 // Keeps the class, status and request id; isOctenError also matches an error from a client of another SDK copy.
 // On an image-URL call every API error drops the upstream text and body: they can hold a copy of a signed URL.
 function imageError(err: unknown, byUrl: boolean): unknown {
+  const transport = isOctenError(err) ? TRANSPORT_MESSAGES[err.name] : undefined;
+  if (byUrl && transport !== undefined) return new ((err as Error).constructor as new (message: string) => Error)(transport);
   if (!isOctenError(err) || !('status' in err)) return err;
   const api = err as OctenAPIError & { retryAfter?: number | null };
   const { status, code, requestId } = api;
@@ -195,12 +204,12 @@ export function octenImageSearch(given: OctenImageSearchOptions = {}): Tool<Imag
   const modelDomains = (['include_domains', 'exclude_domains'] as const).filter((f) => fixed[f] === undefined);
   // One client per tool, reused by every call.
   const client = resolveClient(options);
+  const { schema, validator } = inputSchema(modelDomains);
   return tool({
     description: options.description ?? DESCRIPTION,
-    inputSchema: inputSchema(modelDomains),
-    execute: async (input: ImageSearchInput, { abortSignal }): Promise<ImageSearchToolResult> => {
-      const problem = inputProblem(input);
-      if (problem !== undefined) invalid(problem.field, problem.message);
+    inputSchema: schema,
+    execute: async (given: ImageSearchInput, { abortSignal }): Promise<ImageSearchToolResult> => {
+      const input = checkInput<ImageSearchInput>(validator, given);
       const inputs: ImageSearchParams['inputs'] = isNonBlank(input.query)
         ? [{ type: 'text', data: input.query }]
         : [{ type: 'image', url: String(input.image_url) }];

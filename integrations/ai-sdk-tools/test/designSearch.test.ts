@@ -478,3 +478,18 @@ describe('octenDesignSearch review round 5', () => {
     expect(calls.map((c) => c.body)).toEqual(Array.from({ length: 4 }, () => ({ query: 'q', images: { enable: false } })));
   });
 });
+
+describe('octenDesignSearch review round 6', () => {
+  it.each([
+    ['a 501-character query', { query: 'q'.repeat(501) }, 'query'],
+    ['a non-string group_id', { group_id: 42 }, 'group_id'],
+    ['a non-string query', { query: 7, group_id: 'pg_1' }, 'query'],
+  ])('refuses %s in a direct execute call without a request', async (_name, input, field) => {
+    const { t, calls } = build();
+    const err = await run(t, input).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(OctenValidationError);
+    expect((err as OctenValidationError).field).toBe(field);
+    expect((err as Error).message).toMatch(/No request was made\.$/);
+    expect(calls).toHaveLength(0);
+  });
+});

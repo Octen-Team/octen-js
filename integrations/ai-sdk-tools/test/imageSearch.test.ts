@@ -4,9 +4,11 @@ import {
   OctenAPIError,
   OctenAuthenticationError,
   OctenBadRequestError,
+  OctenConnectionError,
   OctenPermissionDeniedError,
   OctenRateLimitError,
   OctenServerError,
+  OctenTimeoutError,
   OctenValidationError,
 } from '@octen.ai/sdk';
 import { inspect } from 'node:util';
@@ -521,5 +523,57 @@ describe('octenImageSearch review round 5', () => {
       await run(t, { image_url: url });
     }
     expect(calls).toHaveLength(3);
+  });
+});
+
+describe('octenImageSearch review round 6', () => {
+  const SIGNED = 'https://cdn.example.com/a.png?sig=SECRET-TOKEN&se=1';
+  const shown = (err: unknown) =>
+    `${String(err)} ${(err as Error).stack ?? ''} ${JSON.stringify(err)} ${inspect(err, { depth: 8 })}`;
+
+  it('rethrows a connection error on an image-URL call as the same class, with a fixed message and no cause', async () => {
+    const leaky = (async (_url: unknown, init?: RequestInit) => {
+      throw new TypeError(`socket closed while sending ${String(init?.body)}`, { cause: new Error(`payload ${SIGNED}`) });
+    }) as typeof fetch;
+    const err = await run(octenImageSearch({ client: clientFor(leaky) }), { image_url: SIGNED }).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(OctenConnectionError);
+    expect((err as Error & { cause?: unknown }).cause).toBeUndefined();
+    expect(shown(err)).not.toContain('SECRET-TOKEN');
+    expect(shown(err)).not.toContain('socket closed');
+  });
+
+  it('rethrows a client timeout on an image-URL call as the same class with no cause', async () => {
+    const rec = recordingFetch((_url, init) => hangUntilAborted(init));
+    const t = octenImageSearch({ client: new Octen({ apiKey: 'test-key', fetch: rec.fakeFetch, maxRetries: 0, timeout: 20 }) });
+    const err = await run(t, { image_url: SIGNED }).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(OctenTimeoutError);
+    expect((err as Error & { cause?: unknown }).cause).toBeUndefined();
+  });
+
+  it('keeps a caller abort as before, and a connection error on a text query unchanged', async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const { t } = build();
+    await expect(run(t, { image_url: SIGNED }, controller.signal)).rejects.toBeInstanceOf(OctenAbortError);
+    const leaky = (async () => {
+      throw new TypeError('socket closed');
+    }) as typeof fetch;
+    const err = (await run(octenImageSearch({ client: clientFor(leaky) }), { query: 'q' }).catch((e: unknown) => e)) as Error;
+    expect(err).toBeInstanceOf(OctenConnectionError);
+    expect(err.message).toMatch(/socket closed/);
+  });
+
+  it.each([
+    ['a 501-character query', { query: 'q'.repeat(501) }, 'query'],
+    ['11 include domains', { query: 'q', include_domains: Array.from({ length: 11 }, (_, i) => `d${i}.com`) }, 'include_domains'],
+    ['an empty exclude domain', { query: 'q', exclude_domains: [''] }, 'exclude_domains'],
+    ['a non-string image_url', { image_url: 42 }, 'image_url'],
+  ])('refuses %s in a direct execute call without a request', async (_name, input, field) => {
+    const { t, calls } = build();
+    const err = await run(t, input).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(OctenValidationError);
+    expect((err as OctenValidationError).field).toBe(field);
+    expect((err as Error).message).toMatch(/No request was made\.$/);
+    expect(calls).toHaveLength(0);
   });
 });

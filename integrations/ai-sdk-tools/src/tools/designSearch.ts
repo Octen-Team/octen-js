@@ -4,6 +4,7 @@ import type { Tool } from 'ai';
 import { z } from 'zod';
 import {
   bool,
+  checkInput,
   codePoints,
   defined,
   intIn,
@@ -207,7 +208,7 @@ function inputSchema(groups: boolean, groupCount: number) {
         },
       }
     : { query: { type: 'string', minLength: 1, maxLength: MAX_QUERY_LENGTH, description: "What to find, e.g. 'pricing page design'. Max 500 characters." } };
-  return jsonSchema<DesignSearchInput>(
+  const schema = jsonSchema<DesignSearchInput>(
     { type: 'object', properties, ...(groups ? {} : { required: ['query'] }), additionalProperties: false },
     {
       validate: (value) => {
@@ -216,6 +217,7 @@ function inputSchema(groups: boolean, groupCount: number) {
       },
     },
   );
+  return { schema, validator };
 }
 
 function strings<K extends string>(from: Record<string, unknown>, keys: readonly K[]): Partial<Record<K, string>> {
@@ -275,12 +277,12 @@ export function octenDesignSearch(given: OctenDesignSearchOptions = {}): Tool<De
   const groups = images?.enable !== false;
   // One client per tool, reused by every call.
   const client = resolveClient(options);
+  const { schema, validator } = inputSchema(groups, images?.count ?? API_IMAGE_COUNT);
   return tool({
     description: options.description ?? defaultDescription(images, web),
-    inputSchema: inputSchema(groups, images?.count ?? API_IMAGE_COUNT),
-    execute: async (input: DesignSearchInput, { abortSignal }): Promise<DesignSearchToolResult> => {
-      const problem = inputProblem(input, groups);
-      if (problem !== undefined) invalid('query', problem);
+    inputSchema: schema,
+    execute: async (given: DesignSearchInput, { abortSignal }): Promise<DesignSearchToolResult> => {
+      const input = checkInput<DesignSearchInput>(validator, given);
       const groupId = groups && isNonBlank(input.group_id) ? input.group_id : undefined;
       const withGroup = groupId === undefined ? images : { ...images, group_id: groupId };
       const params: DesignSearchParams = defined([
