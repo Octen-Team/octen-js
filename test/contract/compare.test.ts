@@ -221,9 +221,14 @@ describe('compareResponse', () => {
 });
 
 describe('known_diffs.json', () => {
-  test('snapshot file is valid and holds the two seeded entries', () => {
+  test('snapshot file is valid and holds the seeded entries', () => {
     const diffs = loadKnownDiffs();
-    expect(diffs.map((d) => d.path).sort()).toEqual(['BroadSearchResponse.msg', 'PlaceSearchRequest.places.max_reviews']);
+    expect(diffs.map((d) => d.path).sort()).toEqual([
+      'BroadSearchResponse.msg',
+      'ExtractResponse.data.results[].category',
+      'ExtractResponse.data.results[].page_structure',
+      'PlaceSearchRequest.places.max_reviews',
+    ]);
     for (const d of diffs) expect(d.reason.trim()).not.toBe('');
   });
 

@@ -3,6 +3,7 @@ import { OctenValidationError } from './core/errors';
 import { normalizeHeaders } from './core/headers';
 import { assertValidTimeout, HttpCore } from './core/http';
 import { DesignSearchResource } from './resources/designSearch';
+import { ExtractResource } from './resources/extract';
 import { ImageSearchResource } from './resources/imageSearch';
 import { PlaceSearchResource } from './resources/placeSearch';
 import { SearchResource } from './resources/search';
@@ -19,8 +20,8 @@ export type ClientOptions = {
   /** Defaults to https://api.octen.ai. */
   baseURL?: string | undefined;
   /**
-   * Milliseconds per attempt. Once set it applies to every endpoint, broadSearch included;
-   * when unset: 30000, and 120000 for broadSearch.
+   * Milliseconds per attempt. Once set it applies to every endpoint, broadSearch and extract included;
+   * when unset: 30000, 120000 for broadSearch, and 91000-150000 for extract (from its per-URL timeout).
    */
   timeout?: number | undefined;
   /** Retries after the first attempt; defaults to 3. */
@@ -98,6 +99,7 @@ export default class Octen {
   /** Invite-only beta: without beta access the API rejects the call. */
   readonly videoSearch: VideoSearchResource;
   readonly designSearch: DesignSearchResource;
+  readonly extract: ExtractResource;
 
   constructor(opts: ClientOptions = {}) {
     if (isBrowser() && opts.dangerouslyAllowBrowser !== true) {
@@ -126,5 +128,6 @@ export default class Octen {
     this.imageSearch = new ImageSearchResource(http);
     this.videoSearch = new VideoSearchResource(http);
     this.designSearch = new DesignSearchResource(http);
+    this.extract = new ExtractResource(http, opts.timeout !== undefined);
   }
 }

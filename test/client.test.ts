@@ -92,7 +92,7 @@ describe('Octen client construction', () => {
     expect(thisValues[0] === undefined || thisValues[0] === globalThis).toBe(true);
   });
 
-  test('exposes the search, placeSearch, imageSearch, videoSearch and designSearch resources', () => {
+  test('exposes the search, placeSearch, imageSearch, videoSearch, designSearch and extract resources', () => {
     const c = new Octen({ apiKey: 'sk-test' });
     expect(typeof c.search.search).toBe('function');
     expect(typeof c.search.broadSearch).toBe('function');
@@ -101,6 +101,7 @@ describe('Octen client construction', () => {
     expect(typeof c.imageSearch.search).toBe('function');
     expect(typeof c.videoSearch.search).toBe('function');
     expect(typeof c.designSearch.search).toBe('function');
+    expect(typeof c.extract.extract).toBe('function');
   });
 
   test('the new resources post through the client to their paths', async () => {
@@ -110,11 +111,13 @@ describe('Octen client construction', () => {
     await c.imageSearch.search({ inputs: [{ type: 'text', data: 'q' }] });
     await c.videoSearch.search({ inputs: [{ type: 'text', data: 'q' }] });
     await c.designSearch.search({ images: { group_id: 'g' } });
+    await c.extract.extract({ urls: ['https://example.com'] });
     expect(f.mock.calls.map((call) => call[0])).toEqual([
       'https://api.octen.ai/search-premier',
       'https://api.octen.ai/image-search',
       'https://api.octen.ai/video-search',
       'https://api.octen.ai/design-search',
+      'https://api.octen.ai/extract',
     ]);
   });
 
@@ -357,7 +360,7 @@ describe('public entry point', () => {
   });
 });
 
-// Precedence: per-call timeout > explicit client timeout > endpoint default (broadSearch 120000, others 30000)
+// Precedence: per-call timeout > explicit client timeout > endpoint default (broadSearch 120000, extract 91000-150000, others 30000)
 describe('timeout precedence', () => {
   // fetch never returns; use a fake clock in 1000 ms steps to find after how many ms the SDK gives up
   async function timeoutAfterMs(
@@ -415,6 +418,23 @@ describe('timeout precedence', () => {
 
   test('timeout: undefined counts as not set', async () => {
     expect(await timeoutAfterMs({ timeout: undefined }, broad)).toBe(120_000);
+  });
+
+  // extract: the body's per-URL timeout (server-clamped to 1-60 s, default 30) plus 90 s
+  const extract = (perUrl?: number, ms?: number) => (c: Octen) =>
+    c.extract.extract({ urls: ['https://example.com'], timeout: perUrl }, ms === undefined ? undefined : { timeout: ms });
+
+  test('no timeout set: extract waits its per-URL timeout plus 90 s', async () => {
+    expect(await timeoutAfterMs({}, extract())).toBe(120_000);
+    expect(await timeoutAfterMs({}, extract(60))).toBe(150_000);
+    expect(await timeoutAfterMs({}, extract(1))).toBe(91_000);
+    expect(await timeoutAfterMs({ timeout: undefined }, extract(100))).toBe(150_000);
+  });
+
+  test('an explicit client timeout applies to extract, and a per-request timeout beats both', async () => {
+    expect(await timeoutAfterMs({ timeout: 10_000 }, extract(60))).toBe(10_000);
+    expect(await timeoutAfterMs({ timeout: 10_000 }, extract(60, 5000))).toBe(5000);
+    expect(await timeoutAfterMs({}, extract(60, 170_000))).toBe(170_000);
   });
 });
 

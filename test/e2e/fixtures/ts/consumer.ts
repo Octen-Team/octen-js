@@ -1,6 +1,13 @@
 // Common user patterns: must pass tsc under both strict and exactOptionalPropertyTypes configs, and actually run.
 import Octen, { OctenAPIError, OctenRateLimitError, isOctenError } from '@octen.ai/sdk';
-import type { DesignSearchResponse, ImageSearchParams, SearchPremierResponse, SearchResponse } from '@octen.ai/sdk';
+import type {
+  DesignSearchResponse,
+  ExtractParams,
+  ExtractResponse,
+  ImageSearchParams,
+  SearchPremierResponse,
+  SearchResponse,
+} from '@octen.ai/sdk';
 
 // Explicit undefined: must also compile under exactOptionalPropertyTypes (promised in the README)
 const client = new Octen({ apiKey: process.env.OCTEN_API_KEY, baseURL: process.env.OCTEN_FAKE_BASE_URL, maxRetries: 0 });
@@ -66,6 +73,20 @@ export async function callAll(): Promise<string[]> {
   hit(ids, '/design-search', design.request_id);
   const position: number | undefined = design.data?.images?.[0]?.group?.position;
   void position;
+  const extractParams: ExtractParams = {
+    urls: ['https://example.com'],
+    mode: 'auto',
+    format: 'text',
+    timeout: 60,
+    include_links: {},
+  };
+  const extracted: ExtractResponse = await client.extract.extract(extractParams, { timeout: 5000 });
+  hit(ids, '/extract', extracted.request_id);
+  const item = extracted.data?.results?.find((r) => r.url === 'https://example.com');
+  const structure: string | null | undefined = item?.page_structure?.primary;
+  const billed: number | undefined = extracted.meta?.usage?.successful_by_mode?.advanced_urls;
+  void structure;
+  void billed;
   return ids;
 }
 
@@ -86,7 +107,7 @@ export async function errorHandling(): Promise<string> {
 
 callAll()
   .then((ids) => {
-    if (ids.length !== 10 || ids.some((id) => !id.startsWith('fake-'))) throw new Error(`unexpected ids ${ids.join(',')}`);
+    if (ids.length !== 11 || ids.some((id) => !id.startsWith('fake-'))) throw new Error(`unexpected ids ${ids.join(',')}`);
     return errorHandling();
   })
   .then((r) => {
