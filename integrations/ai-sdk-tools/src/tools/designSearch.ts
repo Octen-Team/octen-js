@@ -67,6 +67,8 @@ export type OctenDesignSearchOptions = {
 
 // Limits from docs.octen.ai/api-reference/design-search.
 const MAX_QUERY_LENGTH = 500;
+// images.count default per the API reference; a group lookup returns at most this many images.
+const API_IMAGE_COUNT = 5;
 const LANGUAGES = ['ar', 'de', 'en', 'es', 'fr', 'hi', 'id', 'it', 'ja', 'ko', 'nl', 'pl', 'pt', 'ru', 'th', 'tr', 'vi', 'zh'] as const;
 
 type ImagesParams = NonNullable<DesignSearchParams['images']>;
@@ -156,7 +158,7 @@ function defaultDescription(images: ImagesParams | undefined, web: WebParams | u
   ];
   if (web?.enable !== false) parts.push('Web pages on the same query come back alongside as `results`.');
   parts.push(
-    'An image from a web page or deck has a `group` with a `group_id`; to see the rest of that page or deck, call again with that `group_id` and no query, and its images come back in order.',
+    `An image from a web page or deck has a \`group\` with a \`group_id\`; to see more of that page or deck, call again with that \`group_id\` and no query: up to ${images?.count ?? API_IMAGE_COUNT} of its images come back, in group order.`,
     'Use this for web, app or slide design inspiration, not for general image search.',
   );
   return parts.join(' ');
@@ -177,7 +179,7 @@ function inputProblem(input: { query?: unknown; group_id?: unknown }, groups: bo
 const QUERY_SCHEMA = { anyOf: [{ type: 'string', minLength: 1, maxLength: MAX_QUERY_LENGTH }, { type: 'null' }] };
 
 // The JSON schema is written out so the model sees code-point lengths and the nullable fields; zod only validates.
-function inputSchema(groups: boolean) {
+function inputSchema(groups: boolean, groupCount: number) {
   const validator = z
     .object({
       // Strict-mode providers send null for an optional field; execute drops it.
@@ -201,7 +203,7 @@ function inputSchema(groups: boolean) {
         group_id: {
           anyOf: [{ type: 'string', minLength: 1 }, { type: 'null' }],
           description:
-            'Optional. The `group.group_id` of an image from an earlier result; returns the images of that web page or deck in order instead of searching by query.',
+            `Optional. The \`group.group_id\` of an image from an earlier result; returns up to ${groupCount} images of that web page or deck, in group order, instead of searching by query.`,
         },
       }
     : { query: { type: 'string', minLength: 1, maxLength: MAX_QUERY_LENGTH, description: "What to find, e.g. 'pricing page design'. Max 500 characters." } };
@@ -275,7 +277,7 @@ export function octenDesignSearch(given: OctenDesignSearchOptions = {}): Tool<De
   const client = resolveClient(options);
   return tool({
     description: options.description ?? defaultDescription(images, web),
-    inputSchema: inputSchema(groups),
+    inputSchema: inputSchema(groups, images?.count ?? API_IMAGE_COUNT),
     execute: async (input: DesignSearchInput, { abortSignal }): Promise<DesignSearchToolResult> => {
       const problem = inputProblem(input, groups);
       if (problem !== undefined) invalid('query', problem);

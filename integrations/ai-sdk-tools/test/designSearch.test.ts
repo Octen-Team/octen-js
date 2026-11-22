@@ -417,3 +417,25 @@ describe('octenDesignSearch review fixes', () => {
     expect((err2 as OctenValidationError).field).toBe('webSearch.includeDomains[0]');
   });
 });
+
+describe('octenDesignSearch group follow-up wording', () => {
+  const client = new Octen({ apiKey: 'test-key' });
+  const groupText = async (options: OctenDesignSearchOptions) => {
+    const t = octenDesignSearch({ client, ...options } as OctenDesignSearchOptions);
+    const schema = (await modelJsonSchema(t)).properties?.['group_id'] as { description?: string };
+    return { description: t.description ?? '', schema: schema.description ?? '' };
+  };
+
+  it('promises up to the API default of 5 group images when images.count is unset', async () => {
+    const { description, schema } = await groupText({});
+    expect(description).toMatch(/up to 5 of its images come back, in group order/);
+    expect(schema).toMatch(/returns up to 5 images of that web page or deck/);
+    expect(`${description} ${schema}`).not.toMatch(/every image|all (of )?(its|the) images|the rest of/i);
+  });
+
+  it('promises up to the developer images.count', async () => {
+    const { description, schema } = await groupText({ images: { count: 30 } });
+    expect(description).toMatch(/up to 30 of its images/);
+    expect(schema).toMatch(/returns up to 30 images/);
+  });
+});

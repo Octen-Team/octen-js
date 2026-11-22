@@ -321,7 +321,15 @@ describe('octenImageSearch errors and cancellation', () => {
 
 describe('octenImageSearch review fixes', () => {
   // Each URL parses as no host, fails to parse, or uses another scheme; none may reach the API.
-  const BAD_URLS = ['https://', 'https://:443/x.png', 'https://[example.com/x.jpg', 'file:///x.png'];
+  // The two port cases are rejected by the WHATWG URL parser, which the check relies on.
+  const BAD_URLS = [
+    'https://',
+    'https://:443/x.png',
+    'https://[example.com/x.jpg',
+    'file:///x.png',
+    'https://example.com:abc/x.png',
+    'https://example.com:70000/x.png',
+  ];
 
   it.each(BAD_URLS)('refuses image_url %s without a request, in execute and in the input check', async (url) => {
     const { t, calls } = build();
