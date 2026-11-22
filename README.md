@@ -1,8 +1,8 @@
 # @octen.ai/sdk
 
-Official TypeScript SDK for the [Octen](https://docs.octen.ai) search API. Zero runtime dependencies, ships ESM, CommonJS and type declarations.
+Official TypeScript SDK for the [Octen](https://docs.octen.ai) search and extract API. Zero runtime dependencies, ships ESM, CommonJS and type declarations.
 
-It covers ten endpoints: Web Search, Web Search Premier, Broad Search, News Search, Business Search, Pulse Search, Place Search, Image Search, Video Search (invite-only beta) and Design Search.
+It covers eleven endpoints: Web Search, Web Search Premier, Broad Search, News Search, Business Search, Pulse Search, Place Search, Image Search, Video Search (invite-only beta), Design Search and Extract.
 
 - [Install](#install)
 - [Quick start](#quick-start)
@@ -52,7 +52,7 @@ Responses are the parsed JSON bodies, so field names are snake_case exactly as i
 
 ## The methods
 
-Every method takes the request body as an object and an optional [request options](#request-options) object as the second argument. `query` is required everywhere except Image and Video Search, which take `inputs`, and Design Search, where it is optional for a group lookup. Parameter names match the API reference; the SDK does not rename them.
+Every method takes the request body as an object and an optional [request options](#request-options) object as the second argument. `query` is required everywhere except Image and Video Search, which take `inputs`, Design Search, where it is optional for a group lookup, and Extract, which takes `urls`. Parameter names match the API reference; the SDK does not rename them.
 
 ```ts
 // Web Search: POST /search
@@ -163,9 +163,24 @@ if (groupId) {
   const deck = await client.designSearch.search({ images: { group_id: groupId, count: 20 } });
   console.log(deck.data?.images?.map((img) => img.group?.position));
 }
+
+// Extract: POST /extract (clean page content for 1 to 20 URLs per call; note: client.extract)
+const pages = await client.extract.extract({
+  urls: ['https://octen.ai/', 'https://docs.octen.ai/api-reference/search'],
+  format: 'markdown', // or 'text'
+  include_images: true,
+  include_links: { max_links: 20 }, // {} uses the server defaults
+});
+for (const item of pages.data?.results ?? []) {
+  if (item.status === 'success') console.log(item.url, item.resolved_mode, item.title, item.full_content?.length);
+  else console.log(item.url, 'failed:', item.error_message);
+}
+console.log(pages.meta?.usage?.successful_by_mode); // { standard_urls, advanced_urls }: what the call is billed for
 ```
 
 `searchPremier` takes the same body as `search` (there is no `topic`) and returns the same response shape. Video Search is an invite-only beta: contact Octen to request access. In Design Search, `images` options apply to the image results and `web_search` options to the web results only; turn off what you do not need with `images: { design_facts: false, snippet: { enable: false } }`, `images: { enable: false }` or `web_search: { enable: false }`. `design_facts` and `group.master` are free-form objects whose keys vary by image.
+
+Extract notes: each URL gets its own result with a `status`, so a call can succeed while some URLs fail (`status: 'failed'` with an `error_message`); failed URLs are not billed. Match results to your input by `url` rather than by position. With `query`, each result carries `highlights` instead of `full_content`. `mode` is `standard` (the default), `advanced` (slower, more expensive, for pages that are hard to reach) or `auto` (picks one per URL); each result's `resolved_mode` is the mode that URL is billed at, and `meta.usage.successful_by_mode` counts them. The body's `timeout` (1 to 60 s, default 30) bounds each URL on the server; it is not the SDK's HTTP timeout, which Extract derives from it (see [Request options](#request-options)). `page_structure` and `category` can be `null` when the server cannot determine them.
 
 `BusinessEntity` note: the TypeScript type lists the two variants that exist today, `company` and `person`, so `entity.type === 'company'` narrows the type. The server can add new `type` values at any time and the SDK returns them unchanged at runtime, so always keep a `default` branch like the one above.
 
@@ -178,8 +193,9 @@ The required input, checked with `field` naming the offending path:
 - `query` must be a non-empty string (not only whitespace) for every method except the three below.
 - `imageSearch` and `videoSearch`: `inputs` must hold exactly one input (`inputs`), of a type the endpoint takes: `text` or `image` for Image Search, `text` for Video Search (`inputs[0].type`). A `text` input needs a non-empty `data` (`inputs[0].data`) and takes no `url` (`inputs[0].url`); an `image` input needs exactly one of `url` or `data` (base64), not both (`inputs[0]`).
 - `designSearch`: `query` must be a non-empty string unless `images.group_id` is set; an empty or blank `group_id` counts as not set (`query`).
+- `extract`: `urls` must be an array of 1 to 20 URLs (`urls`), each a non-empty string (not only whitespace) of at most 2048 characters (`urls[1]` names the offending item).
 
-Lengths are not checked locally either: a `query` over 500 characters comes back as a 400.
+Other lengths are not checked locally: a `query` over 500 characters comes back as a 400. For Extract, an out-of-range `include_links.max_links` or `query`, or an unknown `mode`, `format` or `scope`, comes back as a 400; the server adjusts an out-of-range `timeout` or `max_age_seconds` to the nearest bound instead.
 
 ## Request options
 
@@ -187,7 +203,7 @@ Each method accepts an optional second argument:
 
 | Option | Meaning |
 |---|---|
-| `timeout` | Milliseconds for each attempt of this call. Precedence: this option, then an explicitly set client `timeout`, then the endpoint default (120 s for Broad Search, 30 s otherwise) |
+| `timeout` | Milliseconds for each attempt of this call. Precedence: this option, then an explicitly set client `timeout`, then the endpoint default (120 s for Broad Search; for Extract, the body's per-URL `timeout` plus 90 s; 30 s otherwise) |
 | `signal` | An `AbortSignal`; aborting rejects with `OctenAbortError` and stops retrying |
 | `headers` | Extra headers for this call, as a plain object of strings. Setting `x-api-key` here throws `OctenValidationError`; the key only comes from `apiKey` |
 
@@ -203,8 +219,8 @@ await client.search.search({ query: 'hello' }, { signal: ac.signal, timeout: 10_
 const client = new Octen({
   apiKey: 'sk-...',          // default: process.env.OCTEN_API_KEY; the constructor throws if neither is set
   baseURL: 'https://api.octen.ai',
-  timeout: 60_000,           // ms per attempt; once set it applies to every endpoint, broadSearch included
-                             // (unset: 30 s, and 120 s for broadSearch)
+  timeout: 60_000,           // ms per attempt; once set it applies to every endpoint, broadSearch and extract included
+                             // (unset: 30 s, 120 s for broadSearch, 91 to 150 s for extract)
   maxRetries: 3,             // default 3 (at most 4 requests)
   defaultHeaders: {},        // plain object, sent with every request; must not contain x-api-key
   fetch: customFetch,        // default: the runtime's global fetch
@@ -212,7 +228,8 @@ const client = new Octen({
 });
 ```
 
-- `timeout` counts each attempt and includes reading the response body. An explicit client `timeout` applies to every endpoint, Broad Search included; without one, Broad Search defaults to 120 s (it runs many sub-queries) and every other endpoint to 30 s. A per-request `timeout` beats both.
+- `timeout` counts each attempt and includes reading the response body. An explicit client `timeout` applies to every endpoint, Broad Search and Extract included; without one, Broad Search defaults to 120 s (it runs many sub-queries), Extract to its per-URL `timeout` plus 90 s, and every other endpoint to 30 s. A per-request `timeout` beats both.
+- Extract's default: the body's `timeout` bounds each URL on the server, and a batch of up to 20 URLs needs headroom beyond it, so the SDK waits the per-URL value (clamped to 1 to 60 s like the server does, 30 s when unset) plus 90 s: 120 s by default, 150 s with `timeout: 60`. A client `timeout` shorter than that (for example 30 s set for the search endpoints) also applies to Extract and can abort it while the server is still working; pass a per-request `timeout` to Extract in that case.
 - Only the `x-api-key` header carries credentials. Redirects are never followed (a redirect is reported as an error), so the key cannot be forwarded to another host.
 - The `User-Agent` is `octen-js-sdk/<version>`.
 - Every optional option accepts an explicit `undefined` and then behaves as if omitted, so `new Octen({ apiKey: process.env.OCTEN_API_KEY })` compiles under `exactOptionalPropertyTypes` and falls back to the environment variable.
@@ -284,6 +301,8 @@ The message is taken from the response body's `msg`, `message`, `detail` or `err
 1. An edge gateway or load balancer returns 408, 502, 503 or 504 after the backend already succeeded; the retry then runs and is billed again.
 2. The server records the billing event but fails while writing the response (for example the connection is recycled mid-response). You see a network error, the SDK does not retry it, but the call was billed.
 
+Extract follows the same policy and is billed per successful URL, so in the first case the retry can bill every URL that succeeded on the first attempt a second time, up to 20 URLs at the `advanced` rate.
+
 For billing-sensitive jobs, set `maxRetries: 0` and handle retries yourself. Server-side idempotency keys are the proper fix and are not available yet.
 
 ## Runtimes and browsers
@@ -298,7 +317,7 @@ Compared with `octen-py` 0.13.0:
 
 | Area | `octen-py` | `@octen.ai/sdk` |
 |---|---|---|
-| Parameter validation | Checks value ranges (such as `count`) locally | Checks only `query` and unknown keys; ranges are checked by the server (400) |
+| Parameter validation | Checks value ranges (such as `count`) locally | Checks only the required input (`query`, `inputs` or `urls`) and unknown keys; ranges are checked by the server (400) |
 | Unknown keys in nested request objects | Top level rejected, nested `highlight` / `full_content` allowed | Rejected at every level |
 | Client timeout | Retried by default; with `retry_after_send=False` raised at once, except connect and pool timeouts, which never reached the server and are always retried | Never retried (`OctenTimeoutError`) |
 | `Retry-After` | 429 only | 429 and 503; above 60 s no retry |
@@ -312,6 +331,10 @@ Compared with `octen-py` 0.13.0:
 | Image Search input | `query=` or `image_url=` (or raw `inputs`); also the deprecated `topic` and `html_snippet` | Raw `inputs` only, as in the API reference; no `topic` or `html_snippet` |
 | Video Search input | `query=` | Raw `inputs` |
 | Broad Search timeout | 30 s like every endpoint | 120 s, separate default, unless a client `timeout` is set explicitly |
+| Extract call | `client.extract.extract(urls=[...], ...)` with keyword arguments, plus `simple_extract(url)` | `client.extract.extract({ urls: [...], ... })` with the request body as in the API reference; no single-URL shortcut |
+| Extract local checks | `urls` (1 to 20, each non-empty and at most 2048 characters), `query` length, `timeout` (1 to 60), `max_age_seconds` (not negative), `include_links.max_links` (1 to 1000) and the `mode`, `format` and `scope` values | `urls` only (1 to 20, each non-blank and at most 2048 characters); the rest is left to the server, which rejects or adjusts it as described above |
+| Extract HTTP timeout | The client's timeout (30 s by default) unless `request_timeout=` is passed; the docs suggest raising it for `advanced` / `auto` | Derived from the per-URL `timeout`: 120 s by default, 150 s with `timeout: 60`, unless a client or per-request `timeout` is set |
+| Extract response | `items` parses each result into a model (and raises on a malformed row); helpers such as `successful_by_mode`, `standard_urls`, `advanced_urls` | The parsed JSON body, typed; read `data.results` and `meta.usage` directly |
 
 ## Integrations
 
@@ -328,7 +351,7 @@ OCTEN_LIVE=1 OCTEN_LIVE_VIDEO=1 OCTEN_API_KEY=... npm run test:live   # also Vid
 npm run spec-drift   # compares the live OpenAPI spec with testdata/openapi.json
 ```
 
-`testdata/openapi.json` is a snapshot of the public OpenAPI spec that the contract tests compare against; see `testdata/README.md`. A weekly workflow (`spec-drift.yml`) fails when the ten endpoints' schemas change upstream; it never rewrites the snapshot.
+`testdata/openapi.json` is a snapshot of the public OpenAPI spec that the contract tests compare against; see `testdata/README.md`. A weekly workflow (`spec-drift.yml`) fails when the eleven endpoints' schemas change upstream; it never rewrites the snapshot.
 
 **Releasing.** The version lives in two places, `package.json` and `src/version.ts` (a smoke test fails if they differ), so a release bumps both. To release: bump both, add a `CHANGELOG.md` entry, merge to `main`, then push a `v<version>` tag. `release.yml` refuses prerelease versions (a `-` in the version) and tags that are not on `main`, checks that the tag equals both versions, type-checks, tests, builds, runs `test:e2e` and publishes with npm provenance through OIDC trusted publishing (no token stored). `prepublishOnly` also runs typecheck, tests and build before any `npm publish`.
 
