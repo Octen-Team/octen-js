@@ -7,6 +7,7 @@ import {
   octenPlaceSearch,
   octenPulseSearch,
   octenWebSearch,
+  octenWebSearchPremier,
 } from '../src/index.js';
 import { jsonResponse, run } from './helpers.js';
 
@@ -53,6 +54,14 @@ const BASELINE = [
     input: { query: 'q' },
     path: '/pulse-search',
     body: '{"count":5,"query":"q"}',
+  },
+  // Recorded from the 0.2.0 Web Search Premier commits before Extract was added.
+  {
+    name: 'octenWebSearchPremier',
+    make: (client: Octen) => octenWebSearchPremier({ client }),
+    input: { query: 'q', time_range: 'week' },
+    path: '/search-premier',
+    body: '{"count":5,"highlight":{"enable":true,"max_tokens":300},"query":"q","time_range":"week"}',
   },
 ];
 
