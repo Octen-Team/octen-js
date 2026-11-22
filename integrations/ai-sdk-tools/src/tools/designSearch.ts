@@ -2,7 +2,20 @@ import type { DesignSearchParams } from '@octen.ai/sdk';
 import { jsonSchema, tool } from 'ai';
 import type { Tool } from 'ai';
 import { z } from 'zod';
-import { bool, codePoints, defined, intIn, invalid, isNonBlank, objectWith, oneOf, snapshot, stringList } from '../options.js';
+import {
+  bool,
+  codePoints,
+  defined,
+  intIn,
+  invalid,
+  isNonBlank,
+  isRfc3339,
+  objectWith,
+  oneOf,
+  rejectUnknown,
+  snapshot,
+  stringList,
+} from '../options.js';
 import { asList, isRecord, nonEmpty, requestOptions, resolveClient, trimWebResults, warningOf } from '../shared.js';
 import type { ModelWebResult, OctenClientOptions, TimeRange } from '../shared.js';
 
@@ -55,7 +68,6 @@ export type OctenDesignSearchOptions = {
 // Limits from docs.octen.ai/api-reference/design-search.
 const MAX_QUERY_LENGTH = 500;
 const LANGUAGES = ['ar', 'de', 'en', 'es', 'fr', 'hi', 'id', 'it', 'ja', 'ko', 'nl', 'pl', 'pt', 'ru', 'th', 'tr', 'vi', 'zh'] as const;
-const DATE_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/;
 
 type ImagesParams = NonNullable<DesignSearchParams['images']>;
 type WebParams = NonNullable<DesignSearchParams['web_search']>;
@@ -71,8 +83,8 @@ function tokens(value: unknown, field: string, maxTokens: number): { enable?: bo
 
 function dateTime(value: unknown, field: string): string | undefined {
   if (value === undefined) return undefined;
-  if (typeof value !== 'string' || !DATE_TIME.test(value)) {
-    invalid(field, `${field} must be an ISO 8601 date-time such as 2025-01-01T00:00:00Z, got ${String(value)}.`);
+  if (typeof value !== 'string' || !isRfc3339(value)) {
+    invalid(field, `${field} must be an RFC 3339 date-time such as 2025-01-01T00:00:00Z, got ${String(value)}.`);
   }
   return value;
 }
@@ -112,6 +124,11 @@ function imagesParams(value: unknown): ImagesParams | undefined {
 function webParams(value: unknown): WebParams | undefined {
   const o = objectWith(value, 'webSearch', WEB_KEYS, '{ count: 3 }');
   if (o === undefined) return undefined;
+  const start = dateTime(o['startTime'], 'webSearch.startTime');
+  const end = dateTime(o['endTime'], 'webSearch.endTime');
+  if (start !== undefined && end !== undefined && Date.parse(start) > Date.parse(end)) {
+    invalid('webSearch.startTime', `webSearch.startTime (${start}) is after webSearch.endTime (${end}).`);
+  }
   return defined<WebParams>([
     ['enable', bool(o['enable'], 'webSearch.enable')],
     ['count', intIn(o['count'], 1, 100, 'webSearch.count')],
@@ -122,13 +139,16 @@ function webParams(value: unknown): WebParams | undefined {
     ['language', languages(o['language'])],
     ['time_basis', oneOf(o['timeBasis'], ['auto', 'published', 'crawled'], 'webSearch.timeBasis')],
     ['time_range', oneOf(o['timeRange'], ['day', 'week', 'month', 'year'], 'webSearch.timeRange')],
-    ['start_time', dateTime(o['startTime'], 'webSearch.startTime')],
-    ['end_time', dateTime(o['endTime'], 'webSearch.endTime')],
+    ['start_time', start],
+    ['end_time', end],
   ]);
 }
 
 // The default description drops what the developer turned off, so the model is not promised it.
 function defaultDescription(images: ImagesParams | undefined, web: WebParams | undefined): string {
+  if (images?.enable === false) {
+    return 'Search for web pages on a design topic, such as articles and galleries about web, app or slide design. Returns ranked pages as `results`, with title, URL and a query-relevant excerpt.';
+  }
   const values = images?.design_facts === false ? '' : ', each with its design values such as colors, fonts and font sizes';
   const code = images?.snippet?.enable === false ? '' : ', and reusable HTML code when the image has it';
   const parts = [
@@ -145,12 +165,19 @@ function defaultDescription(images: ImagesParams | undefined, web: WebParams | u
 const MISSING =
   'Pass `query` to search for design references, or `group_id` (the `group.group_id` of an earlier image result) to get the images of that web page or deck. Both are missing or blank. No request was made.';
 
-function inputProblem(input: { query?: unknown; group_id?: unknown }): string | undefined {
-  return isNonBlank(input.query) || isNonBlank(input.group_id) ? undefined : MISSING;
+const MISSING_QUERY = 'Pass `query`, the design topic to search for. No request was made.';
+
+// With images off there is no group to look up, so only a query counts.
+function inputProblem(input: { query?: unknown; group_id?: unknown }, groups: boolean): string | undefined {
+  if (isNonBlank(input.query)) return undefined;
+  if (!groups) return MISSING_QUERY;
+  return isNonBlank(input.group_id) ? undefined : MISSING;
 }
 
+const QUERY_SCHEMA = { anyOf: [{ type: 'string', minLength: 1, maxLength: MAX_QUERY_LENGTH }, { type: 'null' }] };
+
 // The JSON schema is written out so the model sees code-point lengths and the nullable fields; zod only validates.
-function inputSchema() {
+function inputSchema(groups: boolean) {
   const validator = z
     .object({
       // Strict-mode providers send null for an optional field; execute drops it.
@@ -162,15 +189,13 @@ function inputSchema() {
       group_id: z.string().nullable().optional(),
     })
     .superRefine((value, ctx) => {
-      const problem = inputProblem(value);
+      const problem = inputProblem(value, groups);
       if (problem !== undefined) ctx.addIssue({ code: 'custom', path: ['query'], message: problem });
     });
-  return jsonSchema<DesignSearchInput>(
-    {
-      type: 'object',
-      properties: {
+  const properties = groups
+    ? {
         query: {
-          anyOf: [{ type: 'string', minLength: 1, maxLength: MAX_QUERY_LENGTH }, { type: 'null' }],
+          ...QUERY_SCHEMA,
           description: "What to find, e.g. 'pricing section for a SaaS landing page'. Max 500 characters. Required unless `group_id` is set.",
         },
         group_id: {
@@ -178,9 +203,10 @@ function inputSchema() {
           description:
             'Optional. The `group.group_id` of an image from an earlier result; returns the images of that web page or deck in order instead of searching by query.',
         },
-      },
-      additionalProperties: false,
-    },
+      }
+    : { query: { type: 'string', minLength: 1, maxLength: MAX_QUERY_LENGTH, description: "What to find, e.g. 'pricing page design'. Max 500 characters." } };
+  return jsonSchema<DesignSearchInput>(
+    { type: 'object', properties, ...(groups ? {} : { required: ['query'] }), additionalProperties: false },
     {
       validate: (value) => {
         const result = validator.safeParse(value);
@@ -237,18 +263,23 @@ function trimImage(r: Record<string, unknown>): ModelDesignImage {
 const OPTION_KEYS = ['description', 'images', 'webSearch', 'client', 'apiKey', 'baseURL', 'timeout', 'maxRetries'] as const;
 
 export function octenDesignSearch(given: OctenDesignSearchOptions = {}): Tool<DesignSearchInput, DesignSearchToolResult> {
+  rejectUnknown(given, OPTION_KEYS);
   const options = snapshot(given, OPTION_KEYS);
   const images = imagesParams(options.images);
   const web = webParams(options.webSearch);
+  if (images?.enable === false && web?.enable === false) {
+    invalid('images.enable', 'images.enable and webSearch.enable cannot both be false: the tool would return nothing.');
+  }
+  const groups = images?.enable !== false;
   // One client per tool, reused by every call.
   const client = resolveClient(options);
   return tool({
     description: options.description ?? defaultDescription(images, web),
-    inputSchema: inputSchema(),
+    inputSchema: inputSchema(groups),
     execute: async (input: DesignSearchInput, { abortSignal }): Promise<DesignSearchToolResult> => {
-      const problem = inputProblem(input);
+      const problem = inputProblem(input, groups);
       if (problem !== undefined) invalid('query', problem);
-      const groupId = isNonBlank(input.group_id) ? input.group_id : undefined;
+      const groupId = groups && isNonBlank(input.group_id) ? input.group_id : undefined;
       const withGroup = groupId === undefined ? images : { ...images, group_id: groupId };
       const params: DesignSearchParams = defined([
         ['query', isNonBlank(input.query) ? input.query : undefined],

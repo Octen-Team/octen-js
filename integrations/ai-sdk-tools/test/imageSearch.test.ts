@@ -1,4 +1,12 @@
-import { Octen, OctenAbortError, OctenAuthenticationError, OctenRateLimitError, OctenValidationError } from '@octen.ai/sdk';
+import {
+  Octen,
+  OctenAbortError,
+  OctenAPIError,
+  OctenAuthenticationError,
+  OctenPermissionDeniedError,
+  OctenRateLimitError,
+  OctenValidationError,
+} from '@octen.ai/sdk';
 import { asSchema } from 'ai';
 import { describe, expect, it } from 'vitest';
 import { octenImageSearch } from '../src/tools/imageSearch.js';
@@ -308,5 +316,73 @@ describe('octenImageSearch errors and cancellation', () => {
       expect(err).toBeInstanceOf(cls as new () => Error);
       expect((err as OctenAuthenticationError).requestId).toBe(`req-${status}-image`);
     }
+  });
+});
+
+describe('octenImageSearch review fixes', () => {
+  // Each URL parses as no host, fails to parse, or uses another scheme; none may reach the API.
+  const BAD_URLS = ['https://', 'https://:443/x.png', 'https://[example.com/x.jpg', 'file:///x.png'];
+
+  it.each(BAD_URLS)('refuses image_url %s without a request, in execute and in the input check', async (url) => {
+    const { t, calls } = build();
+    const err = await run(t, { image_url: url }).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(OctenValidationError);
+    expect((err as OctenValidationError).field).toBe('image_url');
+    expect((err as Error).message).toMatch(/image_url must be a public http\(s\) URL of an image, with a host name/);
+    expect(calls).toHaveLength(0);
+    expect((await rejection({ image_url: url })).message).toMatch(/with a host name/);
+  });
+
+  it('still sends an http(s) URL with a host, port, path and query string', async () => {
+    const { t, calls } = build();
+    const url = 'https://images.example.com:8443/a/b.jpg?w=200';
+    await run(t, { image_url: url });
+    expect(calls[0]?.body).toEqual({ inputs: [{ type: 'image', url }] });
+  });
+
+  const guidance: [number, RegExp][] = [
+    [413, /too large.*smaller image/s],
+    [415, /format is not supported.*JPEG, PNG, WEBP/s],
+  ];
+  it.each(guidance)('turns HTTP %i into an OctenAPIError whose message tells the model to try another image', async (status, text) => {
+    const rec = recordingFetch(() => jsonResponse({ code: status, msg: 'server says no', request_id: `req-${status}` }, status));
+    const err = await run(octenImageSearch({ client: clientFor(rec.fakeFetch) }), { image_url: IMG }).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(OctenAPIError);
+    expect((err as OctenAPIError).status).toBe(status);
+    expect((err as OctenAPIError).requestId).toBe(`req-${status}`);
+    expect((err as Error).message).toMatch(text);
+    expect((err as Error).message).toMatch(/server says no/);
+    expect(rec.calls).toHaveLength(1);
+  });
+
+  it('leaves 401 and 403 as the SDK raised them, with no image advice', async () => {
+    const cases: [number, unknown][] = [
+      [401, OctenAuthenticationError],
+      [403, OctenPermissionDeniedError],
+    ];
+    for (const [status, cls] of cases) {
+      const rec = recordingFetch(() => jsonResponse({ code: status, msg: 'denied', request_id: `req-${status}` }, status));
+      const err = await run(octenImageSearch({ client: clientFor(rec.fakeFetch) }), { image_url: IMG }).catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(cls as new () => Error);
+      expect((err as Error).message).toBe('denied');
+    }
+  });
+
+  it.each([
+    ['maxResults', { maxResults: 3 }],
+    ['defaults', { defaults: { count: 3 } }],
+    ['include_domains', { include_domains: ['a.com'] }],
+  ])('rejects the unknown option %s at construction', (field, options) => {
+    const err = thrown(() => octenImageSearch({ client: new Octen({ apiKey: 'test-key' }), ...options } as unknown as OctenImageSearchOptions));
+    expect(err).toBeInstanceOf(OctenValidationError);
+    expect((err as OctenValidationError).field).toBe(field);
+  });
+
+  it('rejects a sparse domain list at construction', () => {
+    const sparse: string[] = [];
+    sparse[0] = 'a.com';
+    sparse[2] = 'b.com';
+    const err = thrown(() => octenImageSearch({ client: new Octen({ apiKey: 'test-key' }), excludeDomains: sparse }));
+    expect((err as OctenValidationError).field).toBe('excludeDomains[1]');
   });
 });

@@ -1,8 +1,9 @@
+import { OctenAPIError, isOctenError } from '@octen.ai/sdk';
 import type { ImageSearchParams } from '@octen.ai/sdk';
 import { jsonSchema, tool } from 'ai';
 import type { Tool } from 'ai';
 import { z } from 'zod';
-import { codePoints, defined, intIn, invalid, isNonBlank, oneOf, snapshot, stringList } from '../options.js';
+import { codePoints, defined, intIn, invalid, isNonBlank, oneOf, rejectUnknown, snapshot, stringList } from '../options.js';
 import { asList, isRecord, nonEmpty, requestOptions, resolveClient, warningOf } from '../shared.js';
 import type { OctenClientOptions } from '../shared.js';
 
@@ -45,9 +46,23 @@ const BOTH = 'Pass exactly one of `query` or `image_url`, not both: this search 
 const NEITHER =
   'Pass one of `query` (text describing the images) or `image_url` (a public http(s) URL of an image, to find similar images). No request was made.';
 const NOT_HTTP =
-  'image_url must be a public http(s) URL of an image; this tool does not take base64 or data: URIs. No request was made.';
+  'image_url must be a public http(s) URL of an image, with a host name; this tool does not take base64 or data: URIs. No request was made.';
 
-const HTTP_URL = /^https?:\/\//i;
+// The API rejects these statuses for the image itself, so the model is told to try another image.
+const IMAGE_ADVICE: Record<number, string> = {
+  413: 'The image is too large for Image Search. Try a smaller image (at most 5 MB) or a different image URL.',
+  415: 'The image format is not supported by Image Search. Try an image in JPEG, PNG, WEBP, BMP, TIFF, ICO, DIB, ICNS or SGI format, or a different image URL.',
+};
+
+// Parsing never throws out of here: a URL that does not parse is just not acceptable.
+function isHttpUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return (url.protocol === 'http:' || url.protocol === 'https:') && url.hostname !== '';
+  } catch {
+    return false;
+  }
+}
 
 type DomainField = 'include_domains' | 'exclude_domains';
 type DeveloperParams = Omit<ImageSearchParams, 'inputs'>;
@@ -72,7 +87,7 @@ function inputProblem(input: { query?: unknown; image_url?: unknown }): { field:
   const image = isNonBlank(input.image_url);
   if (query && image) return { field: 'image_url', message: BOTH };
   if (!query && !image) return { field: 'query', message: NEITHER };
-  if (image && !HTTP_URL.test(String(input.image_url))) return { field: 'image_url', message: NOT_HTTP };
+  if (image && !isHttpUrl(String(input.image_url))) return { field: 'image_url', message: NOT_HTTP };
   return undefined;
 }
 
@@ -136,6 +151,15 @@ function trimImage(r: Record<string, unknown>): ModelImageResult {
   return out;
 }
 
+// Keeps the class, status and request id; isOctenError also matches an error from a client of another SDK copy.
+function withImageAdvice(err: unknown): unknown {
+  if (!isOctenError(err) || !('status' in err)) return err;
+  const { status, code, requestId, body } = err as OctenAPIError;
+  const advice = IMAGE_ADVICE[status];
+  if (advice === undefined) return err;
+  return new OctenAPIError({ status, code, requestId, body, message: `${advice} (HTTP ${status}: ${err.message})` });
+}
+
 const OPTION_KEYS = [
   'description',
   'count',
@@ -150,6 +174,7 @@ const OPTION_KEYS = [
 ] as const;
 
 export function octenImageSearch(given: OctenImageSearchOptions = {}): Tool<ImageSearchInput, ImageSearchToolResult> {
+  rejectUnknown(given, OPTION_KEYS);
   const options = snapshot(given, OPTION_KEYS);
   const fixed = developerParams(options);
   // A domain list the developer set is pinned: the model does not see that filter.
@@ -171,7 +196,9 @@ export function octenImageSearch(given: OctenImageSearchOptions = {}): Tool<Imag
         if (Array.isArray(list) && list.length > 0) fromModel[field] = [...list];
       }
       const params: ImageSearchParams = { inputs, ...fromModel, ...fixed };
-      const res = await client.imageSearch.search(params, requestOptions(abortSignal));
+      const res = await client.imageSearch.search(params, requestOptions(abortSignal)).catch((err: unknown) => {
+        throw withImageAdvice(err);
+      });
       return {
         request_id: res.request_id,
         ...warningOf(res),

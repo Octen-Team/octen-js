@@ -331,3 +331,89 @@ describe('octenDesignSearch errors and cancellation', () => {
     }
   });
 });
+
+describe('octenDesignSearch review fixes', () => {
+  const client = new Octen({ apiKey: 'test-key' });
+  const noImages = { images: { enable: false } } as const;
+
+  it('with images off, offers neither screenshots nor group_id and requires query', async () => {
+    const t = octenDesignSearch({ client, ...noImages });
+    expect(t.description).not.toMatch(/screenshot|group_id|design values|HTML code/i);
+    expect(t.description).toMatch(/`results`/);
+    const json = await modelJsonSchema(t);
+    expect(Object.keys(json.properties ?? {})).toEqual(['query']);
+    expect(json.required).toEqual(['query']);
+    expect(await validateInput(t, { query: 'q' })).toBe(true);
+    expect(await validateInput(t, { group_id: GROUP })).toBe(false);
+    expect(await validateInput(t, { query: null })).toBe(false);
+  });
+
+  it('with images off, refuses a call without query and never sends group_id', async () => {
+    const { t, calls } = build(noImages);
+    const err = await run(t, { group_id: GROUP }).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(OctenValidationError);
+    expect((err as Error).message).toBe('Pass `query`, the design topic to search for. No request was made.');
+    expect(calls).toHaveLength(0);
+    await run(t, { query: 'q', group_id: GROUP });
+    expect(calls.map((c) => c.body)).toEqual([{ query: 'q', images: { enable: false } }]);
+  });
+
+  it('rejects turning off both images and web results', () => {
+    const err = thrown(() => octenDesignSearch({ client, images: { enable: false }, webSearch: { enable: false } }));
+    expect((err as OctenValidationError).field).toBe('images.enable');
+  });
+
+  it.each([
+    '2025-02-30T00:00:00Z',
+    '2023-02-29T00:00:00Z',
+    '2025-13-01T00:00:00Z',
+    '2025-00-10T00:00:00Z',
+    '2025-01-01T24:00:00Z',
+    '2025-01-01T00:60:00Z',
+    '2025-01-01T00:00:60Z',
+    '2025-01-01T00:00:00+24:00',
+    '2025-01-01T00:00:00+05:60',
+    '2025-01-01T00:00Z',
+    '2025-01-01 00:00:00Z',
+  ])('rejects the impossible or malformed startTime %s', (value) => {
+    const err = thrown(() => octenDesignSearch({ client, webSearch: { startTime: value } }));
+    expect(err).toBeInstanceOf(OctenValidationError);
+    expect((err as OctenValidationError).field).toBe('webSearch.startTime');
+  });
+
+  it.each(['2024-02-29T00:00:00Z', '2025-12-31T23:59:59.999+14:00', '2025-01-01t00:00:00z', '2025-06-30T12:00:00-09:30'])(
+    'accepts the RFC 3339 date-time %s',
+    (value) => {
+      expect(() => octenDesignSearch({ client, webSearch: { startTime: value, endTime: '2030-01-01T00:00:00Z' } })).not.toThrow();
+    },
+  );
+
+  it('rejects a startTime after the endTime', () => {
+    const err = thrown(() =>
+      octenDesignSearch({ client, webSearch: { startTime: '2026-01-02T00:00:00+08:00', endTime: '2026-01-01T00:00:00Z' } }),
+    );
+    expect((err as OctenValidationError).field).toBe('webSearch.startTime');
+  });
+
+  it.each([
+    ['image', { image: { count: 3 } }],
+    ['web_search', { web_search: { enable: false } }],
+    ['defaults', { defaults: {} }],
+  ])('rejects the unknown option %s at construction', (field, options) => {
+    const err = thrown(() => octenDesignSearch({ client, ...options } as unknown as OctenDesignSearchOptions));
+    expect(err).toBeInstanceOf(OctenValidationError);
+    expect((err as OctenValidationError).field).toBe(field);
+  });
+
+  it('rejects sparse lists at construction', () => {
+    const language: string[] = [];
+    language[0] = 'en';
+    language[2] = 'ja';
+    const domains: string[] = [];
+    domains[1] = 'a.com';
+    const err1 = thrown(() => octenDesignSearch({ client, webSearch: { language } } as unknown as OctenDesignSearchOptions));
+    expect((err1 as OctenValidationError).field).toBe('webSearch.language[1]');
+    const err2 = thrown(() => octenDesignSearch({ client, webSearch: { includeDomains: domains } }));
+    expect((err2 as OctenValidationError).field).toBe('webSearch.includeDomains[0]');
+  });
+});
