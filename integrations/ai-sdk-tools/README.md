@@ -1,10 +1,11 @@
 # @octen.ai/ai-sdk-tools
 
-[Octen](https://docs.octen.ai) search tools for the [Vercel AI SDK](https://ai-sdk.dev). Give a model web search (standard or Premier), news, company and people lookup, place search and official-page lookup with one function call each. Built on [`@octen.ai/sdk`](https://github.com/Octen-Team/octen-js).
+[Octen](https://docs.octen.ai) search tools for the [Vercel AI SDK](https://ai-sdk.dev). Give a model web search (standard or Premier), news, company and people lookup, place search, official-page lookup and page reading by URL with one function call each. Built on [`@octen.ai/sdk`](https://github.com/Octen-Team/octen-js).
 
 - [Install](#install)
 - [Quick start](#quick-start)
-- [The seven tools](#the-seven-tools)
+- [The eight tools](#the-eight-tools)
+- [Extract](#extract)
 - [Options and precedence](#options-and-precedence)
 - [What the model sees](#what-the-model-sees)
 - [Errors and cancellation](#errors-and-cancellation)
@@ -44,7 +45,7 @@ Any AI SDK provider works the same way: only the `model` line changes. `stopWhen
 
 `octenWebSearch()` reads `OCTEN_API_KEY` when it is called, not when the package is imported. If no key is set, the call throws the same error the SDK's `Octen` constructor throws.
 
-## The seven tools
+## The eight tools
 
 Each factory returns an AI SDK `Tool`. Pass any of them under any name in `tools`.
 
@@ -57,10 +58,11 @@ Each factory returns an AI SDK `Tool`. Pass any of them under any name in `tools
 | `octenBusinessSearch(options?)` | `POST /business-search` | `query` |
 | `octenPlaceSearch(options?)` | `POST /place-search` | `query` |
 | `octenPulseSearch(options?)` | `POST /pulse-search` | `query` |
+| `octenExtract(options?)` | `POST /extract` | `urls`, optional `query` |
 
-- **Web** is general search. **Web Search Premier** takes the same parameters and returns the same shape, but uses deeper retrieval and reranking so the page that holds the answer ranks higher; use it for a specific fact, a niche document or a page that is hard to find, and Web for low-latency lookups. **Broad** splits a multi-part question into sub-queries and runs them in parallel. **News** returns recent articles plus storylines. **Business** returns company and person cards plus sources. **Place** finds shops, restaurants and services with address, rating and opening hours. **Pulse** finds the official page for a site, product or document.
+- **Web** is general search. **Web Search Premier** takes the same parameters and returns the same shape, but uses deeper retrieval and reranking so the page that holds the answer ranks higher; use it for a specific fact, a niche document or a page that is hard to find, and Web for low-latency lookups. **Broad** splits a multi-part question into sub-queries and runs them in parallel. **News** returns recent articles plus storylines. **Business** returns company and person cards plus sources. **Place** finds shops, restaurants and services with address, rating and opening hours. **Pulse** finds the official page for a site, product or document. **Extract** reads pages the model already has URLs for and returns their clean content; see [Extract](#extract).
 - `time_range` is `day`, `week`, `month` or `year`. The model may also send `null` or leave it out, which means no time filter.
-- The model only ever supplies `query` (and `time_range` for Web, Web Search Premier and News). Everything else is fixed by the tool or by you through `defaults`, so the model has fewer decisions to get wrong.
+- The model only ever supplies `query` (and `time_range` for Web, Web Search Premier and News; `urls` and an optional `query` for Extract). Everything else is fixed by the tool or by you through `defaults` (named options for Extract), so the model has fewer decisions to get wrong.
 - Place does not take a location from the model. Either put the area in the query ("coffee near Shibuya, Tokyo"), or pin a location with `defaults`.
 
 Everything that changes how much a call returns or costs, such as `count`, `highlight`, `full_content` or `result_type`, is yours to set. For example, a Web Search Premier tool restricted to a few sources:
@@ -74,9 +76,48 @@ const premier = octenWebSearchPremier({
 });
 ```
 
+## Extract
+
+`octenExtract` reads web pages by URL. The model chooses only the URLs and an optional `query`. The most URLs it may pass in one call, and every option that changes what a call returns or costs, are yours to set when you build the tool. Each option is checked then: a value out of range throws `OctenValidationError`, with `field` naming the option, before any request. An option you leave unset is not sent, so the API default applies.
+
+```ts
+import { generateText, stepCountIs } from 'ai';
+import { anthropic } from '@ai-sdk/anthropic';
+import { octenExtract, octenWebSearch } from '@octen.ai/ai-sdk-tools';
+
+// The model finds pages with web search, then reads up to three of them per call.
+const { text: summary } = await generateText({
+  model: anthropic('claude-opus-5-5'),
+  tools: {
+    webSearch: octenWebSearch(),
+    readPages: octenExtract({ maxUrls: 3, maxAgeSeconds: 3600, includeLinks: { maxLinks: 20 } }),
+  },
+  stopWhen: stepCountIs(8),
+  prompt: 'Read the latest Node.js release announcement and list its three biggest changes.',
+});
+console.log(summary);
+```
+
+| Option | Request field | Values | When unset |
+|---|---|---|---|
+| `maxUrls` | none: the tool's own cap | integer 1 to 20 | 5 |
+| `mode` | `mode` | `'standard'`, `'advanced'` (for pages that are hard to reach; slower and billed at a higher rate) or `'auto'` (picks one per URL) | not sent; the API uses `standard` |
+| `format` | `format` | `'markdown'` or `'text'` | not sent; the API uses `markdown` |
+| `maxAgeSeconds` | `max_age_seconds` | integer 300 to 31536000; a cached copy older than this is fetched again | not sent; the API uses 86400 |
+| `urlTimeout` | `timeout` | integer 1 to 60, seconds for each URL on the server | not sent; the API uses 30 |
+| `includeImages`, `includeVideos`, `includeAudio` | `include_images`, `include_videos`, `include_audio` | boolean; images also turn on `cover_image` | not sent; off |
+| `includeLinks` | `include_links` | `{}` for the API defaults, or `{ scope?: 'prefer_internal' \| 'prefer_external', maxLinks?: 1 to 1000 }` | not sent; no links |
+
+`client`, `apiKey`, `baseURL`, `timeout`, `maxRetries` and `description` work as for the other tools (see [Options and precedence](#options-and-precedence)). Extract takes no `defaults`.
+
+- **The URL cap.** The model's input schema allows 1 to `maxUrls` URLs of at most 2048 characters each, and the default description tells the model the cap. A call with more URLs than `maxUrls`, or with none, never reaches the API: the AI SDK's input check rejects it, and the model receives a tool error that states the cap and asks for several calls (checked by the version matrix in `ai` 5, 6 and 7). `execute`, if called directly, throws `OctenValidationError` naming how many URLs were passed and the cap.
+- **Without `query`** each result carries the page's full content. With `query` (1 to 500 characters), each result carries ranked `highlights` instead, so the page body is partial. The default description tells the model to leave `query` unset in the normal case.
+- **Each URL succeeds or fails on its own.** A page that could not be read comes back as its own item with `status: 'failed'` and an `error_message`, while the other URLs still return their content; failed URLs are not billed. The default description tells the model to match results to its URLs by `url`, not by position.
+- **HTTP timeout.** Unless you pass `timeout` or a `client`, the tool uses the SDK's default for Extract: the per-URL timeout (`urlTimeout`, or 30 s when unset) plus 90 s, so 120 s by default. A `timeout` you pass, or one set on a shared `client`, applies to Extract too, so a short timeout chosen for the search tools can abort Extract while the server is still reading pages.
+
 ## Options and precedence
 
-Every factory takes the same options:
+Every search factory takes the same options; Extract takes the same client options and `description`, and its own options in place of `defaults` (see [Extract](#extract)):
 
 ```ts
 import { Octen } from '@octen.ai/sdk';
@@ -156,14 +197,16 @@ A "web result" below has `title`, `url`, `highlight`, `time_published` and `full
 | News | `{ request_id, warning?, results: WebResult[], subjects: { name?, summary?, time_latest?, top_news?: { title?, url? } }[] }` | `count: 5`, `highlight: { enable: true, max_tokens: 300 }` |
 | Business | `{ request_id, warning?, entities: ModelEntity[], results: WebResult[] }` | `count: 5`, `highlight: { enable: true, max_tokens: 300 }` |
 | Place | `{ request_id, warning?, places: ModelPlace[], results: WebResult[] }` | `places: { count: 5 }` |
+| Extract | `{ request_id, warning?, results: ModelExtractResult[] }` | none: the request carries the model's `urls` and `query` and only the options you set |
 
 - **Business entities.** A company keeps `type`, `name`, `summary` and `website` (taken from `identifiers.website`). A person keeps `type`, `name`, `summary`, `current_position` and `linkedin_url`. An entity type the SDK does not know yet keeps only `type`, `name` and `summary`. An entity without a `type` is dropped. Because an unknown `type` comes through as its own string, checking `e.type === 'company'` alone does not narrow the type: add a key check such as `'website' in e`, or cast to the exported `ModelCompany` or `ModelPerson`.
 - **Places** keep `name`, `category`, `address`, `latitude`, `longitude`, `distance`, `rating`, `review_count`, `opening_hours`, `status`, `phone` and `website`. A value of `0` is kept; only missing values are dropped. `results` is empty unless you turn on web results with `defaults: { web_search: { enable: true } }`.
+- **Extract results** keep one item per URL, failures included, in the order the API returns them. Every item has `url` and `status`, and a failed one has `error_message`. A successful item has `title`, `full_content` (or `highlights` when the model sent a `query`), `time_published`, `time_last_crawled`, and `category` and `page_structure` as `{ primary, secondary? }`, each when the API returned it. Only when you turned them on does it also have `cover_image` and `images`, `videos` and `audio` as lists of URLs, and `links` as `{ url, anchor_text?, is_external? }`. `favicon` and `resolved_mode` are left out. The content is not shortened. The API's `warning`, for example that some URLs failed and were not billed, comes through as `warning`.
 - **Full content is off by default.** A web result carries `full_content` only if you turn it on, for example `defaults: { full_content: { enable: true, max_tokens: 1000 } }`. Full content beyond the free allowance is billed separately, and it is a lot of text for the model to read, so the tools leave it off unless you ask for it. Web, Web Search Premier, News, Business and Pulse take `full_content` at the top level of `defaults`; Broad takes it under `search_options` and Place under `web_search`.
 
 ## Errors and cancellation
 
-When a search fails, the tool throws the SDK's error as it is. It is not caught, wrapped or turned into a plain object. These are the classes from `@octen.ai/sdk`: every one extends `OctenError`, and API errors (`OctenAPIError` and its subclasses such as `OctenAuthenticationError` and `OctenRateLimitError`) carry `status` and `requestId`. Quote `requestId` when you contact support. The one error that does not come from the SDK is a plain `Error` naming the field, thrown when a list in the response is neither an array nor missing, so a malformed reply never looks like "no results".
+When a call fails, the tool throws the SDK's error as it is. It is not caught, wrapped or turned into a plain object. These are the classes from `@octen.ai/sdk`: every one extends `OctenError`, and API errors (`OctenAPIError` and its subclasses such as `OctenAuthenticationError` and `OctenRateLimitError`) carry `status` and `requestId`. Quote `requestId` when you contact support. The one error that does not come from the SDK is a plain `Error` naming the field, thrown when a list in the response is neither an array nor missing, so a malformed reply never looks like "no results". Extract also throws the SDK's `OctenValidationError` itself: when it is built with an option out of range, and when `execute` gets more URLs than `maxUrls` or none; neither sends a request.
 
 ```ts
 import { OctenAPIError, OctenError } from '@octen.ai/sdk';
@@ -275,6 +318,8 @@ import { octenWebSearch } from '@octen.ai/ai-sdk-tools';
 const strict = octenWebSearch({ maxRetries: 0 });
 ```
 
+Extract is billed per successful URL, so in the first case a retry can bill again every URL that succeeded on the first attempt, up to `maxUrls` URLs, at the `advanced` rate if you set `mode: 'advanced'`.
+
 Keep in mind that each tool call the model makes is a separate Octen request, and a single step can contain several tool calls. `stopWhen` limits the number of steps, not the number of billed searches.
 
 ## Supported versions
@@ -283,11 +328,12 @@ Keep in mind that each tool call the model makes is a separate Octen request, an
 |---|---|
 | `ai` | `^5.0.0 \|\| ^6.0.0 \|\| ^7.0.0` |
 | `zod` | `^3.25.76 \|\| ^4.1.8` |
+| `@octen.ai/sdk` | `^0.3.0`, a dependency installed with the tools; 0.3.0 is the first release with Extract |
 | Node | 20 or newer for the ESM build; 20.19+ or 22.12+ to load it with `require()` together with `ai` 7 |
 
 `ai` 7 is published as ESM only, so loading this package through `require()` (CommonJS) together with `ai` 7 needs Node 20.19 or later, or Node 22.12 or later: older Node versions cannot `require()` an ES module and fail with `ERR_REQUIRE_ESM`. Measured on 2026-11-18 with `@octen.ai/ai-sdk-tools` 0.1.0 and `ai` 7.0.176: Node 20.18.3 and 22.11.0 fail, Node 20.19.0 and 22.12.0 work. The ESM build works on Node 20 and later.
 
-The package declares `ai` and `zod` as peer dependency ranges. A version matrix (`scripts/matrix.sh` in the repository) checks them; on 2026-11-21, for version 0.2.0 with `@octen.ai/sdk` 0.2.0, it passed for exactly these eight combinations:
+The package declares `ai` and `zod` as peer dependency ranges. A version matrix (`scripts/matrix.sh` in the repository) checks them; on 2026-11-22, for version 0.2.0 with `@octen.ai/sdk` 0.3.0, it passed for exactly these eight combinations:
 
 | `ai` | `zod` | Node |
 |---|---|---|
@@ -296,7 +342,7 @@ The package declares `ai` and `zod` as peer dependency ranges. A version matrix 
 | 7.0.176 | 3.25.76, 4.1.8 | 24.18.0 |
 | 7.0.179 | 4.6.7 | 20.20.2, 24.18.0 |
 
-`ai` 5 and 6 were run on Node 24 only, `zod` 4.6.7 only with `ai` 7.0.179, and Node 20 only with `ai` 7.0.179 and `zod` 4.6.7. For each combination the matrix drives `generateText` and `streamText` with the AI SDK's mock model through a search and an answer, checks the JSON schema the model is given (`query` required, `time_range` optional and removed when pinned) and that `time_range: null` passes the AI SDK's input check, records how the failures described under [What the AI SDK does with the error](#what-the-ai-sdk-does-with-the-error) surface, loads the package through `require`, and type-checks a project that uses all seven tools with TypeScript 6.0.3, `strict` and `skipLibCheck: false`. With `skipLibCheck: false` you also need `@types/json-schema`, because the AI SDK's own declarations import `json-schema`.
+`ai` 5 and 6 were run on Node 24 only, `zod` 4.6.7 only with `ai` 7.0.179, and Node 20 only with `ai` 7.0.179 and `zod` 4.6.7. For each combination the matrix drives `generateText` and `streamText` with the AI SDK's mock model through a search and an answer, checks the JSON schema the model is given (`query` required, `time_range` optional and removed when pinned) and that `time_range: null` passes the AI SDK's input check, checks that an Extract call over its URL cap sends no request and that the model gets the cap in the error, records how the failures described under [What the AI SDK does with the error](#what-the-ai-sdk-does-with-the-error) surface, loads the package through `require`, and type-checks a project that uses all eight tools with TypeScript 6.0.3, `strict` and `skipLibCheck: false`. With `skipLibCheck: false` you also need `@types/json-schema`, because the AI SDK's own declarations import `json-schema`.
 
 The public types do not mention zod, so whether you use zod 3 or 4 does not affect your type checking. `ai` 4 is not supported: it uses `parameters` where this package uses the `inputSchema` form of `tool()`.
 
