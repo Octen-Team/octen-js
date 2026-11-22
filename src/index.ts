@@ -21,6 +21,7 @@ export type { RequestOptions } from './core/http';
 export type { BroadSearchParams, BroadSearchResponse } from './schema/broadSearch';
 export type { BusinessSearchParams, BusinessSearchResponse } from './schema/businessSearch';
 export type { DesignSearchParams, DesignSearchResponse } from './schema/designSearch';
+export type { ExtractParams, ExtractResponse } from './schema/extract';
 export type { ImageSearchParams, ImageSearchResponse } from './schema/imageSearch';
 export type { NewsSearchParams, NewsSearchResponse } from './schema/newsSearch';
 export type { PlaceSearchParams, PlaceSearchResponse } from './schema/placeSearch';

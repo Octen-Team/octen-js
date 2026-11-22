@@ -1,6 +1,6 @@
 {
   "name": "@octen.ai/sdk",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Official TypeScript SDK for the Octen API",
   "keywords": [
     "octen",
@@ -8,6 +8,7 @@
     "web-search",
     "news-search",
     "place-search",
+    "extract",
     "search-api",
     "sdk",
     "typescript"

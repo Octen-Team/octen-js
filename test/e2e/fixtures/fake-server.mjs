@@ -27,6 +27,9 @@ const ROUTES = {
   '/image-search': hasInput(['text', 'image']),
   '/video-search': hasInput(['text']),
   '/design-search': (b) => b?.inputs === undefined && (hasQuery(b) || nonEmpty(b?.images?.group_id)),
+  // 1 to 20 non-empty URL strings
+  '/extract': (b) =>
+    Array.isArray(b?.urls) && b.urls.length >= 1 && b.urls.length <= 20 && b.urls.every(nonEmpty) && b?.inputs === undefined,
 };
 
 const server = createServer((req, res) => {

@@ -1,0 +1,49 @@
+{
+  "data": {
+    "query": "solid-state battery breakthroughs",
+    "results": [
+      {
+        "title": "Interfacial Amorphous Lithium Polysulfide Reservoir Design Enables High‐Power and Energy‐Dense All‐Solid‐State Li─S Battery",
+        "url": "https://advanced.onlinelibrary.wiley.com/doi/10.1002/adma.75807",
+        "highlight": "Placeholder highlight text.",
+        "full_content": "",
+        "authors": "",
+        "time_published": "2026-11-20T00:00:00Z",
+        "time_last_crawled": "2026-11-21T05:01:52Z",
+        "favicon": ""
+      },
+      {
+        "title": "Time-evolved hetero-alkali interphases enable long-life sulfide-based anode-free solid-state batteries - Europe PMC",
+        "url": "https://europepmc.org/article/PMC/PMC13763863",
+        "highlight": "Placeholder highlight text.",
+        "full_content": "",
+        "authors": "",
+        "time_published": "2026-11-13T00:00:00Z",
+        "time_last_crawled": "2026-11-21T11:12:49Z",
+        "favicon": ""
+      },
+      {
+        "title": "Energy storage | Nature Communications",
+        "url": "https://preview-www.nature.com/subjects/energy-storage/ncomms",
+        "highlight": "Placeholder highlight text.",
+        "full_content": "",
+        "authors": "",
+        "time_published": "2026-11-20T00:00:00Z",
+        "time_last_crawled": "2026-11-20T13:08:01Z",
+        "favicon": ""
+      }
+    ]
+  },
+  "request_id": "20261121153943035B1G5DVBE1S",
+  "meta": {
+    "usage": {
+      "num_search_queries": 1,
+      "full_content_extra_count": 0
+    },
+    "latency": 470,
+    "result_type": "standard",
+    "warning": ""
+  },
+  "code": 0,
+  "msg": "success"
+}

@@ -79,6 +79,23 @@ export function assertQueryOrGroup(params: unknown): void {
   throw new OctenValidationError('query', 'query is required unless images.group_id is set; both are missing or blank.');
 }
 
+const EXTRACT_MAX_URLS = 20;
+const EXTRACT_MAX_URL_LENGTH = 2048;
+
+/** /extract: 1 to 20 URLs, each a non-blank string of at most 2048 characters (code points). */
+export function assertUrls(params: unknown): void {
+  const urls = field(params, 'urls');
+  if (!Array.isArray(urls) || urls.length === 0 || urls.length > EXTRACT_MAX_URLS) {
+    throw new OctenValidationError('urls', `urls is required and must be an array of 1 to ${EXTRACT_MAX_URLS} URLs.`);
+  }
+  urls.forEach((url: unknown, i) => {
+    if (!isNonBlank(url)) throw new OctenValidationError(`urls[${i}]`, `urls[${i}] must be a non-empty string.`);
+    if ([...url].length > EXTRACT_MAX_URL_LENGTH) {
+      throw new OctenValidationError(`urls[${i}]`, `urls[${i}] is longer than ${EXTRACT_MAX_URL_LENGTH} characters.`);
+    }
+  });
+}
+
 // JSON.stringify would send NaN, ±Infinity and undefined (or missing) array items as null,
 // silently changing the request; reject them with the same path format as checkUnknownFields.
 function assertJsonSafe(value: unknown, path: string): void {

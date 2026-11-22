@@ -8,10 +8,12 @@ export type TimeRange = (typeof TIME_RANGES)[number];
 type ClientConfig = { apiKey?: string; baseURL?: string; timeout?: number; maxRetries?: number };
 
 // A union so that passing client with any client option is a compile error; resolveClient checks it at runtime too.
+export type OctenClientOptions = ({ client: Octen } & { [K in keyof ClientConfig]?: never }) | ({ client?: undefined } & ClientConfig);
+
 export type OctenToolOptions<P> = {
   description?: string;
   defaults?: Partial<Omit<P, 'query'>>;
-} & ({ client: Octen } & { [K in keyof ClientConfig]?: never } | { client?: undefined } & ClientConfig);
+} & OctenClientOptions;
 
 export type ModelWebResult = {
   title?: string;
@@ -26,7 +28,7 @@ export type ModelField = 'query' | 'time_range';
 
 const CLIENT_KEYS = ['apiKey', 'baseURL', 'timeout', 'maxRetries'] as const;
 
-export function resolveClient(options: OctenToolOptions<unknown>): Octen {
+export function resolveClient(options: OctenClientOptions): Octen {
   if (options.client !== undefined) {
     for (const key of CLIENT_KEYS) {
       if (options[key] !== undefined) {

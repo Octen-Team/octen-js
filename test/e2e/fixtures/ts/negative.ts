@@ -22,5 +22,11 @@ void client.imageSearch.search({ query: 'q' });
 void client.videoSearch.search({ inputs: [{ type: 'image', url: 'u' }] });
 // @ts-expect-error design web_search has no safesearch
 void client.designSearch.search({ query: 'q', web_search: { safesearch: 'off' } });
+// @ts-expect-error extract takes urls as an array
+void client.extract.extract({ urls: 'https://example.com' });
+// @ts-expect-error extract mode enum
+void client.extract.extract({ urls: ['u'], mode: 'turbo' });
+// @ts-expect-error extract include_links has no max_link
+void client.extract.extract({ urls: ['u'], include_links: { max_link: 3 } });
 // @ts-expect-error unknown client option
 void new Octen({ apiKey: 'k', retries: 2 });

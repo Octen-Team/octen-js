@@ -4,10 +4,12 @@ import { Octen, OctenAPIError, OctenError } from '@octen.ai/sdk';
 import {
   octenBroadSearch,
   octenBusinessSearch,
+  octenExtract,
   octenNewsSearch,
   octenPlaceSearch,
   octenPulseSearch,
   octenWebSearch,
+  octenWebSearchPremier,
 } from '@octen.ai/ai-sdk-tools';
 import type { WebSearchToolResult } from '@octen.ai/ai-sdk-tools';
 
@@ -17,11 +19,13 @@ const client = new Octen({ apiKey: 'test-key' });
 export async function consume(): Promise<string> {
   const tools = {
     webSearch: octenWebSearch({ client }),
+    webSearchPremier: octenWebSearchPremier({ client, defaults: { count: 3 } }),
     broadSearch: octenBroadSearch({ client }),
     newsSearch: octenNewsSearch({ client, defaults: { time_range: 'week' } }),
     businessSearch: octenBusinessSearch({ client }),
     placeSearch: octenPlaceSearch({ client }),
     pulseSearch: octenPulseSearch({ client }),
+    extract: octenExtract({ client, maxUrls: 3, includeLinks: {} }),
   };
   const result = await generateText({ model, tools, stopWhen: stepCountIs(5), prompt: 'q' });
   for (const r of result.toolResults) {
@@ -52,5 +56,8 @@ export function optionTypes() {
     octenWebSearch({ client, apiKey: 'k' }),
     // @ts-expect-error `query` is chosen by the model, so it cannot be pinned through `defaults`.
     octenWebSearch({ defaults: { query: 'x' } }),
+    octenExtract({ apiKey: 'k', mode: 'advanced', urlTimeout: 45 }),
+    // @ts-expect-error Extract `mode` is standard, advanced or auto.
+    octenExtract({ apiKey: 'k', mode: 'fast' }),
   ];
 }

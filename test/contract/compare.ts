@@ -12,7 +12,9 @@ const SCALARS = new Set<string>(['string', 'integer', 'number', 'boolean']);
 
 function walk(mode: Mode, desc: Desc, flat: FlatSchema, path: string, known: Set<string>, used: Set<string>, out: string[]) {
   const sdkNullable = desc.nullable === true;
-  if (sdkNullable !== flat.nullable) {
+  // A known diff may only let the SDK accept null where the spec does not; the reverse is always reported
+  if (sdkNullable && !flat.nullable && known.has(path)) used.add(path);
+  else if (sdkNullable !== flat.nullable) {
     out.push(`${path}: nullable mismatch (sdk ${sdkNullable}, spec ${flat.nullable})`);
   }
 
@@ -96,7 +98,7 @@ export function compareRequest(desc: Desc, flat: FlatSchema, knownDiffs: readonl
   return compare('request', desc, flat, knownDiffs, path);
 }
 
-/** Response: field names (at every level including array elements and union variants) and nullability. Extra SDK fields must be registered in knownDiffs; fields the SDK lacks are always reported. */
+/** Response: field names (at every level including array elements and union variants) and nullability. Extra SDK fields and SDK-only nullability must be registered in knownDiffs; fields the SDK lacks are always reported. */
 export function compareResponse(desc: Desc, flat: FlatSchema, knownDiffs: readonly KnownDiff[], path: string): string[] {
   return compare('response', desc, flat, knownDiffs, path);
 }

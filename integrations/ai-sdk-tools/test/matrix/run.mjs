@@ -1,12 +1,13 @@
 // Version-matrix scenarios. Runs inside a temp project that installed the packed tarball,
-// @octen.ai/sdk, ai and zod (see scripts/matrix.sh). Usage: node run.mjs <search-fixture.json>
+// @octen.ai/sdk, ai and zod (see scripts/matrix.sh). Usage: node run.mjs <search-fixture.json> <extract-fixture.json>
 import { readFileSync } from 'node:fs';
 import * as ai from 'ai';
 import * as aiTest from 'ai/test';
 import { Octen, OctenAuthenticationError } from '@octen.ai/sdk';
-import { octenWebSearch } from '@octen.ai/ai-sdk-tools';
+import { octenExtract, octenWebSearch } from '@octen.ai/ai-sdk-tools';
 
 const fixture = JSON.parse(readFileSync(process.argv[2], 'utf8'));
+const extractFixture = JSON.parse(readFileSync(process.argv[3], 'utf8'));
 const installed = (name) =>
   JSON.parse(readFileSync(new URL(`./node_modules/${name}/package.json`, import.meta.url), 'utf8')).version;
 const FINAL_TEXT = 'Answer based on the search results.';
@@ -291,7 +292,76 @@ async function scenarioSchema() {
   check(failures, (await validate({ query: 'q', time_range: null })) === true, 'time_range null rejected');
   check(failures, (await validate({ query: 'q' })) === true, 'missing time_range rejected');
   check(failures, (await validate({ query: 'q', time_range: 'w' })) === false, "time_range 'w' accepted");
+  await extractInput(failures);
   return { failures, timeRange: JSON.stringify(byName.webSearch?.properties?.time_range) };
+}
+
+// Extract's URL cap: in the JSON schema, in the AI SDK's input check, and in what the model gets back, with no request.
+async function extractInput(failures) {
+  const http = fakeFetch(200);
+  const extract = octenExtract({ client: new Octen({ apiKey: 'test-key', fetch: http.fetch }), maxUrls: 2 });
+  const urls = ['https://example.com/1', 'https://example.com/2', 'https://example.com/3'];
+  const prompts = [];
+  const call = { type: 'tool-call', toolCallId: 'call-x', toolName: 'extract', input: JSON.stringify({ urls }) };
+  const model = new Mock({
+    doGenerate: async (options) => {
+      prompts.push(options);
+      return prompts.length === 1
+        ? { content: [call], finishReason: finishReason('tool-calls'), usage: usage(), warnings: [] }
+        : { content: [{ type: 'text', text: FINAL_TEXT }], finishReason: finishReason('stop'), usage: usage(), warnings: [] };
+    },
+  });
+  await ai.generateText({ model, tools: { extract }, stopWhen: stepCount(2), prompt: 'q' });
+  const schema = (prompts[0]?.tools ?? [])[0]?.inputSchema;
+  check(failures, Object.keys(schema?.properties ?? {}).sort().join(',') === 'query,urls', 'extract properties');
+  check(failures, JSON.stringify(schema?.required) === '["urls"]', 'extract required');
+  check(failures, schema?.properties?.urls?.maxItems === 2, `extract maxItems ${schema?.properties?.urls?.maxItems}`);
+  const validate = async (value) => (await ai.asSchema(extract.inputSchema).validate(value)).success;
+  check(failures, (await validate({ urls: urls.slice(0, 2), query: null })) === true, 'extract 2 URLs rejected');
+  check(failures, (await validate({ urls })) === false, 'extract 3 URLs accepted');
+  check(failures, (await validate({ urls: [] })) === false, 'extract empty list accepted');
+  check(failures, JSON.stringify(prompts[1]?.prompt ?? '').includes('at most 2 URLs'), 'extract cap message not sent to the model');
+  check(failures, http.calls.length === 0, `extract sent ${http.calls.length} requests over the cap`);
+  // Lengths count code points, as the JSON schema says: an emoji is one character, not two UTF-16 units.
+  const emojiUrl = (n) => `https://e.com/${'\u{1F600}'.repeat(n - 14)}`;
+  check(failures, (await validate({ urls: [emojiUrl(2048)] })) === true, 'extract URL of 2048 code points rejected');
+  check(failures, (await validate({ urls: [emojiUrl(2049)] })) === false, 'extract URL of 2049 code points accepted');
+  check(failures, (await validate({ urls: ['u'], query: '\u{1F600}'.repeat(500) })) === true, 'extract query of 500 code points rejected');
+  await extractCall(failures);
+}
+
+// An in-cap Extract call: one request to /extract, and the trimmed results reach the next model turn.
+async function extractCall(failures) {
+  const calls = [];
+  const fetch = async (url, init) => {
+    calls.push({ path: new URL(String(url)).pathname, body: JSON.parse(String(init?.body ?? '{}')) });
+    return new Response(JSON.stringify(extractFixture), { status: 200, headers: { 'content-type': 'application/json' } });
+  };
+  const extract = octenExtract({ client: new Octen({ apiKey: 'test-key', fetch, maxRetries: 0 }), maxUrls: 2 });
+  const urls = extractFixture.data.results.map((r) => r.url);
+  const prompts = [];
+  const call = { type: 'tool-call', toolCallId: 'call-e', toolName: 'extract', input: JSON.stringify({ urls }) };
+  const model = new Mock({
+    doGenerate: async (options) => {
+      prompts.push(options.prompt);
+      return prompts.length === 1
+        ? { content: [call], finishReason: finishReason('tool-calls'), usage: usage(), warnings: [] }
+        : { content: [{ type: 'text', text: FINAL_TEXT }], finishReason: finishReason('stop'), usage: usage(), warnings: [] };
+    },
+  });
+  await ai.generateText({ model, tools: { extract }, stopWhen: stepCount(2), prompt: 'q' });
+  check(failures, calls.length === 1 && calls[0].path === '/extract', `extract requests ${JSON.stringify(calls.map((c) => c.path))}`);
+  check(failures, JSON.stringify(calls[0]?.body) === JSON.stringify({ urls }), `extract body ${JSON.stringify(calls[0]?.body)}`);
+  // The tool result the next model call receives (output type json in ai 5, 6 and 7).
+  const part = (prompts[1] ?? []).flatMap((m) => (Array.isArray(m.content) ? m.content : [])).find((c) => c.type === 'tool-result');
+  const value = part?.output?.value ?? {};
+  check(failures, value.request_id === extractFixture.request_id, `extract request_id fed ${value.request_id}`);
+  const fed = (value.results ?? []).map((r) => `${r.url} ${r.status} ${r.error_message ?? ''}`.trim());
+  const want = extractFixture.data.results.map((r) => `${r.url} ${r.status} ${r.error_message ?? ''}`.trim());
+  check(failures, JSON.stringify(fed) === JSON.stringify(want), `extract results fed ${JSON.stringify(fed)}`);
+  const page = extractFixture.data.results.find((r) => r.status === 'success');
+  const fedPage = (value.results ?? []).find((r) => r.url === page.url);
+  check(failures, fedPage?.full_content === page.full_content, `extract full_content fed ${JSON.stringify(fedPage?.full_content)}`);
 }
 
 // Observation only: what generateText does after a tool-call step when stopWhen is not set.

@@ -3,7 +3,14 @@
 
 import { generateText, stepCountIs, streamText } from 'ai';
 import { anthropic } from '@ai-sdk/anthropic';
-import { octenBroadSearch, octenNewsSearch, octenPlaceSearch, octenWebSearch } from '@octen.ai/ai-sdk-tools';
+import {
+  octenBroadSearch,
+  octenExtract,
+  octenNewsSearch,
+  octenPlaceSearch,
+  octenWebSearch,
+  octenWebSearchPremier,
+} from '@octen.ai/ai-sdk-tools';
 import { Octen, OctenAPIError, OctenError } from '@octen.ai/sdk';
 
 export async function quickStart(): Promise<void> {
@@ -14,6 +21,27 @@ export async function quickStart(): Promise<void> {
     prompt: 'What changed in the latest Node.js LTS release? Cite your sources.',
   });
   console.log(text);
+}
+
+export async function premierSettings(): Promise<void> {
+  // The model still only writes the query and may pick a time range; the rest is fixed here.
+  const premier = octenWebSearchPremier({
+    defaults: { count: 3, result_type: 'dynamic', include_domains: ['nature.com', 'science.org'] },
+  });
+}
+
+export async function extractTool(): Promise<void> {
+  // The model finds pages with web search, then reads up to three of them per call.
+  const { text: summary } = await generateText({
+    model: anthropic('claude-opus-5-5'),
+    tools: {
+      webSearch: octenWebSearch(),
+      readPages: octenExtract({ maxUrls: 3, maxAgeSeconds: 3600, includeLinks: { maxLinks: 20 } }),
+    },
+    stopWhen: stepCountIs(8),
+    prompt: 'Read the latest Node.js release announcement and list its three biggest changes.',
+  });
+  console.log(summary);
 }
 
 export async function optionsAndPrecedence(): Promise<void> {

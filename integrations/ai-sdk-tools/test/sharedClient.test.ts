@@ -7,6 +7,7 @@ import { octenNewsSearch } from '../src/tools/newsSearch.js';
 import { octenPlaceSearch } from '../src/tools/placeSearch.js';
 import { octenPulseSearch } from '../src/tools/pulseSearch.js';
 import { octenWebSearch } from '../src/tools/webSearch.js';
+import { octenWebSearchPremier } from '../src/tools/webSearchPremier.js';
 import { clientFor, hangUntilAborted, jsonResponse, recordingFetch, run } from './helpers.js';
 import broadFixture from './fixtures/broad-search.json';
 import businessFixture from './fixtures/business-search.json';
@@ -14,6 +15,7 @@ import newsFixture from './fixtures/news-search.json';
 import placeFixture from './fixtures/place-search.json';
 import pulseFixture from './fixtures/pulse-search.json';
 import searchFixture from './fixtures/search.json';
+import premierFixture from './fixtures/search-premier.json';
 
 type Entry = {
   name: string;
@@ -27,6 +29,7 @@ type Entry = {
 // Add one entry per tool.
 const ENTRIES: Entry[] = [
   { name: 'web search', make: (client) => octenWebSearch({ client }), input: { query: 'q' }, path: '/search', fixture: searchFixture },
+  { name: 'web search premier', make: (client) => octenWebSearchPremier({ client }), input: { query: 'q' }, path: '/search-premier', fixture: premierFixture },
   { name: 'pulse search', make: (client) => octenPulseSearch({ client }), input: { query: 'q' }, path: '/pulse-search', fixture: pulseFixture },
   { name: 'broad search', make: (client) => octenBroadSearch({ client }), input: { query: 'q' }, path: '/broad-search', fixture: broadFixture },
   { name: 'news search', make: (client) => octenNewsSearch({ client }), input: { query: 'q' }, path: '/news-search', fixture: newsFixture },

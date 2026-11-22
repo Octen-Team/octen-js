@@ -6,5 +6,13 @@
   {
     "path": "BroadSearchResponse.msg",
     "reason": "Returned by the server but absent from the public OpenAPI schema."
+  },
+  {
+    "path": "ExtractResponse.data.results[].page_structure",
+    "reason": "Nullable in the SDK: the spec's description says it is null when the structure cannot be determined, but the schema does not mark it nullable."
+  },
+  {
+    "path": "ExtractResponse.data.results[].category",
+    "reason": "Nullable in the SDK: the spec's description says it is null when the category cannot be determined, but the schema does not mark it nullable."
   }
 ]

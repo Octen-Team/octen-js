@@ -12,7 +12,15 @@ const TSX = join(ROOT, 'node_modules/.bin/tsx');
 const dir = mkdtempSync(join(tmpdir(), 'octen-spec-drift-'));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
-type Property = { enum?: string[]; minItems?: number; maxItems?: number };
+type Property = {
+  enum?: string[];
+  minItems?: number;
+  maxItems?: number;
+  items?: Record<string, unknown>;
+  default?: number;
+  minimum?: number;
+  maximum?: number;
+};
 type Spec = { components: { schemas: Record<string, { properties: Record<string, Property> }> } };
 
 function writeSpec(name: string, mutate: (s: Spec) => void): string {
@@ -82,6 +90,74 @@ describe('scripts/spec-drift.ts', { timeout: 30_000 }, () => {
     });
     const r = run(live);
     expect(r.out).toContain(expected);
+    expect(r.status).toBe(1);
+  });
+
+  // The SDK checks the urls limits locally; the spec states them only in the description, so a change there is drift.
+  test('a changed urls description of /extract exits 1', () => {
+    const live = writeSpec('extract-urls-text.json', (s) => {
+      const urls = s.components.schemas.ExtractRequest!.properties.urls as Property & { description: string };
+      urls.description = urls.description.replace('Maximum URLs per request: 20.', 'Maximum URLs per request: 50.');
+    });
+    const r = run(live);
+    expect(r.out).toMatch(/\/extract request\.urls: description ".*20\..*" -> ".*50\..*"/);
+    expect(r.status).toBe(1);
+  });
+
+  test('urls bounds added to /extract exit 1', () => {
+    const live = writeSpec('extract-urls-bounds.json', (s) => {
+      s.components.schemas.ExtractRequest!.properties.urls!.maxItems = 20;
+    });
+    const r = run(live);
+    expect(r.out).toContain('/extract request.urls: maxItems none -> 20');
+    expect(r.status).toBe(1);
+  });
+
+  // The SDK checks each URL against 2048 characters, so an item length bound in the spec must not change silently
+  test('a urls item maxLength added to /extract exits 1, with nothing else changed', () => {
+    const live = writeSpec('extract-urls-item-maxlength.json', (s) => {
+      const urls = s.components.schemas.ExtractRequest!.properties.urls!;
+      urls.items = { ...urls.items, maxLength: 4096 };
+    });
+    const r = run(live);
+    expect(r.out).toContain('/extract request.urls[].maxLength: none -> 4096');
+    expect(r.out).toMatch(/Spec drift in 1 place/);
+    expect(r.status).toBe(1);
+  });
+
+  // The SDK and the tools reject an empty URL, so an item minLength added upstream must not go unnoticed
+  test('a urls item minLength added to /extract exits 1, with nothing else changed', () => {
+    const live = writeSpec('extract-urls-item-minlength.json', (s) => {
+      const urls = s.components.schemas.ExtractRequest!.properties.urls!;
+      urls.items = { ...urls.items, minLength: 1 };
+    });
+    const r = run(live);
+    expect(r.out).toContain('/extract request.urls[].minLength: none -> 1');
+    expect(r.out).toMatch(/Spec drift in 1 place/);
+    expect(r.status).toBe(1);
+  });
+
+  // The default HTTP timeout of extract derives from the per-URL timeout's default and range
+  test.each([
+    ['default', 45, '/extract request.timeout.default: 30 -> 45'],
+    ['minimum', 5, '/extract request.timeout.minimum: 1 -> 5'],
+    ['maximum', 120, '/extract request.timeout.maximum: 60 -> 120'],
+  ] as const)('a changed /extract timeout %s exits 1', (key, value, expected) => {
+    const live = writeSpec(`extract-timeout-${key}.json`, (s) => {
+      s.components.schemas.ExtractRequest!.properties.timeout![key] = value;
+    });
+    const r = run(live);
+    expect(r.out).toContain(expected);
+    expect(r.out).toMatch(/Spec drift in 1 place/);
+    expect(r.status).toBe(1);
+  });
+
+  test('a property removed from ExtractResult is reported', () => {
+    const live = writeSpec('extract-result.json', (s) => {
+      delete s.components.schemas.ExtractResult!.properties.resolved_mode;
+    });
+    const r = run(live);
+    expect(r.out).toContain('/extract response.data.results[].resolved_mode: removed from live spec');
     expect(r.status).toBe(1);
   });
 

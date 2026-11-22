@@ -189,6 +189,24 @@ describe('compareResponse', () => {
     expect(compareResponse(d, resFlat, [], 'Res')).toEqual([expect.stringMatching(/Res\.data\.warning.*null/)]);
   });
 
+  test('a known diff lets the SDK accept null where the spec does not, and must still apply', () => {
+    const d = mutateRes((x) => (x.fields.data.fields.results.items.fields.title.nullable = true));
+    const known: KnownDiff[] = [{ path: 'Res.data.results[].title', reason: 'documented null in prose' }];
+    expect(compareResponse(d, resFlat, [], 'Res')).toEqual([expect.stringMatching(/Res\.data\.results\[\]\.title.*null/)]);
+    expect(compareResponse(d, resFlat, known, 'Res')).toEqual([]);
+    expect(compareResponse(goodRes, resFlat, known, 'Res')).toEqual([
+      expect.stringContaining('Res.data.results[].title: listed in known_diffs.json'),
+    ]);
+  });
+
+  test('a known diff never excuses the SDK dropping a nullable the spec has', () => {
+    const d = mutateRes((x) => delete x.fields.data.fields.warning.nullable);
+    const known: KnownDiff[] = [{ path: 'Res.data.warning', reason: 'r' }];
+    expect(compareResponse(d, resFlat, known, 'Res')).toEqual(
+      expect.arrayContaining([expect.stringMatching(/Res\.data\.warning: nullable mismatch/)]),
+    );
+  });
+
   test('union variants are compared field by field', () => {
     const d = mutateRes((x) => delete x.fields.data.fields.entities.items.variants.person.fields.title);
     expect(compareResponse(d, resFlat, [], 'Res')).toEqual([expect.stringContaining('Res.data.entities[]{person}.title')]);
@@ -203,9 +221,14 @@ describe('compareResponse', () => {
 });
 
 describe('known_diffs.json', () => {
-  test('snapshot file is valid and holds the two seeded entries', () => {
+  test('snapshot file is valid and holds the seeded entries', () => {
     const diffs = loadKnownDiffs();
-    expect(diffs.map((d) => d.path).sort()).toEqual(['BroadSearchResponse.msg', 'PlaceSearchRequest.places.max_reviews']);
+    expect(diffs.map((d) => d.path).sort()).toEqual([
+      'BroadSearchResponse.msg',
+      'ExtractResponse.data.results[].category',
+      'ExtractResponse.data.results[].page_structure',
+      'PlaceSearchRequest.places.max_reviews',
+    ]);
     for (const d of diffs) expect(d.reason.trim()).not.toBe('');
   });
 
