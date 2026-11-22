@@ -535,18 +535,23 @@ describe('live: design search against production', () => {
 
   it('returns the images of a group from an earlier result, in group order', { timeout: TIMEOUT }, async () => {
     // A group of at least three images, so the order check covers several concrete positions.
-    const group = (await designControl()).out.images.map((i) => i.group).find((g) => (g?.total ?? 0) >= 3);
+    const seed = (await designControl()).out.images.find((i) => (i.group?.total ?? 0) >= 3);
+    const group = seed?.group;
     expect(group?.group_id, 'the control has a group of three or more images').toBeTruthy();
     const log: Sent[] = [];
-    const out = (await runTool(octenDesignSearch({ client: sentClient(log) }), { group_id: group!.group_id })) as DesignSearchToolResult;
-    expect(log[0]?.body).toEqual({ images: { group_id: group!.group_id } });
+    // A count above the usual group size, so the returned prefix normally reaches the seed's own position.
+    const out = (await runTool(octenDesignSearch({ client: sentClient(log), images: { count: 20 } }), { group_id: group!.group_id })) as DesignSearchToolResult;
+    expect(log[0]?.body).toEqual({ images: { count: 20, group_id: group!.group_id } });
     const ids = out.images.map((i) => i.group?.group_id);
     expect(ids.length).toBeGreaterThanOrEqual(3);
     expect(ids.every((id) => id === group!.group_id), JSON.stringify(ids)).toBe(true);
     const positions = out.images.map((i) => i.group?.position);
-    // The API default count is 5, so the first min(5, total) positions in order.
-    const expected = Array.from({ length: Math.min(5, group!.total!) }, (_, i) => i + 1);
+    const expected = Array.from({ length: Math.min(20, group!.total!) }, (_, i) => i + 1);
     expect(positions).toEqual(expected);
+    // The seed image itself must sit at its own position when that position is within the returned prefix.
+    const seedChecked = (group!.position ?? Infinity) <= expected.length;
+    if (seedChecked) expect(urlPath(out.images[group!.position! - 1]?.url)).toBe(urlPath(seed!.url));
+    console.log(`[live-design] seed position ${group!.position}, checked ${seedChecked}`);
     console.log(`[live-design] group ${group!.group_id} total ${group!.total}: positions ${positions.join(',')}, web results ${out.results.length}`);
   });
 
@@ -606,8 +611,10 @@ describe('live: design search against production', () => {
     const control = (await designControl()).out.results;
     expect(control.some((r) => r.highlight !== undefined), 'the control has highlights').toBe(true);
     expect(control.some((r) => r.full_content !== undefined), 'the control has no full content').toBe(false);
-    const t = octenDesignSearch({ webSearch: { highlight: { enable: false }, fullContent: { enable: true, maxTokens: 200 } } });
+    const log: Sent[] = [];
+    const t = octenDesignSearch({ client: sentClient(log), webSearch: { highlight: { enable: false }, fullContent: { enable: true, maxTokens: 200 } } });
     const out = (await runTool(t, { query: DESIGN_QUERY })) as DesignSearchToolResult;
+    expect(log[0]?.body).toEqual({ query: DESIGN_QUERY, web_search: { highlight: { enable: false }, full_content: { enable: true, max_tokens: 200 } } });
     expect(out.results.length).toBeGreaterThan(0);
     expect(out.results.some((r) => r.highlight !== undefined)).toBe(false);
     expect(out.results.some((r) => (r.full_content ?? '') !== '')).toBe(true);
