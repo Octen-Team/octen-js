@@ -298,10 +298,10 @@ The message is taken from the response body's `msg`, `message`, `detail` or `err
 
 **Known residual risk of double billing.** There are no idempotency keys yet, so two situations can bill a request twice or bill a request that looked like it failed:
 
-1. An edge gateway or load balancer returns 408, 502, 503 or 504 after the backend already succeeded; the retry then runs and is billed again.
+1. An edge gateway or load balancer returns 408, 502, 503 or 504 after the backend already succeeded; the retry then runs and is billed again. With the default `maxRetries: 3` this can happen on every retry, so one call can be billed up to 4 times.
 2. The server records the billing event but fails while writing the response (for example the connection is recycled mid-response). You see a network error, the SDK does not retry it, but the call was billed.
 
-Extract follows the same policy and is billed per successful URL, so in the first case the retry can bill every URL that succeeded on the first attempt a second time, up to 20 URLs at the `advanced` rate.
+Extract follows the same policy and is billed per successful URL, so in the first case each retry can bill again every URL that succeeded: with the default `maxRetries: 3`, up to 4 times per URL, so a batch of 20 URLs at the `advanced` rate can be billed up to 80 times. Pre-send network errors are also retried, but those requests never reached the server and are not billed.
 
 For billing-sensitive jobs, set `maxRetries: 0` and handle retries yourself. Server-side idempotency keys are the proper fix and are not available yet.
 
