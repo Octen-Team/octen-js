@@ -93,7 +93,9 @@ function dateTime(value: unknown, field: string): string | undefined {
   return value;
 }
 
+// [] is the API's default (no language filter), so it is treated like an unset option and not sent.
 function languages(value: unknown): DesignLanguage[] | undefined {
+  if (Array.isArray(value) && value.length === 0) return undefined;
   const list = stringList(value, 'webSearch.language', LANGUAGES.length);
   list?.forEach((code, i) => oneOf(code, LANGUAGES, `webSearch.language[${i}]`));
   return list as DesignLanguage[] | undefined;

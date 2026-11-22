@@ -211,7 +211,6 @@ describe('octenDesignSearch construction', () => {
     ['domain of 61 characters', 'webSearch.includeDomains[0]', { webSearch: { includeDomains: [`${'a'.repeat(57)}.com`] } }],
     ['1201 domains', 'webSearch.excludeDomains', { webSearch: { excludeDomains: Array.from({ length: 1201 }, (_, i) => `d${i}.com`) } }],
     ['language xx', 'webSearch.language[1]', { webSearch: { language: ['en', 'xx'] } }],
-    ['language []', 'webSearch.language', { webSearch: { language: [] } }],
     ['timeBasis indexed', 'webSearch.timeBasis', { webSearch: { timeBasis: 'indexed' } }],
     ['timeRange w', 'webSearch.timeRange', { webSearch: { timeRange: 'w' } }],
     ['startTime date only', 'webSearch.startTime', { webSearch: { startTime: '2025-01-01' } }],
@@ -491,5 +490,22 @@ describe('octenDesignSearch review round 6', () => {
     expect((err as OctenValidationError).field).toBe(field);
     expect((err as Error).message).toMatch(/No request was made\.$/);
     expect(calls).toHaveLength(0);
+  });
+});
+
+describe('octenDesignSearch review round 7', () => {
+  // The API reference gives [] as the language default (no filter); like other unset options it is not sent.
+  it('treats language [] as no language filter and leaves it out of the request', async () => {
+    const { t, calls } = build({ webSearch: { language: [], count: 3 } });
+    await run(t, { query: 'q' });
+    expect(calls[0]?.body).toEqual({ query: 'q', web_search: { count: 3 } });
+  });
+
+  it('still sends and checks a non-empty language list', async () => {
+    const { t, calls } = build({ webSearch: { language: ['en'] } });
+    await run(t, { query: 'q' });
+    expect(calls[0]?.body).toEqual({ query: 'q', web_search: { language: ['en'] } });
+    const err = thrown(() => octenDesignSearch({ client: new Octen({ apiKey: 'test-key' }), webSearch: { language: ['en', 'xx'] } } as unknown as OctenDesignSearchOptions));
+    expect((err as OctenValidationError).field).toBe('webSearch.language[1]');
   });
 });

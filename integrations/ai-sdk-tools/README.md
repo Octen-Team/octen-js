@@ -183,7 +183,7 @@ console.log(ideas);
 | `webSearch.highlight` | `web_search.highlight` | `{ enable?: boolean, maxTokens?: 100 to 20000 }` | not sent; on, 512 tokens |
 | `webSearch.fullContent` | `web_search.full_content` | `{ enable?: boolean, maxTokens?: 100 to 100000 }` | not sent; off |
 | `webSearch.includeDomains`, `webSearch.excludeDomains` | `web_search.include_domains`, `web_search.exclude_domains` | 1 to 1200 domains of at most 60 characters | not sent |
-| `webSearch.language` | `web_search.language` | ISO 639-1 codes: `ar`, `de`, `en`, `es`, `fr`, `hi`, `id`, `it`, `ja`, `ko`, `nl`, `pl`, `pt`, `ru`, `th`, `tr`, `vi`, `zh` | not sent; no language filter |
+| `webSearch.language` | `web_search.language` | ISO 639-1 codes: `ar`, `de`, `en`, `es`, `fr`, `hi`, `id`, `it`, `ja`, `ko`, `nl`, `pl`, `pt`, `ru`, `th`, `tr`, `vi`, `zh`; `[]` means no filter, like leaving it unset | not sent; no language filter |
 | `webSearch.timeBasis` | `web_search.time_basis` | `'auto'`, `'published'` or `'crawled'` | not sent; `auto` |
 | `webSearch.timeRange` | `web_search.time_range` | `'day'`, `'week'`, `'month'` or `'year'` | not sent; no time filter |
 | `webSearch.startTime`, `webSearch.endTime` | `web_search.start_time`, `web_search.end_time` | RFC 3339 date-time with seconds and a time zone, e.g. `'2025-01-01T00:00:00Z'`; every field must be in range (no `2025-02-30` or `+24:00`), and `startTime` may not be after `endTime` | not sent |

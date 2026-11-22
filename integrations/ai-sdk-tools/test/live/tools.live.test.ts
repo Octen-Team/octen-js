@@ -404,7 +404,7 @@ describe('live: extract against production', () => {
   });
 });
 
-// Image Search: 6 billed calls per run; no model is called. Each option is compared with a control on the same query.
+// Image Search: 6 billed calls per run; no model is called. Each option is compared with a control or the API default.
 const IMAGE_QUERY = 'red vintage sports car';
 // A night photo of the Eiffel Tower whose URL names no subject; the Commons file page describes it as
 // "Tour Eiffel" in Category:Eiffel Tower illuminated yellow (commons.wikimedia.org/wiki/File:P_20170811_002542.jpg).
@@ -466,14 +466,14 @@ describe('live: image search against production', () => {
     console.log(`[live-image] include ${domain}: ${included.length}; exclude ${dropped}: ${excluded.map(hostOf).join(' ')}`);
   });
 
+  // More than the API default of 5 can only come from the count; the result check runs first so a dropped count fails it.
   it('honors a developer count above the default and sends safesearch', { timeout: TIMEOUT }, async () => {
-    const control = (await imageControl()).out.results.length;
     const log: Sent[] = [];
     const out = (await runTool(octenImageSearch({ client: sentClient(log), count: 8, safesearch: 'strict' }), { query: IMAGE_QUERY })) as ImageSearchToolResult;
-    expect(log[0]?.body).toEqual({ inputs: [{ type: 'text', data: IMAGE_QUERY }], count: 8, safesearch: 'strict' });
-    expect(out.results.length).toBeGreaterThan(control);
+    console.log(`[live-image] count 8: ${out.results.length} results`);
+    expect(out.results.length).toBeGreaterThan(5);
     expect(out.results.length).toBeLessThanOrEqual(8);
-    console.log(`[live-image] count 8: ${out.results.length} results, control ${control}`);
+    expect(log[0]?.body).toEqual({ inputs: [{ type: 'text', data: IMAGE_QUERY }], count: 8, safesearch: 'strict' });
   });
 
   it('keeps a developer include_domains when the model sends its own', { timeout: TIMEOUT }, async () => {
@@ -555,12 +555,12 @@ describe('live: design search against production', () => {
     console.log(`[live-design] group ${group!.group_id} total ${group!.total}: positions ${positions.join(',')}, web results ${out.results.length}`);
   });
 
+  // More than the API default of 5 can only come from images.count.
   it('honors a developer images.count above the default', { timeout: TIMEOUT }, async () => {
-    const control = (await designControl()).out.images.length;
     const out = (await runTool(octenDesignSearch({ images: { count: 8 } }), { query: DESIGN_QUERY })) as DesignSearchToolResult;
-    expect(out.images.length).toBeGreaterThan(control);
+    console.log(`[live-design] images.count 8: ${out.images.length}`);
+    expect(out.images.length).toBeGreaterThan(5);
     expect(out.images.length).toBeLessThanOrEqual(8);
-    console.log(`[live-design] images.count 8: ${out.images.length}, control ${control}`);
   });
 
   // Same query and count as the control, which has both on; image URLs are signed, so images match by path.
