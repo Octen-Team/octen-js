@@ -359,6 +359,9 @@ async function extractCall(failures) {
   const fed = (value.results ?? []).map((r) => `${r.url} ${r.status} ${r.error_message ?? ''}`.trim());
   const want = extractFixture.data.results.map((r) => `${r.url} ${r.status} ${r.error_message ?? ''}`.trim());
   check(failures, JSON.stringify(fed) === JSON.stringify(want), `extract results fed ${JSON.stringify(fed)}`);
+  const page = extractFixture.data.results.find((r) => r.status === 'success');
+  const fedPage = (value.results ?? []).find((r) => r.url === page.url);
+  check(failures, fedPage?.full_content === page.full_content, `extract full_content fed ${JSON.stringify(fedPage?.full_content)}`);
 }
 
 // Observation only: what generateText does after a tool-call step when stopWhen is not set.
