@@ -19,13 +19,18 @@ const ENDPOINTS = [
   '/image-search',
   '/video-search',
   '/design-search',
+  '/extract',
 ];
 
-// flattenSchema drops minItems/maxItems; these arrays are checked locally (exactly one input), so compare their bounds too
+// flattenSchema drops minItems/maxItems; these arrays are checked locally (exactly one input, 1-20 URLs), so compare their bounds too
 const CARDINALITY = [
   ['/image-search', 'inputs'],
   ['/video-search', 'inputs'],
+  ['/extract', 'urls'],
 ] as const;
+
+// The spec states the urls limits (20 URLs, 2048 characters each) only in the description, so compare it verbatim
+const LIMIT_TEXT = [['/extract', 'urls']] as const;
 
 type Raw = Record<string, unknown>;
 
@@ -91,12 +96,17 @@ function expand(spec: OpenAPI, node: unknown, stack: readonly string[] = []): Ra
   return out;
 }
 
-// minItems / maxItems of a request property ("none" when absent), resolved through $ref and allOf
-function cardinality(spec: OpenAPI, path: string, prop: string): Bounds {
+// Every node defining a request property, resolved through $ref and allOf
+function propertyNodes(spec: OpenAPI, path: string, prop: string): Raw[] {
   const schema = expand(spec, { $ref: schemaRef(spec, path, 'request') });
   const defs = schema.map((n) => (isRaw(n.properties) ? n.properties[prop] : undefined)).filter(isRaw);
   if (defs.length === 0) throw new Error(`${path}: request property "${prop}" not found`);
-  const nodes = defs.flatMap((d) => expand(spec, d));
+  return defs.flatMap((d) => expand(spec, d));
+}
+
+// minItems / maxItems of a request property ("none" when absent)
+function cardinality(spec: OpenAPI, path: string, prop: string): Bounds {
+  const nodes = propertyNodes(spec, path, prop);
   const bound = (k: string) => {
     const values = [...new Set(nodes.map((n) => n[k]).filter((v) => typeof v === 'number'))];
     if (values.length > 1) throw new Error(`${path}: conflicting ${k} for "${prop}": ${values.join(', ')}`);
@@ -107,6 +117,18 @@ function cardinality(spec: OpenAPI, path: string, prop: string): Bounds {
 
 function cardinalityAll(spec: OpenAPI): Map<string, Bounds> {
   return new Map(CARDINALITY.map(([path, prop]) => [`${path} request.${prop}`, cardinality(spec, path, prop)]));
+}
+
+// The description text(s) of a request property, joined; "none" when it has none
+function limitText(spec: OpenAPI, path: string, prop: string): string {
+  const texts = propertyNodes(spec, path, prop)
+    .map((n) => n.description)
+    .filter((d): d is string => typeof d === 'string');
+  return texts.length === 0 ? 'none' : texts.join(' | ');
+}
+
+function limitTextAll(spec: OpenAPI): Map<string, string> {
+  return new Map(LIMIT_TEXT.map(([path, prop]) => [`${path} request.${prop}`, limitText(spec, path, prop)]));
 }
 
 function diffCardinality(a: Bounds, b: Bounds, where: string, out: string[]): void {
@@ -144,10 +166,13 @@ async function main(): Promise<number> {
   let live: Map<string, FlatSchema>;
   let snapshotBounds: Map<string, Bounds>;
   let liveBounds: Map<string, Bounds>;
+  let snapshotLimits: Map<string, string>;
+  let liveLimits: Map<string, string>;
   try {
     const spec = JSON.parse(readFileSync(SNAPSHOT_PATH, 'utf8')) as OpenAPI;
     snapshot = flattenAll(spec);
     snapshotBounds = cardinalityAll(spec);
+    snapshotLimits = limitTextAll(spec);
   } catch (err) {
     console.error(`cannot read the snapshot (${SNAPSHOT_PATH}): ${String(err)}`);
     return 2;
@@ -156,6 +181,7 @@ async function main(): Promise<number> {
     const spec = await downloadLive();
     live = flattenAll(spec);
     liveBounds = cardinalityAll(spec);
+    liveLimits = limitTextAll(spec);
   } catch (err) {
     // A structure flattenSchema does not recognize in the live spec also needs a human look
     console.error(`cannot read the live spec (${LIVE_URL}): ${String(err)}`);
@@ -168,6 +194,10 @@ async function main(): Promise<number> {
   }
   for (const [name, bounds] of snapshotBounds) {
     diffCardinality(bounds, liveBounds.get(name) as Bounds, name, differences);
+  }
+  for (const [name, text] of snapshotLimits) {
+    const after = liveLimits.get(name);
+    if (text !== after) differences.push(`${name}: description ${JSON.stringify(text)} -> ${JSON.stringify(after)}`);
   }
   if (differences.length === 0) {
     console.log(`No drift: ${snapshot.size} request/response schemas match the snapshot.`);
