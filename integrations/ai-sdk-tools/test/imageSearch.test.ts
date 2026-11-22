@@ -359,7 +359,8 @@ describe('octenImageSearch review fixes', () => {
     expect((err as OctenAPIError).status).toBe(status);
     expect((err as OctenAPIError).requestId).toBe(`req-${status}`);
     expect((err as Error).message).toMatch(text);
-    expect((err as Error).message).toMatch(/server says no/);
+    // An image-URL call never repeats upstream text, which could carry a copy of a signed URL.
+    expect((err as Error).message).not.toMatch(/server says no/);
     expect(rec.calls).toHaveLength(1);
   });
 
@@ -398,25 +399,39 @@ describe('octenImageSearch review fixes', () => {
 describe('octenImageSearch review round 3', () => {
   const SIGNED = 'https://cdn.example.com/a.png?sig=SECRET-TOKEN%2Bx&se=2026-11-22';
 
-  it.each([413, 415])('redacts the submitted image URL from the HTTP %i message and body', async (status) => {
-    const echo = `cannot use ${SIGNED}`;
+  it.each([413, 415])('keeps every echo of the submitted image URL out of the HTTP %i message and body', async (status) => {
+    // A truncated and a normalized copy, which string replacement of the exact URL would miss.
+    const echo = `cannot use ${SIGNED.slice(0, 40)} (${new URL(SIGNED).href.toUpperCase()})`;
     const rec = recordingFetch(() => jsonResponse({ code: status, msg: echo, request_id: `req-${status}`, detail: { url: SIGNED } }, status));
     const err = (await run(octenImageSearch({ client: clientFor(rec.fakeFetch) }), { image_url: SIGNED }).catch((e: unknown) => e)) as OctenAPIError;
     expect(err).toBeInstanceOf(OctenAPIError);
     expect(err.status).toBe(status);
     expect(err.requestId).toBe(`req-${status}`);
     expect(err.message).toMatch(/Try a smaller image|supported format|Try an image/);
-    expect(err.message).toMatch(/cannot use \[image URL\]/);
-    const exposed = `${err.message} ${JSON.stringify(err.body)}`;
-    expect(exposed).not.toContain('SECRET-TOKEN');
+    expect(err.message).toBe(`${err.message.split(' (HTTP')[0]} (HTTP ${status}, request req-${status})`);
+    const exposed = `${err.message} ${JSON.stringify(err.body) ?? ''}`.toLowerCase();
+    expect(exposed).not.toContain('secret-to');
     expect(exposed).not.toContain('cdn.example.com');
+    expect(exposed).not.toContain('cannot use');
   });
 
-  it('redacts a query string the API echoes on its own', async () => {
-    const rec = recordingFetch(() => jsonResponse({ code: 413, msg: 'bad query sig=SECRET-TOKEN%2Bx&se=2026-11-22', request_id: 'r' }, 413));
-    const err = (await run(octenImageSearch({ client: clientFor(rec.fakeFetch) }), { image_url: SIGNED }).catch((e: unknown) => e)) as Error;
-    expect(err.message).not.toContain('SECRET-TOKEN');
+  it('keeps the upstream message and body for a text query call', async () => {
+    const rec = recordingFetch(() => jsonResponse({ code: 413, msg: 'query too large', request_id: 'r' }, 413));
+    const err = (await run(octenImageSearch({ client: clientFor(rec.fakeFetch) }), { query: 'q' }).catch((e: unknown) => e)) as OctenAPIError;
+    expect(err.message).toMatch(/Try a smaller image.*query too large/s);
+    expect(err.body).toEqual({ code: 413, msg: 'query too large', request_id: 'r' });
   });
+
+  it.each(['\u0000https://example.com/a.png', 'https://example.com/a\u0001.png', 'https://example.com/a.png\u007f', 'https:///example.com/a.png', 'http://?x=1'])(
+    'refuses the image URL %j with a control character or an empty authority, without a request',
+    async (url) => {
+      const { t, calls } = build();
+      const err = await run(t, { image_url: url }).catch((e: unknown) => e);
+      expect((err as OctenValidationError).field).toBe('image_url');
+      expect(calls).toHaveLength(0);
+      expect((await rejection({ image_url: url })).success).toBe(false);
+    },
+  );
 
   it.each(['https:example.com/a.png', 'http:/example.com/a.png', 'https://exa mple.com/photo.png', ' https://example.com/a.png', 'https://example.com/a.png\n'])(
     'refuses %j without a request',
