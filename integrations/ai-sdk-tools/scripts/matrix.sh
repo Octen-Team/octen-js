@@ -8,7 +8,7 @@ PKG_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MATRIX_DIR="$PKG_DIR/test/matrix"
 FIXTURE="$PKG_DIR/test/fixtures/search.json"
 EXTRACT_FIXTURE="$PKG_DIR/test/fixtures/extract.json"
-SDK_SPEC="${MATRIX_SDK:-@octen.ai/sdk@0.2.0}"
+SDK_SPEC="${MATRIX_SDK:-@octen.ai/sdk@0.3.0}"
 NODE20="${MATRIX_NODE20:-npx -y node@20}"
 # Type-check toolchain, pinned so results do not drift between runs. With skipLibCheck off,
 # the AI SDK's own declarations import json-schema, which ships no types of its own.
@@ -60,7 +60,7 @@ else
 usage: $0 [ai-version zod-version]
   With no arguments, runs the six pinned combos plus ai@latest/zod@latest under Node 20 and the default node.
   MATRIX_TMPDIR  parent for the temp projects (default: \$TMPDIR or /tmp)
-  MATRIX_SDK     npm spec of the Octen SDK to install (default: @octen.ai/sdk@0.2.0)
+  MATRIX_SDK     npm spec of the Octen SDK to install (default: @octen.ai/sdk@0.3.0)
   MATRIX_NODE20  command that runs Node 20 (default: npx -y node@20)
   MATRIX_KEEP=1  keep the temp projects instead of deleting them on exit
 USAGE
