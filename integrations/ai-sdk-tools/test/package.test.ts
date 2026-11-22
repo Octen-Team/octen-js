@@ -22,9 +22,9 @@ describe('package metadata', () => {
     expect(pkg.peerDependencies.zod).toBe('^3.25.76 || ^4.1.8');
   });
 
-  // extract needs SDK 0.3.0; 0.2.x stays in the range until 0.3.0 is published and the lockfile can pin it.
-  it('depends on the Octen SDK 0.2.x or 0.3.x', () => {
-    expect(pkg.dependencies['@octen.ai/sdk']).toBe('^0.2.0 || ^0.3.0');
+  // octenExtract needs the Extract API, added in SDK 0.3.0.
+  it('depends on the Octen SDK 0.3.x', () => {
+    expect(pkg.dependencies['@octen.ai/sdk']).toBe('^0.3.0');
   });
 
   it('points repository at the package directory', () => {
