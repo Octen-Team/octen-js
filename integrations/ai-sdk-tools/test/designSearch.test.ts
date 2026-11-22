@@ -509,3 +509,21 @@ describe('octenDesignSearch review round 7', () => {
     expect((err as OctenValidationError).field).toBe('webSearch.language[1]');
   });
 });
+
+describe('octenDesignSearch group_id length', () => {
+  // The API refuses a group_id of 128 or more characters; length counts code points.
+  it('accepts 127 code points and refuses 128, in the input check and in execute', async () => {
+    const { t, calls } = build();
+    const id = (n: number) => '\u{1F600}'.repeat(n);
+    expect(await validateInput(t, { group_id: id(127) })).toBe(true);
+    expect(await validateInput(t, { group_id: id(128) })).toBe(false);
+    const err = await run(t, { group_id: id(128) }).catch((e: unknown) => e);
+    expect((err as OctenValidationError).field).toBe('group_id');
+    expect((err as Error).message).toBe('group_id must be at most 127 characters. No request was made.');
+    expect(calls).toHaveLength(0);
+    await run(t, { group_id: id(127) });
+    expect(calls).toHaveLength(1);
+    const schema = (await modelJsonSchema(t)).properties?.['group_id'];
+    expect(schema).toMatchObject({ anyOf: [{ type: 'string', minLength: 1, maxLength: 127 }, { type: 'null' }] });
+  });
+});

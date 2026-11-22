@@ -71,8 +71,15 @@ function isHttpsUrl(value: string): boolean {
   const authority = /^https:\/\/([^/?#]*)/i.exec(value)?.[1] ?? '';
   if (authority === '' || /[\u0000-\u007f]/.test(authority.replace(/[A-Za-z0-9\-._~%!$&'()*+,;=:@[\]]/g, ''))) return false;
   if (/%(?![0-9A-Fa-f]{2})/.test(withoutQuery(value))) return false;
+  // In the host the API takes an escape only for %25 or a non-ASCII byte, so %65 for "e" is refused.
+  const at = authority.lastIndexOf('@') + 1;
+  const host = authority.slice(at);
+  if (/%(?!25|[89A-Fa-f][0-9A-Fa-f])/.test(host)) return false;
+  // The WHATWG parser refuses %25 in a host, which the API accepts; it cannot be part of an IP, so parse a stand-in.
+  const start = 'https://'.length + at;
+  const parseable = value.slice(0, start) + host.replace(/%25/g, '25') + value.slice(start + host.length);
   try {
-    const { protocol, hostname } = new URL(value);
+    const { protocol, hostname } = new URL(parseable);
     // The parser normalizes every IPv4 form to dotted decimal and wraps IPv6 in brackets.
     const ip = hostname.startsWith('[') || /^\d+\.\d+\.\d+\.\d+$/.test(hostname);
     return protocol === 'https:' && hostname !== '' && !ip;

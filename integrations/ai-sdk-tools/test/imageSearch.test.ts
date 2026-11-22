@@ -686,3 +686,43 @@ describe('octenImageSearch percent escapes by URL part', () => {
     },
   );
 });
+
+describe('octenImageSearch host escapes and transient errors', () => {
+  // The API's URL parser accepts a host escape only for %25 or a non-ASCII byte (0x80 to 0xFF).
+  it.each(['https://%65xample.com/photo.jpg', 'https://example%2ecom/photo.png', 'https://ex%2Dample.com/a.png', 'https://user@%65xample.com/a.png'])(
+    'refuses the ASCII host escape in %s without a request',
+    async (url) => {
+      const { t, calls } = build();
+      const err = await run(t, { image_url: url }).catch((e: unknown) => e);
+      expect((err as OctenValidationError).field).toBe('image_url');
+      expect(calls).toHaveLength(0);
+      expect(await validateInput(t, { image_url: url })).toBe(false);
+    },
+  );
+
+  it.each(['https://caf%C3%A9.com/a.png', 'https://ex%25ample.com/a.png', 'https://us%65r@example.com/a%2e.png'])(
+    'accepts %s and sends it unchanged',
+    async (url) => {
+      const { t, calls } = build();
+      expect(await validateInput(t, { image_url: url })).toBe(true);
+      await run(t, { image_url: url });
+      expect(calls[0]?.body).toEqual({ inputs: [{ type: 'image', url }] });
+    },
+  );
+
+  // Only 413 and 415 are about the image; a transient failure gets neutral wording.
+  it.each([500, 502, 503, 504])('gives no try-another-image advice for HTTP %i on an image-URL call', async (status) => {
+    const rec = recordingFetch(() => jsonResponse({ code: status, msg: 'upstream down', request_id: 'r' }, status));
+    const err = (await run(octenImageSearch({ client: clientFor(rec.fakeFetch) }), { image_url: IMG }).catch((e: unknown) => e)) as Error;
+    expect(err.message).toBe(`Image Search failed. (HTTP ${status}, request r)`);
+    expect(err.message).not.toMatch(/try|another image/i);
+  });
+
+  it('gives no try-another-image advice for a connection error on an image-URL call', async () => {
+    const leaky = (async () => {
+      throw new TypeError('socket closed');
+    }) as typeof fetch;
+    const err = (await run(octenImageSearch({ client: clientFor(leaky) }), { image_url: IMG }).catch((e: unknown) => e)) as Error;
+    expect(err.message).not.toMatch(/try|another image/i);
+  });
+});

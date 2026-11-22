@@ -69,6 +69,8 @@ export type OctenDesignSearchOptions = {
 
 // Limits from docs.octen.ai/api-reference/design-search.
 const MAX_QUERY_LENGTH = 500;
+// The API refuses a group_id of 128 or more characters.
+const MAX_GROUP_ID_LENGTH = 127;
 // images.count default per the API reference; a group lookup returns at most this many images.
 const API_IMAGE_COUNT = 5;
 const LANGUAGES = ['ar', 'de', 'en', 'es', 'fr', 'hi', 'id', 'it', 'ja', 'ko', 'nl', 'pl', 'pt', 'ru', 'th', 'tr', 'vi', 'zh'] as const;
@@ -192,7 +194,12 @@ function inputSchema(groups: boolean, groupCount: number) {
     .nullable()
     .optional();
   // With images off group_id is not part of the input at all, so any value is ignored rather than checked.
-  const validator = (groups ? z.object({ query, group_id: z.string().nullable().optional() }) : z.object({ query }))
+  const groupId = z
+    .string()
+    .refine((g) => codePoints(g) <= MAX_GROUP_ID_LENGTH, `group_id must be at most ${MAX_GROUP_ID_LENGTH} characters.`)
+    .nullable()
+    .optional();
+  const validator = (groups ? z.object({ query, group_id: groupId }) : z.object({ query }))
     .superRefine((value, ctx) => {
       const problem = inputProblem(value, groups);
       if (problem !== undefined) ctx.addIssue({ code: 'custom', path: ['query'], message: problem });
@@ -204,7 +211,7 @@ function inputSchema(groups: boolean, groupCount: number) {
           description: "What to find, e.g. 'pricing section for a SaaS landing page'. Max 500 characters. Required unless `group_id` is set.",
         },
         group_id: {
-          anyOf: [{ type: 'string', minLength: 1 }, { type: 'null' }],
+          anyOf: [{ type: 'string', minLength: 1, maxLength: MAX_GROUP_ID_LENGTH }, { type: 'null' }],
           description:
             `Optional. The \`group.group_id\` of an image from an earlier result; returns up to ${groupCount} images of that web page or deck, in group order, instead of searching by query.`,
         },
