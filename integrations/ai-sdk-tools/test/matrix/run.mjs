@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import * as ai from 'ai';
 import * as aiTest from 'ai/test';
 import { Octen, OctenAuthenticationError } from '@octen.ai/sdk';
-import { octenWebSearch } from '@octen.ai/ai-sdk-tools';
+import { octenExtract, octenWebSearch } from '@octen.ai/ai-sdk-tools';
 
 const fixture = JSON.parse(readFileSync(process.argv[2], 'utf8'));
 const installed = (name) =>
@@ -291,7 +291,36 @@ async function scenarioSchema() {
   check(failures, (await validate({ query: 'q', time_range: null })) === true, 'time_range null rejected');
   check(failures, (await validate({ query: 'q' })) === true, 'missing time_range rejected');
   check(failures, (await validate({ query: 'q', time_range: 'w' })) === false, "time_range 'w' accepted");
+  await extractInput(failures);
   return { failures, timeRange: JSON.stringify(byName.webSearch?.properties?.time_range) };
+}
+
+// Extract's URL cap: in the JSON schema, in the AI SDK's input check, and in what the model gets back, with no request.
+async function extractInput(failures) {
+  const http = fakeFetch(200);
+  const extract = octenExtract({ client: new Octen({ apiKey: 'test-key', fetch: http.fetch }), maxUrls: 2 });
+  const urls = ['https://example.com/1', 'https://example.com/2', 'https://example.com/3'];
+  const prompts = [];
+  const call = { type: 'tool-call', toolCallId: 'call-x', toolName: 'extract', input: JSON.stringify({ urls }) };
+  const model = new Mock({
+    doGenerate: async (options) => {
+      prompts.push(options);
+      return prompts.length === 1
+        ? { content: [call], finishReason: finishReason('tool-calls'), usage: usage(), warnings: [] }
+        : { content: [{ type: 'text', text: FINAL_TEXT }], finishReason: finishReason('stop'), usage: usage(), warnings: [] };
+    },
+  });
+  await ai.generateText({ model, tools: { extract }, stopWhen: stepCount(2), prompt: 'q' });
+  const schema = (prompts[0]?.tools ?? [])[0]?.inputSchema;
+  check(failures, Object.keys(schema?.properties ?? {}).sort().join(',') === 'query,urls', 'extract properties');
+  check(failures, JSON.stringify(schema?.required) === '["urls"]', 'extract required');
+  check(failures, schema?.properties?.urls?.maxItems === 2, `extract maxItems ${schema?.properties?.urls?.maxItems}`);
+  const validate = async (value) => (await ai.asSchema(extract.inputSchema).validate(value)).success;
+  check(failures, (await validate({ urls: urls.slice(0, 2), query: null })) === true, 'extract 2 URLs rejected');
+  check(failures, (await validate({ urls })) === false, 'extract 3 URLs accepted');
+  check(failures, (await validate({ urls: [] })) === false, 'extract empty list accepted');
+  check(failures, JSON.stringify(prompts[1]?.prompt ?? '').includes('at most 2 URLs'), 'extract cap message not sent to the model');
+  check(failures, http.calls.length === 0, `extract sent ${http.calls.length} requests over the cap`);
 }
 
 // Observation only: what generateText does after a tool-call step when stopWhen is not set.
