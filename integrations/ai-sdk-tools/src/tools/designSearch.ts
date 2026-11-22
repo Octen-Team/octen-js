@@ -182,16 +182,14 @@ const QUERY_SCHEMA = { anyOf: [{ type: 'string', minLength: 1, maxLength: MAX_QU
 
 // The JSON schema is written out so the model sees code-point lengths and the nullable fields; zod only validates.
 function inputSchema(groups: boolean, groupCount: number) {
-  const validator = z
-    .object({
-      // Strict-mode providers send null for an optional field; execute drops it.
-      query: z
-        .string()
-        .refine((q) => codePoints(q) <= MAX_QUERY_LENGTH, 'query must be at most 500 characters.')
-        .nullable()
-        .optional(),
-      group_id: z.string().nullable().optional(),
-    })
+  // Strict-mode providers send null for an optional field; execute drops it.
+  const query = z
+    .string()
+    .refine((q) => codePoints(q) <= MAX_QUERY_LENGTH, 'query must be at most 500 characters.')
+    .nullable()
+    .optional();
+  // With images off group_id is not part of the input at all, so any value is ignored rather than checked.
+  const validator = (groups ? z.object({ query, group_id: z.string().nullable().optional() }) : z.object({ query }))
     .superRefine((value, ctx) => {
       const problem = inputProblem(value, groups);
       if (problem !== undefined) ctx.addIssue({ code: 'custom', path: ['query'], message: problem });

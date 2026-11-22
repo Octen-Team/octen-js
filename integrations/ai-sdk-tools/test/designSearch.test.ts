@@ -467,3 +467,14 @@ describe('octenDesignSearch review round 3', () => {
     expect(d).toMatch(/`results`/);
   });
 });
+
+describe('octenDesignSearch review round 5', () => {
+  it('with images off, ignores a group_id of any type in the input check and never sends it', async () => {
+    const { t, calls } = build({ images: { enable: false } });
+    for (const groupId of [123, { id: 'x' }, ['pg_1'], 'pg_1']) {
+      expect(await validateInput(t, { query: 'q', group_id: groupId })).toBe(true);
+      await run(t, { query: 'q', group_id: groupId });
+    }
+    expect(calls.map((c) => c.body)).toEqual(Array.from({ length: 4 }, () => ({ query: 'q', images: { enable: false } })));
+  });
+});

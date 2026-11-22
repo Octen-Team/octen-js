@@ -57,7 +57,10 @@ const IMAGE_ADVICE: Record<number, string> = {
 // Parsing never throws out of here: a URL that does not parse is just not acceptable.
 // The raw string needs a non-empty // authority and no whitespace or control characters: it is sent as given.
 function isHttpUrl(value: string): boolean {
-  if (!/^https?:\/\/[^/?#]/i.test(value) || /[\s\u0000-\u001f\u007f]/.test(value)) return false;
+  if (/[\s\u0000-\u001f\u007f]/.test(value)) return false;
+  // The raw authority may hold only RFC 3986 authority characters; the parser would read a backslash as a slash.
+  const authority = /^https?:\/\/([^/?#]*)/i.exec(value)?.[1] ?? '';
+  if (!/^[A-Za-z0-9\-._~%!$&'()*+,;=:@[\]]+$/.test(authority)) return false;
   try {
     const url = new URL(value);
     return (url.protocol === 'http:' || url.protocol === 'https:') && url.hostname !== '';
@@ -153,17 +156,22 @@ function trimImage(r: Record<string, unknown>): ModelImageResult {
   return out;
 }
 
+type APIErrorClass = new (init: ConstructorParameters<typeof OctenAPIError>[0] & { retryAfter: number | null }) => OctenAPIError;
+
 // Keeps the class, status and request id; isOctenError also matches an error from a client of another SDK copy.
-// For an image-URL call no upstream text is kept: it can hold a truncated or normalized copy of a signed URL.
-function withImageAdvice(err: unknown, byUrl: boolean): unknown {
+// On an image-URL call every API error drops the upstream text and body: they can hold a copy of a signed URL.
+function imageError(err: unknown, byUrl: boolean): unknown {
   if (!isOctenError(err) || !('status' in err)) return err;
-  const { status, code, requestId, body } = err as OctenAPIError;
+  const api = err as OctenAPIError & { retryAfter?: number | null };
+  const { status, code, requestId } = api;
   const advice = IMAGE_ADVICE[status];
-  if (advice === undefined) return err;
   if (byUrl) {
-    return new OctenAPIError({ status, code, requestId, body: null, message: `${advice} (HTTP ${status}, request ${requestId ?? 'unknown'})` });
+    const Cls = api.constructor as APIErrorClass;
+    const message = `${advice ?? 'Image Search failed.'} (HTTP ${status}, request ${requestId ?? 'unknown'})`;
+    return new Cls({ status, code, requestId, body: null, message, retryAfter: api.retryAfter ?? null });
   }
-  return new OctenAPIError({ status, code, requestId, body, message: `${advice} (HTTP ${status}: ${err.message})` });
+  if (advice === undefined) return err;
+  return new OctenAPIError({ status, code, requestId, body: api.body, message: `${advice} (HTTP ${status}: ${api.message})` });
 }
 
 const OPTION_KEYS = [
@@ -202,8 +210,9 @@ export function octenImageSearch(given: OctenImageSearchOptions = {}): Tool<Imag
         if (Array.isArray(list) && list.length > 0) fromModel[field] = [...list];
       }
       const params: ImageSearchParams = { inputs, ...fromModel, ...fixed };
+      const byUrl = inputs[0]?.type === 'image';
       const res = await client.imageSearch.search(params, requestOptions(abortSignal)).catch((err: unknown) => {
-        throw withImageAdvice(err, !isNonBlank(input.query));
+        throw imageError(err, byUrl);
       });
       return {
         request_id: res.request_id,

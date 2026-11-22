@@ -3,10 +3,13 @@ import {
   OctenAbortError,
   OctenAPIError,
   OctenAuthenticationError,
+  OctenBadRequestError,
   OctenPermissionDeniedError,
   OctenRateLimitError,
+  OctenServerError,
   OctenValidationError,
 } from '@octen.ai/sdk';
+import { inspect } from 'node:util';
 import { asSchema } from 'ai';
 import { describe, expect, it } from 'vitest';
 import { octenImageSearch } from '../src/tools/imageSearch.js';
@@ -364,14 +367,15 @@ describe('octenImageSearch review fixes', () => {
     expect(rec.calls).toHaveLength(1);
   });
 
-  it('leaves 401 and 403 as the SDK raised them, with no image advice', async () => {
+  // A text-query call; an image-URL call drops the upstream text (see the round 5 tests).
+  it('leaves 401 and 403 on a text query as the SDK raised them, with no image advice', async () => {
     const cases: [number, unknown][] = [
       [401, OctenAuthenticationError],
       [403, OctenPermissionDeniedError],
     ];
     for (const [status, cls] of cases) {
       const rec = recordingFetch(() => jsonResponse({ code: status, msg: 'denied', request_id: `req-${status}` }, status));
-      const err = await run(octenImageSearch({ client: clientFor(rec.fakeFetch) }), { image_url: IMG }).catch((e: unknown) => e);
+      const err = await run(octenImageSearch({ client: clientFor(rec.fakeFetch) }), { query: 'q' }).catch((e: unknown) => e);
       expect(err).toBeInstanceOf(cls as new () => Error);
       expect((err as Error).message).toBe('denied');
     }
@@ -450,5 +454,72 @@ describe('octenImageSearch review round 3', () => {
     const url = 'HTTPS://Example.COM/a/../b.png?sig=a%2Bb%3D&x=1#frag';
     await run(t, { image_url: url });
     expect(calls[0]?.body).toEqual({ inputs: [{ type: 'image', url }] });
+  });
+});
+
+describe('octenImageSearch review round 5', () => {
+  const SIGNED = 'https://cdn.example.com/a.png?sig=SECRET-TOKEN&se=1';
+
+  it.each([
+    [403, OctenPermissionDeniedError],
+    [401, OctenAuthenticationError],
+    [429, OctenRateLimitError],
+    [400, OctenBadRequestError],
+    [500, OctenServerError],
+  ])('rethrows HTTP %i on an image-URL call as the same class with no upstream text', async (status, cls) => {
+    const rec = recordingFetch(() => jsonResponse({ code: status, msg: `refused ${SIGNED}`, request_id: `req-${status}` }, status));
+    const err = (await run(octenImageSearch({ client: clientFor(rec.fakeFetch) }), { image_url: SIGNED }).catch((e: unknown) => e)) as OctenAPIError;
+    expect(err).toBeInstanceOf(cls as unknown as new () => Error);
+    expect(err.status).toBe(status);
+    expect(err.requestId).toBe(`req-${status}`);
+    expect(err.body).toBeNull();
+    expect((err as Error & { cause?: unknown }).cause).toBeUndefined();
+    const shown = `${String(err)} ${err.stack ?? ''} ${JSON.stringify(err)} ${inspect(err, { depth: 5 })}`;
+    expect(shown).not.toContain('SECRET-TOKEN');
+    expect(shown).not.toContain('refused');
+  });
+
+  it('keeps retryAfter on a sanitized rate-limit error', async () => {
+    const rec = recordingFetch(() => new Response(JSON.stringify({ code: 429, msg: SIGNED, request_id: 'r' }), { status: 429, headers: { 'content-type': 'application/json', 'retry-after': '120' } }));
+    const err = (await run(octenImageSearch({ client: clientFor(rec.fakeFetch) }), { image_url: SIGNED }).catch((e: unknown) => e)) as OctenRateLimitError;
+    expect(err).toBeInstanceOf(OctenRateLimitError);
+    expect(err.retryAfter).toBe(120);
+  });
+
+  it('leaves errors on a text-query call unchanged', async () => {
+    const rec = recordingFetch(() => jsonResponse({ code: 403, msg: 'denied for q', request_id: 'r' }, 403));
+    const err = (await run(octenImageSearch({ client: clientFor(rec.fakeFetch) }), { query: 'q' }).catch((e: unknown) => e)) as OctenAPIError;
+    expect(err).toBeInstanceOf(OctenPermissionDeniedError);
+    expect(err.message).toBe('denied for q');
+  });
+
+  it('decides URL handling from the request it built, not from the input object afterwards', async () => {
+    const input: Record<string, unknown> = { image_url: SIGNED };
+    const rec = recordingFetch(() => {
+      input['query'] = 'now a text query';
+      return jsonResponse({ code: 403, msg: `refused ${SIGNED}`, request_id: 'r' }, 403);
+    });
+    const err = (await run(octenImageSearch({ client: clientFor(rec.fakeFetch) }), input).catch((e: unknown) => e)) as Error;
+    expect(err.message).not.toContain('SECRET-TOKEN');
+    expect(rec.calls[0]?.body).toEqual({ inputs: [{ type: 'image', url: SIGNED }] });
+  });
+
+  it.each(['https://\\example.com/a.png', 'https://example.com\\@evil.com/a.png', 'https://exa`mple.com/a.png', 'https://"example.com"/a.png'])(
+    'refuses %j, whose authority has a character an authority cannot hold, without a request',
+    async (url) => {
+      const { t, calls } = build();
+      const err = await run(t, { image_url: url }).catch((e: unknown) => e);
+      expect((err as OctenValidationError).field).toBe('image_url');
+      expect(calls).toHaveLength(0);
+      expect((await rejection({ image_url: url })).success).toBe(false);
+    },
+  );
+
+  it('still accepts userinfo, ports and IPv6 hosts', async () => {
+    const { t, calls } = build();
+    for (const url of ['https://user:pa%20ss@example.com:8443/a.png', 'http://[2001:db8::1]/a.png', 'https://sub-1.example.co.uk/a.png']) {
+      await run(t, { image_url: url });
+    }
+    expect(calls).toHaveLength(3);
   });
 });
