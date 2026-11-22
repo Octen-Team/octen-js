@@ -1,11 +1,13 @@
 # @octen.ai/ai-sdk-tools
 
-[Octen](https://docs.octen.ai) search tools for the [Vercel AI SDK](https://ai-sdk.dev). Give a model web search (standard or Premier), news, company and people lookup, place search, official-page lookup and page reading by URL with one function call each. Built on [`@octen.ai/sdk`](https://github.com/Octen-Team/octen-js).
+[Octen](https://docs.octen.ai) search tools for the [Vercel AI SDK](https://ai-sdk.dev). Give a model web search (standard or Premier), news, company and people lookup, place search, official-page lookup, image search, design reference search and page reading by URL with one function call each. Built on [`@octen.ai/sdk`](https://github.com/Octen-Team/octen-js).
 
 - [Install](#install)
 - [Quick start](#quick-start)
-- [The eight tools](#the-eight-tools)
+- [The ten tools](#the-ten-tools)
 - [Extract](#extract)
+- [Image Search](#image-search)
+- [Design Search](#design-search)
 - [Options and precedence](#options-and-precedence)
 - [What the model sees](#what-the-model-sees)
 - [Errors and cancellation](#errors-and-cancellation)
@@ -45,7 +47,7 @@ Any AI SDK provider works the same way: only the `model` line changes. `stopWhen
 
 `octenWebSearch()` reads `OCTEN_API_KEY` when it is called, not when the package is imported. If no key is set, the call throws the same error the SDK's `Octen` constructor throws.
 
-## The eight tools
+## The ten tools
 
 Each factory returns an AI SDK `Tool`. Pass any of them under any name in `tools`.
 
@@ -59,10 +61,12 @@ Each factory returns an AI SDK `Tool`. Pass any of them under any name in `tools
 | `octenPlaceSearch(options?)` | `POST /place-search` | `query` |
 | `octenPulseSearch(options?)` | `POST /pulse-search` | `query` |
 | `octenExtract(options?)` | `POST /extract` | `urls`, optional `query` |
+| `octenImageSearch(options?)` | `POST /image-search` | exactly one of `query` or `image_url`, optional `include_domains`, `exclude_domains` |
+| `octenDesignSearch(options?)` | `POST /design-search` | `query`, `group_id` or both |
 
-- **Web** is general search. **Web Search Premier** takes the same parameters and returns the same shape, but uses deeper retrieval and reranking so the page that holds the answer ranks higher; use it for a specific fact, a niche document or a page that is hard to find, and Web for low-latency lookups. **Broad** splits a multi-part question into sub-queries and runs them in parallel. **News** returns recent articles plus storylines. **Business** returns company and person cards plus sources. **Place** finds shops, restaurants and services with address, rating and opening hours. **Pulse** finds the official page for a site, product or document. **Extract** reads pages the model already has URLs for and returns their clean content; see [Extract](#extract).
+- **Web** is general search. **Web Search Premier** takes the same parameters and returns the same shape, but uses deeper retrieval and reranking so the page that holds the answer ranks higher; use it for a specific fact, a niche document or a page that is hard to find, and Web for low-latency lookups. **Broad** splits a multi-part question into sub-queries and runs them in parallel. **News** returns recent articles plus storylines. **Business** returns company and person cards plus sources. **Place** finds shops, restaurants and services with address, rating and opening hours. **Pulse** finds the official page for a site, product or document. **Extract** reads pages the model already has URLs for and returns their clean content; see [Extract](#extract). **Image Search** finds images by a text query or by a reference image URL; see [Image Search](#image-search). **Design Search** finds design references (screenshots of web pages, page sections, app screens and slides, with their design values); see [Design Search](#design-search).
 - `time_range` is `day`, `week`, `month` or `year`. The model may also send `null` or leave it out, which means no time filter.
-- The model only ever supplies `query` (and `time_range` for Web, Web Search Premier and News; `urls` and an optional `query` for Extract). Everything else is fixed by the tool or by you through `defaults` (named options for Extract), so the model has fewer decisions to get wrong.
+- The model only ever supplies `query` (and `time_range` for Web, Web Search Premier and News; `urls` and an optional `query` for Extract; `query` or `image_url` and the two domain filters for Image Search; `query` and `group_id` for Design Search). Everything else is fixed by the tool or by you through `defaults` (named options for Extract, Image Search and Design Search), so the model has fewer decisions to get wrong.
 - Place does not take a location from the model. Either put the area in the query ("coffee near Shibuya, Tokyo"), or pin a location with `defaults`.
 
 Everything that changes how much a call returns or costs, such as `count`, `highlight`, `full_content` or `result_type`, is yours to set. For example, a Web Search Premier tool restricted to a few sources:
@@ -115,9 +119,82 @@ console.log(summary);
 - **Each URL succeeds or fails on its own.** A page that could not be read comes back as its own item with `status: 'failed'` and an `error_message`, while the other URLs still return their content; failed URLs are not billed. The default description tells the model to match results to its URLs by `url`, not by position.
 - **HTTP timeout.** Unless you pass `timeout` or a `client`, the tool uses the SDK's default for Extract: the per-URL timeout (`urlTimeout`, or 30 s when unset) plus 90 s, so 120 s by default. A `timeout` you pass, or one set on a shared `client`, applies to Extract too, so a short timeout chosen for the search tools can abort Extract while the server is still reading pages.
 
+## Image Search
+
+`octenImageSearch` finds images on the web. The model passes exactly one input: a text `query` (1 to 500 characters), or an `image_url`, a public http(s) URL of an image, to find visually similar images. It may also pass `include_domains` and `exclude_domains` (up to 10 domains each, matched against each result's source page). These filters narrow the results without changing what a call returns or costs, so they are the model's to choose unless you pin them. The number of results and the adult-content filter are yours to set when you build the tool, and are checked then like Extract's options.
+
+```ts
+import { generateText, stepCountIs } from 'ai';
+import { anthropic } from '@ai-sdk/anthropic';
+import { octenImageSearch } from '@octen.ai/ai-sdk-tools';
+
+// Up to eight images per call, from Wikimedia only; the model writes a query or passes an image URL.
+const { text: gallery } = await generateText({
+  model: anthropic('claude-opus-5-5'),
+  tools: { imageSearch: octenImageSearch({ count: 8, includeDomains: ['wikimedia.org'] }) },
+  stopWhen: stepCountIs(5),
+  prompt: 'Find three photos of the Golden Gate Bridge at sunset and list each image URL with its source page.',
+});
+console.log(gallery);
+```
+
+| Option | Request field | Values | When unset |
+|---|---|---|---|
+| `count` | `count` | integer 1 to 10 | not sent; the API returns 5 |
+| `safesearch` | `safesearch` | `'off'` or `'strict'` (drops adult content) | not sent; the API uses `strict` |
+| `includeDomains`, `excludeDomains` | `include_domains`, `exclude_domains` | 1 to 10 domains. Setting one pins it: that filter is removed from the model's schema and a value the model sends for it is ignored | not sent, unless the model sets the filter |
+
+`client`, `apiKey`, `baseURL`, `timeout`, `maxRetries` and `description` work as for the other tools. Image Search takes no `defaults`.
+
+- **Exactly one input.** A call with both `query` and `image_url`, or with neither (a blank string counts as missing), never reaches the API: the AI SDK's input check rejects it, and the model receives a tool error telling it to pass exactly one (checked by the version matrix in `ai` 5, 6 and 7). An `image_url` that is not an http(s) URL, such as base64 data or a `data:` URI, is refused the same way. `execute`, if called directly, throws `OctenValidationError`.
+- **No base64 input.** The API can also take an image as base64 data, but a model cannot reliably write out an image that way, so the tool does not offer it. To search by an image you hold, call `imageSearch.search` in `@octen.ai/sdk` directly.
+
+## Design Search
+
+`octenDesignSearch` searches for design references: screenshots of web pages, page sections, app screens and slides, each with its design values (`design_facts`, such as colors, fonts and font sizes) and, when the image has it, reusable HTML code (`snippet`). Web pages on the same query come back alongside as `results`. The model passes a `query` (1 to 500 characters), a `group_id`, or both. An image that belongs to a web page or deck carries a `group` with a `group_id`; when the model passes that `group_id`, the API returns the images of that page or deck in group order instead of searching by query, so the model can look through the rest of a page or deck it found. That is why `group_id` is model input: it only ever comes from an earlier result. Everything that changes how much a call returns is yours to set when you build the tool, grouped as `images` and `webSearch` like the API's `images` and `web_search` objects, with camelCase keys.
+
+```ts
+import { generateText, stepCountIs } from 'ai';
+import { anthropic } from '@ai-sdk/anthropic';
+import { octenDesignSearch } from '@octen.ai/ai-sdk-tools';
+
+// Ten references per call with shorter code snippets, and no web results.
+const { text: ideas } = await generateText({
+  model: anthropic('claude-opus-5-5'),
+  tools: {
+    designSearch: octenDesignSearch({ images: { count: 10, snippet: { maxTokens: 1000 } }, webSearch: { enable: false } }),
+  },
+  stopWhen: stepCountIs(5),
+  prompt: 'Find pricing sections of SaaS landing pages and describe the three most common layouts.',
+});
+console.log(ideas);
+```
+
+| Option | Request field | Values | When unset |
+|---|---|---|---|
+| `images.enable` | `images.enable` | boolean; `false` returns no images | not sent; on |
+| `images.count` | `images.count` | integer 1 to 100; also caps a `group_id` lookup | not sent; 5 |
+| `images.designFacts` | `images.design_facts` | boolean | not sent; on |
+| `images.snippet` | `images.snippet` | `{ enable?: boolean, maxTokens?: 100 to 100000 }` | not sent; on, up to 5000 tokens per image |
+| `webSearch.enable` | `web_search.enable` | boolean; `false` returns no web results | not sent; on |
+| `webSearch.count` | `web_search.count` | integer 1 to 100 | not sent; 5 |
+| `webSearch.highlight` | `web_search.highlight` | `{ enable?: boolean, maxTokens?: 100 to 20000 }` | not sent; on, 512 tokens |
+| `webSearch.fullContent` | `web_search.full_content` | `{ enable?: boolean, maxTokens?: 100 to 100000 }` | not sent; off |
+| `webSearch.includeDomains`, `webSearch.excludeDomains` | `web_search.include_domains`, `web_search.exclude_domains` | 1 to 1200 domains of at most 60 characters | not sent |
+| `webSearch.language` | `web_search.language` | ISO 639-1 codes: `ar`, `de`, `en`, `es`, `fr`, `hi`, `id`, `it`, `ja`, `ko`, `nl`, `pl`, `pt`, `ru`, `th`, `tr`, `vi`, `zh` | not sent; no language filter |
+| `webSearch.timeBasis` | `web_search.time_basis` | `'auto'`, `'published'` or `'crawled'` | not sent; `auto` |
+| `webSearch.timeRange` | `web_search.time_range` | `'day'`, `'week'`, `'month'` or `'year'` | not sent; no time filter |
+| `webSearch.startTime`, `webSearch.endTime` | `web_search.start_time`, `web_search.end_time` | ISO 8601 date-time with a time zone, e.g. `'2025-01-01T00:00:00Z'` | not sent |
+
+A key the table does not list, such as a snake_case name, throws `OctenValidationError` with `field` naming it. `client`, `apiKey`, `baseURL`, `timeout`, `maxRetries` and `description` work as for the other tools. Design Search takes no `defaults`.
+
+- **Query or group.** A call with neither `query` nor `group_id` (a blank string counts as missing) never reaches the API: the AI SDK's input check rejects it and the model receives a tool error that explains both inputs (checked by the version matrix in `ai` 5, 6 and 7). `execute`, if called directly, throws `OctenValidationError`.
+- **The `webSearch` options apply to the web results only**; they do not filter the images. The domain, language and time filters are therefore yours to set, not the model's.
+- **Size.** With the API defaults each image carries its design values and up to 5000 tokens of snippet code, and all of it goes into the model's context. Lower `images.snippet.maxTokens`, or turn snippets or design values off, if the model does not need them. The default description stops mentioning design values, code or web results when you turn them off.
+
 ## Options and precedence
 
-Every search factory takes the same options; Extract takes the same client options and `description`, and its own options in place of `defaults` (see [Extract](#extract)):
+Every search factory takes the same options; Extract, Image Search and Design Search take the same client options and `description`, and their own options in place of `defaults` (see [Extract](#extract), [Image Search](#image-search) and [Design Search](#design-search)):
 
 ```ts
 import { Octen } from '@octen.ai/sdk';
@@ -198,15 +275,19 @@ A "web result" below has `title`, `url`, `highlight`, `time_published` and `full
 | Business | `{ request_id, warning?, entities: ModelEntity[], results: WebResult[] }` | `count: 5`, `highlight: { enable: true, max_tokens: 300 }` |
 | Place | `{ request_id, warning?, places: ModelPlace[], results: WebResult[] }` | `places: { count: 5 }` |
 | Extract | `{ request_id, warning?, results: ModelExtractResult[] }` | none: the request carries the model's `urls` and `query` and only the options you set |
+| Image Search | `{ request_id, warning?, results: ModelImageResult[] }` | none: the request carries the model's input and filters and only the options you set |
+| Design Search | `{ request_id, warning?, images: ModelDesignImage[], results: WebResult[] }` | none: the request carries the model's `query` and `group_id` and only the options you set |
 
 - **Business entities.** A company keeps `type`, `name`, `summary` and `website` (taken from `identifiers.website`). A person keeps `type`, `name`, `summary`, `current_position` and `linkedin_url`. An entity type the SDK does not know yet keeps only `type`, `name` and `summary`. An entity without a `type` is dropped. Because an unknown `type` comes through as its own string, checking `e.type === 'company'` alone does not narrow the type: add a key check such as `'website' in e`, or cast to the exported `ModelCompany` or `ModelPerson`.
 - **Places** keep `name`, `category`, `address`, `latitude`, `longitude`, `distance`, `rating`, `review_count`, `opening_hours`, `status`, `phone` and `website`. A value of `0` is kept; only missing values are dropped. `results` is empty unless you turn on web results with `defaults: { web_search: { enable: true } }`.
 - **Extract results** keep one item per URL, failures included, in the order the API returns them. Every item has `url` and `status`, and a failed one has `error_message`. A successful item has `title`, `full_content` (or `highlights` when the model sent a `query`), `time_published`, `time_last_crawled`, and `category` and `page_structure` as `{ primary, secondary? }`, each when the API returned it. Only when you turned them on does it also have `cover_image` and `images`, `videos` and `audio` as lists of URLs, and `links` as `{ url, anchor_text?, is_external? }`. `favicon` and `resolved_mode` are left out. The content is not shortened. The API's `warning`, for example that some URLs failed and were not billed, comes through as `warning`.
-- **Full content is off by default.** A web result carries `full_content` only if you turn it on, for example `defaults: { full_content: { enable: true, max_tokens: 1000 } }`. Full content beyond the free allowance is billed separately, and it is a lot of text for the model to read, so the tools leave it off unless you ask for it. Web, Web Search Premier, News, Business and Pulse take `full_content` at the top level of `defaults`; Broad takes it under `search_options` and Place under `web_search`.
+- **Image results** keep `title`, `url` (the image itself), `source_page` (the page that hosts it), `description`, `width`, `height` and `thumbnail`.
+- **Design images** keep `type` (`web_page`, `web_section`, `app_screen` or `slide`), `title`, `description`, `url`, `thumbnail`, `source_page`, `width`, `height`, `group` as `{ group_id, type, name, position, total, master? }`, `design_facts`, and `snippet` as `{ format, code }`. `design_facts` and a deck's `master` are passed through as the API returns them, because their keys vary by image. Design Search web results are trimmed to the same web result fields as the other tools, so `authors`, `favicon`, `cover_image` and page images are left out. `results` is empty when you turn web results off.
+- **Full content is off by default.** A web result carries `full_content` only if you turn it on, for example `defaults: { full_content: { enable: true, max_tokens: 1000 } }`. Full content beyond the free allowance is billed separately, and it is a lot of text for the model to read, so the tools leave it off unless you ask for it. Web, Web Search Premier, News, Business and Pulse take `full_content` at the top level of `defaults`; Broad takes it under `search_options`, Place under `web_search`, and Design Search as `webSearch.fullContent`.
 
 ## Errors and cancellation
 
-When a call fails, the tool throws the SDK's error as it is. It is not caught, wrapped or turned into a plain object. These are the classes from `@octen.ai/sdk`: every one extends `OctenError`, and API errors (`OctenAPIError` and its subclasses such as `OctenAuthenticationError` and `OctenRateLimitError`) carry `status` and `requestId`. Quote `requestId` when you contact support. The one error that does not come from the SDK is a plain `Error` naming the field, thrown when a list in the response is neither an array nor missing, so a malformed reply never looks like "no results". Extract also throws the SDK's `OctenValidationError` itself: when it is built with an option out of range, and when `execute` gets more URLs than `maxUrls` or none; neither sends a request.
+When a call fails, the tool throws the SDK's error as it is. It is not caught, wrapped or turned into a plain object. These are the classes from `@octen.ai/sdk`: every one extends `OctenError`, and API errors (`OctenAPIError` and its subclasses such as `OctenAuthenticationError` and `OctenRateLimitError`) carry `status` and `requestId`. Quote `requestId` when you contact support. The one error that does not come from the SDK is a plain `Error` naming the field, thrown when a list in the response is neither an array nor missing, so a malformed reply never looks like "no results". Extract, Image Search and Design Search also throw the SDK's `OctenValidationError` themselves: when one is built with an option out of range, and when `execute` gets input that breaks its rule (more URLs than `maxUrls` or none; not exactly one of `query` and `image_url`; neither `query` nor `group_id`). Neither case sends a request.
 
 ```ts
 import { OctenAPIError, OctenError } from '@octen.ai/sdk';
@@ -328,12 +409,12 @@ Keep in mind that each tool call the model makes is a separate Octen request, an
 |---|---|
 | `ai` | `^5.0.0 \|\| ^6.0.0 \|\| ^7.0.0` |
 | `zod` | `^3.25.76 \|\| ^4.1.8` |
-| `@octen.ai/sdk` | `^0.3.0`, a dependency installed with the tools; 0.3.0 is the first release with Extract |
+| `@octen.ai/sdk` | `^0.3.0`, a dependency installed with the tools; 0.3.0 is the first release with Extract (Image Search and Design Search came in 0.2.0) |
 | Node | 20 or newer for the ESM build; 20.19+ or 22.12+ to load it with `require()` together with `ai` 7 |
 
 `ai` 7 is published as ESM only, so loading this package through `require()` (CommonJS) together with `ai` 7 needs Node 20.19 or later, or Node 22.12 or later: older Node versions cannot `require()` an ES module and fail with `ERR_REQUIRE_ESM`. Measured on 2026-11-18 with `@octen.ai/ai-sdk-tools` 0.1.0 and `ai` 7.0.176: Node 20.18.3 and 22.11.0 fail, Node 20.19.0 and 22.12.0 work. The ESM build works on Node 20 and later.
 
-The package declares `ai` and `zod` as peer dependency ranges. A version matrix (`scripts/matrix.sh` in the repository) checks them; on 2026-11-22, for version 0.2.0 with `@octen.ai/sdk` 0.3.0, it passed for exactly these eight combinations:
+The package declares `ai` and `zod` as peer dependency ranges. A version matrix (`scripts/matrix.sh` in the repository) checks them; on 2026-11-22, for version 0.3.0 with `@octen.ai/sdk` 0.3.0, it passed for exactly these eight combinations:
 
 | `ai` | `zod` | Node |
 |---|---|---|
@@ -342,7 +423,7 @@ The package declares `ai` and `zod` as peer dependency ranges. A version matrix 
 | 7.0.176 | 3.25.76, 4.1.8 | 24.18.0 |
 | 7.0.179 | 4.6.7 | 20.20.2, 24.18.0 |
 
-`ai` 5 and 6 were run on Node 24 only, `zod` 4.6.7 only with `ai` 7.0.179, and Node 20 only with `ai` 7.0.179 and `zod` 4.6.7. For each combination the matrix drives `generateText` and `streamText` with the AI SDK's mock model through a search and an answer, checks the JSON schema the model is given (`query` required, `time_range` optional and removed when pinned) and that `time_range: null` passes the AI SDK's input check, checks that an Extract call over its URL cap sends no request and that the model gets the cap in the error, records how the failures described under [What the AI SDK does with the error](#what-the-ai-sdk-does-with-the-error) surface, loads the package through `require`, and type-checks a project that uses all eight tools with TypeScript 6.0.3, `strict` and `skipLibCheck: false`. With `skipLibCheck: false` you also need `@types/json-schema`, because the AI SDK's own declarations import `json-schema`.
+`ai` 5 and 6 were run on Node 24 only, `zod` 4.6.7 only with `ai` 7.0.179, and Node 20 only with `ai` 7.0.179 and `zod` 4.6.7. For each combination the matrix drives `generateText` and `streamText` with the AI SDK's mock model through a search and an answer, checks the JSON schema the model is given (`query` required, `time_range` optional and removed when pinned) and that `time_range: null` passes the AI SDK's input check, checks that an Extract call over its URL cap sends no request and that the model gets the cap in the error, checks the same for Image Search and Design Search calls that break their input rule, records how the failures described under [What the AI SDK does with the error](#what-the-ai-sdk-does-with-the-error) surface, loads the package through `require`, and type-checks a project that uses all ten tools with TypeScript 6.0.3, `strict` and `skipLibCheck: false`. With `skipLibCheck: false` you also need `@types/json-schema`, because the AI SDK's own declarations import `json-schema`.
 
 The public types do not mention zod, so whether you use zod 3 or 4 does not affect your type checking. `ai` 4 is not supported: it uses `parameters` where this package uses the `inputSchema` form of `tool()`.
 
