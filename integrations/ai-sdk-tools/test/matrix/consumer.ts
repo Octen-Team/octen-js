@@ -4,7 +4,9 @@ import { Octen, OctenAPIError, OctenError } from '@octen.ai/sdk';
 import {
   octenBroadSearch,
   octenBusinessSearch,
+  octenDesignSearch,
   octenExtract,
+  octenImageSearch,
   octenNewsSearch,
   octenPlaceSearch,
   octenPulseSearch,
@@ -26,6 +28,8 @@ export async function consume(): Promise<string> {
     placeSearch: octenPlaceSearch({ client }),
     pulseSearch: octenPulseSearch({ client }),
     extract: octenExtract({ client, maxUrls: 3, includeLinks: {} }),
+    imageSearch: octenImageSearch({ client, count: 5, safesearch: 'strict' }),
+    designSearch: octenDesignSearch({ client, images: { count: 10, snippet: { enable: false } }, webSearch: { enable: false } }),
   };
   const result = await generateText({ model, tools, stopWhen: stepCountIs(5), prompt: 'q' });
   for (const r of result.toolResults) {
@@ -59,5 +63,9 @@ export function optionTypes() {
     octenExtract({ apiKey: 'k', mode: 'advanced', urlTimeout: 45 }),
     // @ts-expect-error Extract `mode` is standard, advanced or auto.
     octenExtract({ apiKey: 'k', mode: 'fast' }),
+    // @ts-expect-error Image Search `safesearch` is off or strict.
+    octenImageSearch({ apiKey: 'k', safesearch: 'moderate' }),
+    // @ts-expect-error Design Search options use camelCase names.
+    octenDesignSearch({ apiKey: 'k', images: { design_facts: false } }),
   ];
 }

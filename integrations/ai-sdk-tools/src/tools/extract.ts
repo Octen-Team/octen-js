@@ -1,8 +1,8 @@
-import { OctenValidationError } from '@octen.ai/sdk';
 import type { ExtractParams } from '@octen.ai/sdk';
 import { jsonSchema, tool } from 'ai';
 import type { Tool } from 'ai';
 import { z } from 'zod';
+import { bool, codePoints, intIn, invalid, oneOf, snapshot } from '../options.js';
 import { asList, isRecord, nonEmpty, requestOptions, resolveClient, warningOf } from '../shared.js';
 import type { OctenClientOptions } from '../shared.js';
 
@@ -54,32 +54,6 @@ const DESCRIPTION =
 
 type DeveloperParams = Omit<ExtractParams, 'urls' | 'query'>;
 
-function invalid(field: string, message: string): never {
-  throw new OctenValidationError(field, message);
-}
-
-function intIn(value: unknown, min: number, max: number, field: string): number | undefined {
-  if (value === undefined) return undefined;
-  if (typeof value !== 'number' || !Number.isInteger(value) || value < min || value > max) {
-    invalid(field, `${field} must be an integer from ${min} to ${max}, got ${String(value)}.`);
-  }
-  return value;
-}
-
-function oneOf<T extends string>(value: unknown, allowed: readonly T[], field: string): T | undefined {
-  if (value === undefined) return undefined;
-  if (typeof value !== 'string' || !(allowed as readonly string[]).includes(value)) {
-    invalid(field, `${field} must be one of ${allowed.join(', ')}, got ${String(value)}.`);
-  }
-  return value as T;
-}
-
-function bool(value: unknown, field: string): boolean | undefined {
-  if (value === undefined) return undefined;
-  if (typeof value !== 'boolean') invalid(field, `${field} must be a boolean, got ${String(value)}.`);
-  return value;
-}
-
 function links(value: unknown): DeveloperParams['include_links'] {
   if (value === undefined) return undefined;
   if (!isRecord(value)) invalid('includeLinks', 'includeLinks must be an object such as {} or { maxLinks: 50 }.');
@@ -115,9 +89,6 @@ const URLS_DESCRIPTION = (maxUrls: number) =>
   `URLs of the pages to read, e.g. 'https://example.com/article'. 1 to ${maxUrls} per call, each at most 2048 characters.`;
 const QUERY_DESCRIPTION =
   "Optional; leave it unset in the normal case, and each result returns the page's full content. Set it only to get ranked excerpts about one specific topic: each result then returns `highlights` and omits `full_content`. Max 500 characters.";
-
-// JSON Schema lengths and the SDK's URL check count code points; zod 3.25 and 4.1 count UTF-16 units in .max.
-const codePoints = (s: string) => [...s].length;
 
 // The JSON schema is written out so its lengths keep their code-point meaning; zod only validates.
 function inputSchema(maxUrls: number) {
@@ -246,18 +217,8 @@ const OPTION_KEYS = [
   'maxRetries',
 ] as const;
 
-// Reads each option once, so validation, the schema and the requests all see the same values.
-function snapshot(options: OctenExtractOptions): OctenExtractOptions {
-  const copy: Record<string, unknown> = {};
-  for (const key of OPTION_KEYS) {
-    const value = (options as Record<string, unknown>)[key];
-    if (value !== undefined) copy[key] = value;
-  }
-  return copy as OctenExtractOptions;
-}
-
 export function octenExtract(given: OctenExtractOptions = {}): Tool<ExtractInput, ExtractToolResult> {
-  const options = snapshot(given);
+  const options = snapshot(given, OPTION_KEYS);
   const maxUrls = intIn(options.maxUrls, 1, API_MAX_URLS, 'maxUrls') ?? DEFAULT_MAX_URLS;
   const fixed = developerParams(options);
   // One client per tool, reused by every call; with no client timeout the SDK derives one from urlTimeout.

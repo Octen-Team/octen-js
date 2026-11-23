@@ -1,0 +1,43 @@
+{
+  "data": {
+    "results": [
+      {
+        "title": "File:Golden Gate Bridge at sunset 1.jpg - Wikimedia Commons",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/d/d3/Golden_Gate_Bridge_at_sunset_1.jpg?utm_source=commons.wikimedia.org&utm_campaign=index&utm_content=original",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Golden_Gate_Bridge_at_sunset_1.jpg",
+        "description": "",
+        "width": 2222,
+        "height": 1481,
+        "thumbnail": "https://cdn.octen.ai/octen-public-resource/data/img/baef/baefea1a7d45108ad1a62dc232dccadbc241a6b8d7fb602e0c3a2501e302fc88.jpg"
+      },
+      {
+        "title": "Golden Gate Birdge-San Francisco",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/7/72/Golden_Gate_Birdge-San_Francisco.JPG",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Golden Gate Birdge-San Francisco.JPG",
+        "description": "The Golden Gate Bridge at sunset.",
+        "width": 1600,
+        "height": 1200,
+        "thumbnail": "https://cdn.octen.ai/octen-public-resource/data/wiki/thumbnail_images/b5/b5c36ec787684b2e75c04f12fbd52347.jpg"
+      },
+      {
+        "title": "GoldenGateBridge-001",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/0/0c/GoldenGateBridge-001.jpg?utm_source=en.wikipedia.org&amp;utm_campaign=index&amp;utm_content=original",
+        "source_page": "https://en.wikipedia.org/wiki/File:GoldenGateBridge-001.jpg",
+        "description": "The Golden Gate Bridge and San Francisco, CA at sunset. This photo was taken from the Marin Headlands",
+        "width": 1024,
+        "height": 1376,
+        "thumbnail": "https://cdn.octen.ai/octen-public-resource/data/wiki/thumbnail_images/8a/8adb9cdcb5b1d4fa602d8c4615c9e481.jpg"
+      }
+    ]
+  },
+  "request_id": "20261122115756295ZFCOVLVW4J",
+  "meta": {
+    "usage": {
+      "num_search_queries": 1
+    },
+    "latency": 306,
+    "warning": ""
+  },
+  "code": 0,
+  "msg": ""
+}

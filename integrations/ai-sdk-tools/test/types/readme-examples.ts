@@ -5,7 +5,9 @@ import { generateText, stepCountIs, streamText } from 'ai';
 import { anthropic } from '@ai-sdk/anthropic';
 import {
   octenBroadSearch,
+  octenDesignSearch,
   octenExtract,
+  octenImageSearch,
   octenNewsSearch,
   octenPlaceSearch,
   octenWebSearch,
@@ -42,6 +44,30 @@ export async function extractTool(): Promise<void> {
     prompt: 'Read the latest Node.js release announcement and list its three biggest changes.',
   });
   console.log(summary);
+}
+
+export async function imageSearchTool(): Promise<void> {
+  // Up to eight images per call, from Wikimedia only; the model writes a query or passes an image URL.
+  const { text: gallery } = await generateText({
+    model: anthropic('claude-opus-5-5'),
+    tools: { imageSearch: octenImageSearch({ count: 8, includeDomains: ['wikimedia.org'] }) },
+    stopWhen: stepCountIs(5),
+    prompt: 'Find three photos of the Golden Gate Bridge at sunset and list each image URL with its source page.',
+  });
+  console.log(gallery);
+}
+
+export async function designSearchTool(): Promise<void> {
+  // Ten references per call with shorter code snippets, and no web results.
+  const { text: ideas } = await generateText({
+    model: anthropic('claude-opus-5-5'),
+    tools: {
+      designSearch: octenDesignSearch({ images: { count: 10, snippet: { maxTokens: 1000 } }, webSearch: { enable: false } }),
+    },
+    stopWhen: stepCountIs(5),
+    prompt: 'Find pricing sections of SaaS landing pages and describe the three most common layouts.',
+  });
+  console.log(ideas);
 }
 
 export async function optionsAndPrecedence(): Promise<void> {

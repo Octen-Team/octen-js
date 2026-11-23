@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import * as ai from 'ai';
 import * as aiTest from 'ai/test';
 import { Octen, OctenAuthenticationError } from '@octen.ai/sdk';
-import { octenExtract, octenWebSearch } from '@octen.ai/ai-sdk-tools';
+import { octenDesignSearch, octenExtract, octenImageSearch, octenWebSearch } from '@octen.ai/ai-sdk-tools';
 
 const fixture = JSON.parse(readFileSync(process.argv[2], 'utf8'));
 const extractFixture = JSON.parse(readFileSync(process.argv[3], 'utf8'));
@@ -293,6 +293,7 @@ async function scenarioSchema() {
   check(failures, (await validate({ query: 'q' })) === true, 'missing time_range rejected');
   check(failures, (await validate({ query: 'q', time_range: 'w' })) === false, "time_range 'w' accepted");
   await extractInput(failures);
+  await inputRules(failures);
   return { failures, timeRange: JSON.stringify(byName.webSearch?.properties?.time_range) };
 }
 
@@ -328,6 +329,51 @@ async function extractInput(failures) {
   check(failures, (await validate({ urls: [emojiUrl(2049)] })) === false, 'extract URL of 2049 code points accepted');
   check(failures, (await validate({ urls: ['u'], query: '\u{1F600}'.repeat(500) })) === true, 'extract query of 500 code points rejected');
   await extractCall(failures);
+}
+
+// Image Search takes exactly one of query or image_url, Design Search query or group_id: a call that breaks the rule
+// sends no request, and the model gets the rule back in the tool error.
+async function inputRules(failures) {
+  const http = fakeFetch(200);
+  const client = new Octen({ apiKey: 'test-key', fetch: http.fetch });
+  const cases = [
+    ['image', octenImageSearch({ client }), { query: 'q', image_url: 'https://example.com/a.png' }, 'not both', 'exclude_domains,image_url,include_domains,query'],
+    ['image', octenImageSearch({ client }), { query: null }, 'Pass one of `query`', 'exclude_domains,image_url,include_domains,query'],
+    ['design', octenDesignSearch({ client }), { query: null }, 'Pass `query` to search', 'group_id,query'],
+  ];
+  for (const [name, t, input, advice, properties] of cases) {
+    // execute repeats the rule, so a spy proves the AI SDK's own input check refused the call first.
+    let executed = 0;
+    const spied = { ...t, execute: async (...args) => ((executed += 1), await t.execute(...args)) };
+    const prompts = [];
+    const call = { type: 'tool-call', toolCallId: 'call-r', toolName: name, input: JSON.stringify(input) };
+    const model = new Mock({
+      doGenerate: async (options) => {
+        prompts.push(options);
+        return prompts.length === 1
+          ? { content: [call], finishReason: finishReason('tool-calls'), usage: usage(), warnings: [] }
+          : { content: [{ type: 'text', text: FINAL_TEXT }], finishReason: finishReason('stop'), usage: usage(), warnings: [] };
+      },
+    });
+    await ai.generateText({ model, tools: { [name]: spied }, stopWhen: stepCount(2), prompt: 'q' });
+    check(failures, executed === 0, `${name} execute ran ${executed} times for ${JSON.stringify(input)}`);
+    const schema = (prompts[0]?.tools ?? [])[0]?.inputSchema;
+    check(failures, Object.keys(schema?.properties ?? {}).sort().join(',') === properties, `${name} properties`);
+    check(failures, JSON.stringify(schema?.required ?? []) === '[]', `${name} required ${JSON.stringify(schema?.required)}`);
+    check(failures, JSON.stringify(prompts[1]?.prompt ?? '').includes(advice), `${name} rule not sent to the model for ${JSON.stringify(input)}`);
+  }
+  check(failures, http.calls.length === 0, `input rules sent ${http.calls.length} requests`);
+  const valid = async (t, value) => (await ai.asSchema(t.inputSchema).validate(value)).success;
+  const image = cases[0][1];
+  const design = cases[2][1];
+  check(failures, (await valid(image, { image_url: 'https://example.com/a.png', query: null })) === true, 'image_url alone rejected');
+  check(failures, (await valid(image, { query: '\u{1F600}'.repeat(500) })) === true, 'image query of 500 code points rejected');
+  check(failures, (await valid(image, { image_url: 'data:image/png;base64,AAAA' })) === false, 'image data: URI accepted');
+  check(failures, (await valid(design, { group_id: 'pg_1', query: null })) === true, 'design group_id alone rejected');
+  // The AI SDK's own check rejects these before execute runs (execute repeats the rule for direct callers).
+  check(failures, (await valid(image, cases[0][2])) === false, 'image with both inputs accepted');
+  check(failures, (await valid(image, cases[1][2])) === false, 'image with no input accepted');
+  check(failures, (await valid(design, cases[2][2])) === false, 'design with neither query nor group_id accepted');
 }
 
 // An in-cap Extract call: one request to /extract, and the trimmed results reach the next model turn.

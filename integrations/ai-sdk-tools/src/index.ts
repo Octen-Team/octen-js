@@ -6,6 +6,8 @@ export { octenBusinessSearch } from './tools/businessSearch.js';
 export { octenPlaceSearch } from './tools/placeSearch.js';
 export { octenPulseSearch } from './tools/pulseSearch.js';
 export { octenExtract } from './tools/extract.js';
+export { octenImageSearch } from './tools/imageSearch.js';
+export { octenDesignSearch } from './tools/designSearch.js';
 
 export type { OctenToolOptions, ModelWebResult, TimeRange } from './shared.js';
 export type { WebSearchInput, WebSearchToolResult } from './tools/webSearch.js';
@@ -29,3 +31,11 @@ export type {
   ModelLink,
   OctenExtractOptions,
 } from './tools/extract.js';
+export type { ImageSearchInput, ImageSearchToolResult, ModelImageResult, OctenImageSearchOptions } from './tools/imageSearch.js';
+export type {
+  DesignSearchInput,
+  DesignSearchToolResult,
+  ModelDesignGroup,
+  ModelDesignImage,
+  OctenDesignSearchOptions,
+} from './tools/designSearch.js';
