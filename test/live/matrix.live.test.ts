@@ -147,7 +147,8 @@ describe.skipIf(!enabled)('live matrix: success cases (billed, minimal counts)',
     // /broad-search does not echo result_type, so compare two calls that differ only in it. Observed 2026-11-23 for this query:
     // identical data.queries, 3 of 3 urls paired, dynamic/standard highlight ratios 0.25, 0.37, 0.26. The effect depends on the
     // query (other queries gave identical highlights), so a skip means "no evidence this run", not a defect.
-    it('search_options.result_type: dynamic shortens a paired highlight versus the standard control (skips without evidence)', async (ctx) => {
+    // Two sequential Broad Search calls at the SDK's 120 s per-call limit, plus slack.
+    it('search_options.result_type: dynamic shortens a paired highlight versus the standard control (skips without evidence)', { timeout: 250_000 }, async (ctx) => {
       const run = (result_type: 'standard' | 'dynamic') =>
         succeed(`broadSearch result_type=${result_type}`, () =>
           client().search.broadSearch({
@@ -170,7 +171,10 @@ describe.skipIf(!enabled)('live matrix: success cases (billed, minimal counts)',
       const std = byUrl(standard);
       const pairs = [...byUrl(dynamic)].filter(([url]) => std.has(url)).map(([url, d]) => ({ standard: std.get(url)!, dynamic: d }));
       console.log(`[live-matrix] broadSearch result_type pairs=${JSON.stringify(pairs.map((p) => [p.standard, p.dynamic]))}`);
-      if (JSON.stringify(standard.data?.queries) !== JSON.stringify(dynamic.data?.queries)) ctx.skip('queries differ');
+      const queries = standard.data?.queries;
+      if (queries === undefined || queries.length === 0 || JSON.stringify(queries) !== JSON.stringify(dynamic.data?.queries)) {
+        ctx.skip('queries missing or differ');
+      }
       // An empty highlight is "shorter than half" of anything, so both sides must be non-empty to count.
       const halved = pairs.filter((p) => p.standard > 0 && p.dynamic > 0 && p.dynamic < p.standard / 2);
       if (halved.length < 2) ctx.skip('fewer than 2 pairs under half');

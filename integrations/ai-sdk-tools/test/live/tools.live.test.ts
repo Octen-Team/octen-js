@@ -679,7 +679,8 @@ describe('live: result_type against production', () => {
   // /broad-search does not echo result_type, so compare two calls that differ only in it, on the recorded SDK responses.
   // Observed 2026-11-23 for this query: identical data.queries, 3 of 3 urls paired, dynamic/standard highlight ratios 0.25, 0.37, 0.26.
   // The effect depends on the query, so a skip means "no evidence this run", not a defect. The hard guard is the offline body test.
-  it('octenBroadSearch sends search_options.result_type: dynamic shortens a paired highlight versus the standard control (skips without evidence)', { timeout: TIMEOUT }, async (ctx) => {
+  // Two sequential Broad Search calls at the SDK's 120 s per-call limit, plus slack.
+  it('octenBroadSearch sends search_options.result_type: dynamic shortens a paired highlight versus the standard control (skips without evidence)', { timeout: 250_000 }, async (ctx) => {
     const call = async (result_type: 'standard' | 'dynamic') => {
       const rec = spyingClient();
       const defaults = { max_queries: 1, search_options: { result_type, count: 3, highlight: { enable: true } } };
@@ -703,7 +704,10 @@ describe('live: result_type against production', () => {
     const std = byUrl(standard);
     const pairs = [...byUrl(dynamic)].filter(([url]) => std.has(url)).map(([url, d]) => ({ standard: std.get(url)!, dynamic: d }));
     console.log(`broad result_type pairs ${JSON.stringify(pairs.map((p) => [p.standard, p.dynamic]))}`);
-    if (JSON.stringify(standard.data?.queries) !== JSON.stringify(dynamic.data?.queries)) ctx.skip('queries differ');
+    const queries = standard.data?.queries;
+    if (queries === undefined || queries.length === 0 || JSON.stringify(queries) !== JSON.stringify(dynamic.data?.queries)) {
+      ctx.skip('queries missing or differ');
+    }
     // An empty highlight is "shorter than half" of anything, so both sides must be non-empty to count.
     const halved = pairs.filter((p) => p.standard > 0 && p.dynamic > 0 && p.dynamic < p.standard / 2);
     if (halved.length < 2) ctx.skip('fewer than 2 pairs under half');
