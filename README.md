@@ -65,11 +65,16 @@ const web = await client.search.search({
 });
 console.log(web.data?.results?.[0]?.highlight);
 
+// result_type: 'standard' (the default) returns results as your parameters specify;
+// 'dynamic' returns only relevant results, up to count, and adjusts highlight length per result
+const dynamic = await client.search.search({ query: 'rust async runtimes', count: 5, result_type: 'dynamic' });
+console.log(dynamic.meta?.result_type, dynamic.data?.results?.length);
+
 // Broad Search: POST /broad-search (rewrites the question and runs several sub-queries)
 const broad = await client.search.broadSearch({
   query: 'compare central bank rate decisions this quarter',
   max_queries: 5,
-  search_options: { count: 5, language: ['en'] },
+  search_options: { count: 5, language: ['en'], result_type: 'dynamic' }, // applies to every sub-query
 });
 console.log(broad.data?.queries);
 for (const group of broad.data?.search_results ?? []) {
@@ -178,7 +183,7 @@ for (const item of pages.data?.results ?? []) {
 console.log(pages.meta?.usage?.successful_by_mode); // { standard_urls, advanced_urls }: what the call is billed for
 ```
 
-`searchPremier` takes the same body as `search` (there is no `topic`) and returns the same response shape. Video Search is an invite-only beta: contact Octen to request access. In Design Search, `images` options apply to the image results and `web_search` options to the web results only; turn off what you do not need with `images: { design_facts: false, snippet: { enable: false } }`, `images: { enable: false }` or `web_search: { enable: false }`. `design_facts` and `group.master` are free-form objects whose keys vary by image.
+`searchPremier` takes the same body as `search` (there is no `topic`) and returns the same response shape. `result_type` works the same on `search`, `searchPremier` and, inside `search_options`, on `broadSearch`; with `'dynamic'`, Octen may adjust `highlight.max_tokens` per result, so use `'standard'` when you need a fixed number of results or a fixed highlight length. Video Search is an invite-only beta: contact Octen to request access. In Design Search, `images` options apply to the image results and `web_search` options to the web results only; turn off what you do not need with `images: { design_facts: false, snippet: { enable: false } }`, `images: { enable: false }` or `web_search: { enable: false }`. `design_facts` and `group.master` are free-form objects whose keys vary by image.
 
 Extract notes: each URL gets its own result with a `status`, so a call can succeed while some URLs fail (`status: 'failed'` with an `error_message`); failed URLs are not billed. Match results to your input by `url` rather than by position. With `query`, each result carries `highlights` instead of `full_content`. `mode` is `standard` (the default), `advanced` (slower, more expensive, for pages that are hard to reach) or `auto` (picks one per URL); each result's `resolved_mode` is the mode that URL is billed at, and `meta.usage.successful_by_mode` counts them. The body's `timeout` (1 to 60 s, default 30) bounds each URL on the server; it is not the SDK's HTTP timeout, which Extract derives from it (see [Request options](#request-options)). `page_structure` and `category` can be `null` when the server cannot determine them.
 
