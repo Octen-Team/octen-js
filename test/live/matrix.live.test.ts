@@ -53,6 +53,16 @@ describe.skipIf(!enabled)('live matrix: success cases (billed, minimal counts)',
       expect(res.data?.results?.length ?? 0).toBeLessThanOrEqual(1);
     });
 
+    // The server echoes the type it used, so a dropped or misplaced field comes back as 'standard'.
+    it('result_type: dynamic is echoed in meta, count caps the results', async () => {
+      const res = await succeed('search result_type=dynamic', () =>
+        client().search.search({ query: 'octen search api', count: 3, result_type: 'dynamic' }),
+      );
+      expect(res.meta?.result_type).toBe('dynamic');
+      expect(res.data?.results?.length ?? 0).toBeGreaterThanOrEqual(1);
+      expect(res.data?.results?.length ?? 0).toBeLessThanOrEqual(3);
+    });
+
     it('include_domains: every result is on the included domain', async () => {
       const res = await succeed('search include_domains=wikipedia.org', () =>
         client().search.search({ query: 'solid-state battery', count: 2, include_domains: ['wikipedia.org'] }),
@@ -132,6 +142,45 @@ describe.skipIf(!enabled)('live matrix: success cases (billed, minimal counts)',
       expect(res.data?.queries?.length ?? 0).toBeLessThanOrEqual(1);
       expect(res.data?.search_results?.length ?? 0).toBeLessThanOrEqual(1);
       for (const g of res.data?.search_results ?? []) expect(g.results?.length ?? 0).toBeLessThanOrEqual(1);
+    });
+
+    // /broad-search does not echo result_type, so compare two calls that differ only in it: same query, max_queries=1, count=3,
+    // highlight enabled without max_tokens. Observed 2026-11-23: identical data.queries, 3 of 3 urls matched, dynamic/standard
+    // highlight length ratios 0.25, 0.37, 0.26. Query-specific: other queries left highlights unchanged that day, so keep this one.
+    it('search_options.result_type: dynamic shortens at least one matched highlight versus the standard control', async () => {
+      const query = 'EU AI Act enforcement timeline';
+      const run = (result_type: 'standard' | 'dynamic') =>
+        succeed(`broadSearch result_type=${result_type}`, () =>
+          client().search.broadSearch({
+            query,
+            max_queries: 1,
+            search_options: { result_type, count: 3, highlight: { enable: true } },
+          }),
+        );
+      // The server writes the sub-queries itself, so two calls can differ; retry once, then fail as not comparable.
+      let standard = await run('standard');
+      let dynamic = await run('dynamic');
+      if (JSON.stringify(standard.data?.queries) !== JSON.stringify(dynamic.data?.queries)) {
+        console.log('[live-matrix] broadSearch result_type: sub-queries differ, retrying once');
+        standard = await run('standard');
+        dynamic = await run('dynamic');
+      }
+      expect(dynamic.data?.queries, 'not comparable: the sub-queries differ between the two calls').toEqual(standard.data?.queries);
+
+      const standardByUrl = new Map<string, number>();
+      for (const g of standard.data?.search_results ?? []) {
+        for (const r of g.results ?? []) if (r.url !== undefined) standardByUrl.set(r.url, r.highlight?.length ?? 0);
+      }
+      const pairs: Array<{ url: string; standard: number; dynamic: number }> = [];
+      for (const g of dynamic.data?.search_results ?? []) {
+        for (const r of g.results ?? []) {
+          const std = r.url === undefined ? undefined : standardByUrl.get(r.url);
+          if (r.url !== undefined && std !== undefined) pairs.push({ url: r.url, standard: std, dynamic: r.highlight?.length ?? 0 });
+        }
+      }
+      console.log(`[live-matrix] broadSearch result_type pairs=${JSON.stringify(pairs.map((p) => [p.standard, p.dynamic]))}`);
+      expect(pairs.length).toBeGreaterThanOrEqual(2);
+      expect(pairs.some((p) => p.standard > 0 && p.dynamic < p.standard / 2)).toBe(true);
     });
 
     it('max_queries: 2 -> at most 2 sub-queries', async () => {
@@ -245,6 +294,7 @@ describe.skipIf(!enabled)('live matrix: negative cases (must be structured 4xx, 
     ['search query of 501 chars (max 500)', () => client().search.search({ query: 'a'.repeat(501) })],
     ['broadSearch max_queries=0', () => client().search.broadSearch({ ...q, max_queries: 0 })],
     ['broadSearch max_queries=31', () => client().search.broadSearch({ ...q, max_queries: 31 })],
+    ['broadSearch search_options.result_type=fancy', () => client().search.broadSearch({ ...q, max_queries: 1, search_options: { result_type: bad<'standard'>('fancy') } })],
     ['broadSearch search_options.count=0', () => client().search.broadSearch({ ...q, max_queries: 1, search_options: { count: 0 } })],
     ['newsSearch count=0', () => client().search.newsSearch({ ...q, count: 0 })],
     ['newsSearch count=101', () => client().search.newsSearch({ ...q, count: 101 })],

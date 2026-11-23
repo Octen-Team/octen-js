@@ -252,6 +252,21 @@ describe('SearchResource.searchPremier', () => {
   });
 });
 
+describe('SearchResource.broadSearch result_type', () => {
+  // Contract: result_type sits in search_options (OpenAPI BroadSearchRequest.search_options), not at the top level.
+  test('sends search_options.result_type unchanged and adds nothing else', async () => {
+    const { core, calls } = makeFetch();
+    await new SearchResource(core).broadSearch({ query: 'q', search_options: { result_type: 'dynamic' } });
+    expect(calls).toEqual([{ url: `${BASE}/broad-search`, body: { query: 'q', search_options: { result_type: 'dynamic' } } }]);
+  });
+
+  test('an unset result_type is absent from the body', async () => {
+    const { core, calls } = makeFetch();
+    await new SearchResource(core).broadSearch({ query: 'q', search_options: { count: 3 } });
+    expect(calls[0]?.body).toEqual({ query: 'q', search_options: { count: 3 } });
+  });
+});
+
 describe('SearchResource request-side validation details', () => {
   test('nested unknown field path is dotted', async () => {
     const { core } = makeFetch();
