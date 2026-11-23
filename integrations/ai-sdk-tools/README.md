@@ -80,6 +80,18 @@ const premier = octenWebSearchPremier({
 });
 ```
 
+`result_type` is `standard` (the default) or `dynamic`. `standard` returns results as your parameters specify; with `dynamic`, only relevant results come back, so `count` is a maximum (fewer, possibly none, can come back), and Octen may adjust the highlight length per result: `highlight.max_tokens` is a cap. It works the same for Web, Web Search Premier and Broad Search. Only you set it: the model never sees it. Broad Search takes it inside `search_options`, which replaces the tool's own `search_options` as a whole (see [Options and precedence](#options-and-precedence)), so write the highlight option there as well if you want to keep it:
+
+```ts
+import { octenBroadSearch, octenWebSearch } from '@octen.ai/ai-sdk-tools';
+
+const web = octenWebSearch({ defaults: { count: 5, result_type: 'dynamic' } });
+
+const broad = octenBroadSearch({
+  defaults: { search_options: { result_type: 'dynamic', highlight: { enable: true, max_tokens: 300 } } },
+});
+```
+
 ## Extract
 
 `octenExtract` reads web pages by URL. The model chooses only the URLs and an optional `query`. The most URLs it may pass in one call, and every option that changes what a call returns or costs, are yours to set when you build the tool. Each option is checked then: a value out of range throws `OctenValidationError`, with `field` naming the option, before any request. An option you leave unset is not sent, so the API default applies.
@@ -417,7 +429,7 @@ Keep in mind that each tool call the model makes is a separate Octen request, an
 
 `ai` 7 is published as ESM only, so loading this package through `require()` (CommonJS) together with `ai` 7 needs Node 20.19 or later, or Node 22.12 or later: older Node versions cannot `require()` an ES module and fail with `ERR_REQUIRE_ESM`. Measured on 2026-11-18 with `@octen.ai/ai-sdk-tools` 0.1.0 and `ai` 7.0.176: Node 20.18.3 and 22.11.0 fail, Node 20.19.0 and 22.12.0 work. The ESM build works on Node 20 and later.
 
-The package declares `ai` and `zod` as peer dependency ranges. A version matrix (`scripts/matrix.sh` in the repository) checks them; on 2026-11-22, for version 0.3.0 with `@octen.ai/sdk` 0.3.0, it passed for exactly these eight combinations:
+The package declares `ai` and `zod` as peer dependency ranges. A version matrix (`scripts/matrix.sh` in the repository) checks them; on 2026-11-23, for version 0.3.1 with `@octen.ai/sdk` 0.3.0, it passed for exactly these eight combinations:
 
 | `ai` | `zod` | Node |
 |---|---|---|

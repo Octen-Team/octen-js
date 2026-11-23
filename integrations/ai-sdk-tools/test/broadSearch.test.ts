@@ -2,7 +2,7 @@ import { Octen, OctenAbortError, OctenAuthenticationError } from '@octen.ai/sdk'
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { octenBroadSearch } from '../src/tools/broadSearch.js';
-import { clientFor, jsonResponse, recordingFetch, run } from './helpers.js';
+import { clientFor, jsonResponse, modelJsonSchema, recordingFetch, run } from './helpers.js';
 // Replies are the production envelope recorded in test/fixtures/broad-search.json.
 import broadFixture from './fixtures/broad-search.json';
 
@@ -179,5 +179,67 @@ describe('octenBroadSearch', () => {
       queries: ['a', 'b'],
       search_results: [{ query: 'b', results: [] }],
     });
+  });
+});
+
+describe('octenBroadSearch result_type', () => {
+  // Contract: Broad Search takes result_type inside search_options, never at the top level, and only the developer sets it.
+  it('sends a developer result_type inside search_options and keeps the highlight the developer writes there', async () => {
+    const { fakeFetch, calls } = recordingFetch(() => jsonResponse(broadFixture));
+    const t = octenBroadSearch({
+      client: clientFor(fakeFetch),
+      defaults: { search_options: { result_type: 'dynamic', highlight: { enable: true, max_tokens: 300 } } },
+    });
+    await run(t, { query: 'q' });
+    expect(calls[0]?.body).toEqual({
+      query: 'q',
+      search_options: { result_type: 'dynamic', highlight: { enable: true, max_tokens: 300 } },
+    });
+    expect(calls[0]?.body).not.toHaveProperty('result_type');
+  });
+
+  // search_options is replaced whole, so a developer object without highlight also drops the tool's highlight default.
+  it('replaces the highlight default when search_options holds only result_type', async () => {
+    const { fakeFetch, calls } = recordingFetch(() => jsonResponse(broadFixture));
+    await run(octenBroadSearch({ client: clientFor(fakeFetch), defaults: { search_options: { result_type: 'dynamic' } } }), { query: 'q' });
+    expect(calls[0]?.body).toEqual({ query: 'q', search_options: { result_type: 'dynamic' } });
+  });
+
+  it('does not offer result_type to the model and ignores one the model sends', async () => {
+    const { fakeFetch, calls } = recordingFetch(() => jsonResponse(broadFixture));
+    const t = octenBroadSearch({ client: clientFor(fakeFetch) });
+    expect(Object.keys((await modelJsonSchema(t)).properties ?? {})).toEqual(['query']);
+    await run(t, { query: 'q', result_type: 'dynamic', search_options: { result_type: 'dynamic' } });
+    // Unset means absent: the API default applies.
+    expect(calls[0]?.body).toEqual({ query: 'q', search_options: { highlight: { enable: true, max_tokens: 300 } } });
+  });
+
+  // dynamic may return fewer results than count, each with a highlight longer than the tool's max_tokens (API reference,
+  // WebSearchOptions.result_type and WebSearchHighlightOptions.max_tokens), so none of that may raise or be cut by the tool.
+  it('returns a single result with a long highlight, and an empty group, without error', async () => {
+    const source = broadFixture.data.search_results[0]!.results[0]!;
+    const long = 'long highlight '.repeat(400);
+    const reply = (search_results: unknown[]) => () =>
+      jsonResponse({ ...broadFixture, data: { query: 'q', queries: ['q'], search_results } });
+    // search_options replaces the tool default whole, so set the limits this test is about: count above the one mocked
+    // result and a 300-token highlight cap far below the ~1500-token mocked highlight.
+    const defaults = {
+      search_options: { result_type: 'dynamic', count: 10, highlight: { enable: true, max_tokens: 300 } },
+    } as const;
+
+    const one = recordingFetch(reply([{ query: 'q', results: [{ ...source, highlight: long }] }]));
+    const out = (await run(octenBroadSearch({ client: clientFor(one.fakeFetch), defaults }), { query: 'q' })) as {
+      search_results: { results: { highlight?: string }[] }[];
+    };
+    expect((one.calls[0]?.body as { search_options?: unknown }).search_options).toEqual(defaults.search_options);
+    expect(out.search_results).toHaveLength(1);
+    expect(out.search_results[0]?.results).toHaveLength(1);
+    expect(out.search_results[0]?.results[0]?.highlight).toBe(long);
+
+    const none = recordingFetch(reply([{ query: 'q', results: [] }]));
+    const empty = (await run(octenBroadSearch({ client: clientFor(none.fakeFetch), defaults }), { query: 'q' })) as {
+      search_results: unknown[];
+    };
+    expect(empty.search_results).toEqual([{ query: 'q', results: [] }]);
   });
 });

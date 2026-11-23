@@ -638,3 +638,78 @@ describe('live: design search against production', () => {
     expect(log).toHaveLength(0);
   });
 });
+
+// Wraps a real client and records what search.search and search.broadSearch return, because the tools trim meta and
+// the sub-queries away and result_type is only visible in that recorded SDK response.
+function spyingClient() {
+  const client = new Octen({ apiKey: apiKey ?? '' });
+  const web: Awaited<ReturnType<Octen['search']['search']>>[] = [];
+  const broad: Awaited<ReturnType<Octen['search']['broadSearch']>>[] = [];
+  const broadParams: Parameters<Octen['search']['broadSearch']>[0][] = [];
+  const search = client.search;
+  const searchOnce = search.search.bind(search);
+  const broadOnce = search.broadSearch.bind(search);
+  search.search = async (...args) => {
+    const res = await searchOnce(...args);
+    web.push(res);
+    return res;
+  };
+  search.broadSearch = async (...args) => {
+    broadParams.push(args[0]);
+    const res = await broadOnce(...args);
+    broad.push(res);
+    return res;
+  };
+  return { client, web, broad, broadParams };
+}
+
+describe('live: result_type against production', () => {
+  // The server echoes the type it used (default 'standard'), so a dropped developer option comes back as 'standard'.
+  it('octenWebSearch sends the developer result_type: dynamic is echoed in meta', { timeout: TIMEOUT }, async () => {
+    const rec = spyingClient();
+    const out = await runTool(octenWebSearch({ client: rec.client, defaults: { count: 3, result_type: 'dynamic' } }), {
+      query: 'EU AI Act enforcement timeline',
+    });
+    expect(rec.web).toHaveLength(1);
+    expect(rec.web[0]?.meta?.result_type).toBe('dynamic');
+    // dynamic treats count as a maximum, so fewer results, even none, are valid.
+    expect(count(out['results'])).toBeLessThanOrEqual(3);
+  });
+
+  // /broad-search does not echo result_type, so compare two calls that differ only in it, on the recorded SDK responses.
+  // Observed 2026-11-23 for this query: identical data.queries, 3 of 3 urls paired, dynamic/standard highlight ratios 0.25, 0.37, 0.26.
+  // The effect depends on the query, so a skip means "no evidence this run", not a defect. The hard guard is the offline body test.
+  // Two sequential Broad Search calls at the SDK's 120 s per-call limit, plus slack.
+  it('octenBroadSearch sends search_options.result_type: dynamic shortens a paired highlight versus the standard control (skips without evidence)', { timeout: 250_000 }, async (ctx) => {
+    const call = async (result_type: 'standard' | 'dynamic') => {
+      const rec = spyingClient();
+      const defaults = { max_queries: 1, search_options: { result_type, count: 3, highlight: { enable: true } } };
+      await runTool(octenBroadSearch({ client: rec.client, defaults }), { query: 'EU AI Act enforcement timeline' });
+      expect(rec.broad).toHaveLength(1);
+      // Deterministic part: what the tool forwarded to the SDK. A failure here fails the test; only the comparison below skips.
+      expect(rec.broadParams[0]?.search_options?.result_type).toBe(result_type);
+      return rec.broad[0]!;
+    };
+    const standard = await call('standard');
+    const dynamic = await call('dynamic');
+
+    // Pair distinct, non-empty urls only; a result without a url is ignored and a repeated url counts once.
+    const byUrl = (res: typeof standard) => {
+      const m = new Map<string, number>();
+      for (const g of res.data?.search_results ?? []) {
+        for (const r of g.results ?? []) if (r.url !== undefined && r.url !== '' && !m.has(r.url)) m.set(r.url, r.highlight?.length ?? 0);
+      }
+      return m;
+    };
+    const std = byUrl(standard);
+    const pairs = [...byUrl(dynamic)].filter(([url]) => std.has(url)).map(([url, d]) => ({ standard: std.get(url)!, dynamic: d }));
+    console.log(`broad result_type pairs ${JSON.stringify(pairs.map((p) => [p.standard, p.dynamic]))}`);
+    const queries = standard.data?.queries;
+    if (queries === undefined || queries.length === 0 || JSON.stringify(queries) !== JSON.stringify(dynamic.data?.queries)) {
+      ctx.skip('queries missing or differ');
+    }
+    // An empty highlight is "shorter than half" of anything, so both sides must be non-empty to count.
+    const halved = pairs.filter((p) => p.standard > 0 && p.dynamic > 0 && p.dynamic < p.standard / 2);
+    if (halved.length < 2) ctx.skip('fewer than 2 pairs under half');
+  });
+});

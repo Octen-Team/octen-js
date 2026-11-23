@@ -32,6 +32,14 @@ export async function premierSettings(): Promise<void> {
   });
 }
 
+export async function resultTypeSettings(): Promise<void> {
+  const web = octenWebSearch({ defaults: { count: 5, result_type: 'dynamic' } });
+
+  const broad = octenBroadSearch({
+    defaults: { search_options: { result_type: 'dynamic', highlight: { enable: true, max_tokens: 300 } } },
+  });
+}
+
 export async function extractTool(): Promise<void> {
   // The model finds pages with web search, then reads up to three of them per call.
   const { text: summary } = await generateText({

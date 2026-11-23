@@ -53,6 +53,16 @@ describe.skipIf(!enabled)('live matrix: success cases (billed, minimal counts)',
       expect(res.data?.results?.length ?? 0).toBeLessThanOrEqual(1);
     });
 
+    // The server echoes the type it used, so a dropped or misplaced field comes back as 'standard'.
+    it('result_type: dynamic is echoed in meta, count is an upper bound', async () => {
+      const res = await succeed('search result_type=dynamic', () =>
+        client().search.search({ query: 'octen search api', count: 3, result_type: 'dynamic' }),
+      );
+      expect(res.meta?.result_type).toBe('dynamic');
+      // dynamic treats count as a maximum, so fewer results, even none, are valid.
+      expect(res.data?.results?.length ?? 0).toBeLessThanOrEqual(3);
+    });
+
     it('include_domains: every result is on the included domain', async () => {
       const res = await succeed('search include_domains=wikipedia.org', () =>
         client().search.search({ query: 'solid-state battery', count: 2, include_domains: ['wikipedia.org'] }),
@@ -132,6 +142,42 @@ describe.skipIf(!enabled)('live matrix: success cases (billed, minimal counts)',
       expect(res.data?.queries?.length ?? 0).toBeLessThanOrEqual(1);
       expect(res.data?.search_results?.length ?? 0).toBeLessThanOrEqual(1);
       for (const g of res.data?.search_results ?? []) expect(g.results?.length ?? 0).toBeLessThanOrEqual(1);
+    });
+
+    // /broad-search does not echo result_type, so compare two calls that differ only in it. Observed 2026-11-23 for this query:
+    // identical data.queries, 3 of 3 urls paired, dynamic/standard highlight ratios 0.25, 0.37, 0.26. The effect depends on the
+    // query (other queries gave identical highlights), so a skip means "no evidence this run", not a defect.
+    // Two sequential Broad Search calls at the SDK's 120 s per-call limit, plus slack.
+    it('search_options.result_type: dynamic shortens a paired highlight versus the standard control (skips without evidence)', { timeout: 250_000 }, async (ctx) => {
+      const run = (result_type: 'standard' | 'dynamic') =>
+        succeed(`broadSearch result_type=${result_type}`, () =>
+          client().search.broadSearch({
+            query: 'EU AI Act enforcement timeline',
+            max_queries: 1,
+            search_options: { result_type, count: 3, highlight: { enable: true } },
+          }),
+        );
+      const standard = await run('standard');
+      const dynamic = await run('dynamic');
+
+      // Pair distinct, non-empty urls only; a result without a url is ignored and a repeated url counts once.
+      const byUrl = (res: typeof standard) => {
+        const m = new Map<string, number>();
+        for (const g of res.data?.search_results ?? []) {
+          for (const r of g.results ?? []) if (r.url !== undefined && r.url !== '' && !m.has(r.url)) m.set(r.url, r.highlight?.length ?? 0);
+        }
+        return m;
+      };
+      const std = byUrl(standard);
+      const pairs = [...byUrl(dynamic)].filter(([url]) => std.has(url)).map(([url, d]) => ({ standard: std.get(url)!, dynamic: d }));
+      console.log(`[live-matrix] broadSearch result_type pairs=${JSON.stringify(pairs.map((p) => [p.standard, p.dynamic]))}`);
+      const queries = standard.data?.queries;
+      if (queries === undefined || queries.length === 0 || JSON.stringify(queries) !== JSON.stringify(dynamic.data?.queries)) {
+        ctx.skip('queries missing or differ');
+      }
+      // An empty highlight is "shorter than half" of anything, so both sides must be non-empty to count.
+      const halved = pairs.filter((p) => p.standard > 0 && p.dynamic > 0 && p.dynamic < p.standard / 2);
+      if (halved.length < 2) ctx.skip('fewer than 2 pairs under half');
     });
 
     it('max_queries: 2 -> at most 2 sub-queries', async () => {
@@ -239,7 +285,6 @@ describe.skipIf(!enabled)('live matrix: negative cases (must be structured 4xx, 
     ['search time_range=decade', () => client().search.search({ ...q, time_range: bad<'day'>('decade') })],
     ['search safesearch=maybe', () => client().search.search({ ...q, safesearch: bad<'off'>('maybe') })],
     ['search format=html', () => client().search.search({ ...q, format: bad<'text'>('html') })],
-    ['search result_type=fancy', () => client().search.search({ ...q, result_type: bad<'standard'>('fancy') })],
     ['search language=[xx]', () => client().search.search({ ...q, language: bad<['en']>(['xx']) })],
     ['search highlight.max_tokens=50 (min 100)', () => client().search.search({ ...q, highlight: { enable: true, max_tokens: 50 } })],
     ['search query of 501 chars (max 500)', () => client().search.search({ query: 'a'.repeat(501) })],
@@ -265,6 +310,17 @@ describe.skipIf(!enabled)('live matrix: negative cases (must be structured 4xx, 
 
   it.each(cases)('%s -> OctenBadRequestError', async (name, run) => {
     await rejectsAs4xx(name, run);
+  });
+
+  // The API answers 400 "Invalid param result_type" only if the field arrives under that name and, for Broad Search, inside
+  // search_options. A client that drops it or sends it at the top level gets a 200, so these probes fail on such a client.
+  it.each([
+    ['search', () => client().search.search({ query: 'octen', count: 1, result_type: bad<'standard'>('fancy') })],
+    ['broadSearch', () => client().search.broadSearch({ query: 'octen', max_queries: 1, search_options: { count: 1, result_type: bad<'standard'>('fancy') } })],
+  ] as Array<[string, () => Promise<unknown>]>)('%s result_type=fancy -> 400 naming result_type', async (name, run) => {
+    const err = await rejectsAs4xx(`${name} result_type=fancy (status and message)`, run);
+    expect(err.status).toBe(400);
+    expect(err.message).toContain('result_type');
   });
 
   describe('local validation: rejected before any request is sent', () => {

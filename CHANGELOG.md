@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.3.1
+
+- No API change: `result_type` (`standard` or `dynamic`) was already accepted by `search.search` and, inside `search_options`, by `search.broadSearch`. This release adds tests that fix its request placement and check it against the live API, and README examples for both methods.
+- Version bump only: nothing is sent differently when `result_type` is not set.
+
 ## 0.3.0
 
 - New method: `extract.extract` (`POST /extract`), with request and response types checked against the public OpenAPI spec. Results are per URL (`status`, `error_message`, `resolved_mode`), and `meta.usage.successful_by_mode` gives what the call is billed for.
