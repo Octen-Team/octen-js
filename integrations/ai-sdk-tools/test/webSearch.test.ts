@@ -175,3 +175,44 @@ describe('octenWebSearch', () => {
     expect((calls[0]?.body as { highlight?: unknown }).highlight).toEqual({ max_tokens: 600 });
   });
 });
+
+describe('octenWebSearch result_type', () => {
+  // Contract: Web Search takes result_type at the top level of the body; it is a developer option, never a model input.
+  it('sends a developer result_type at the top level next to the tool defaults', async () => {
+    const { fakeFetch, calls } = recordingFetch(() => jsonResponse(searchFixture));
+    await run(octenWebSearch({ client: clientFor(fakeFetch), defaults: { result_type: 'dynamic' } }), { query: 'q' });
+    expect(calls[0]?.body).toEqual({ query: 'q', count: 5, highlight: { enable: true, max_tokens: 300 }, result_type: 'dynamic' });
+  });
+
+  it('does not offer result_type to the model and ignores one the model sends', async () => {
+    const { fakeFetch, calls } = recordingFetch(() => jsonResponse(searchFixture));
+    const t = octenWebSearch({ client: clientFor(fakeFetch) });
+    expect(Object.keys((await modelJsonSchema(t)).properties ?? {}).sort()).toEqual(['query', 'time_range']);
+    await run(t, { query: 'q', result_type: 'dynamic' });
+    // Unset means absent: the API default applies.
+    expect(calls[0]?.body).not.toHaveProperty('result_type');
+    const pinned = octenWebSearch({ client: clientFor(fakeFetch), defaults: { result_type: 'standard' } });
+    await run(pinned, { query: 'q', result_type: 'dynamic' });
+    expect((calls[1]?.body as { result_type?: string }).result_type).toBe('standard');
+  });
+
+  // dynamic may return fewer results than count, each with a highlight longer than the tool's max_tokens (API reference,
+  // WebSearchOptions.result_type and WebSearchHighlightOptions.max_tokens), so none of that may raise or be cut by the tool.
+  it('returns a single result with a long highlight, and an empty list, without error', async () => {
+    const source = searchFixture.data.results[0]!;
+    const long = 'long highlight '.repeat(400);
+    const reply = (results: unknown[]) => () => jsonResponse({ ...searchFixture, meta: { ...searchFixture.meta, result_type: 'dynamic' }, data: { query: 'q', results } });
+    const options = { defaults: { result_type: 'dynamic' } } as const;
+
+    const one = recordingFetch(reply([{ ...source, highlight: long }]));
+    const out = (await run(octenWebSearch({ client: clientFor(one.fakeFetch), ...options }), { query: 'q' })) as { results: { highlight?: string }[] };
+    expect(out.results).toHaveLength(1);
+    expect(out.results[0]?.highlight).toBe(long);
+
+    const none = recordingFetch(reply([]));
+    expect(await run(octenWebSearch({ client: clientFor(none.fakeFetch), ...options }), { query: 'q' })).toEqual({
+      request_id: searchFixture.request_id,
+      results: [],
+    });
+  });
+});

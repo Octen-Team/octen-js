@@ -638,3 +638,70 @@ describe('live: design search against production', () => {
     expect(log).toHaveLength(0);
   });
 });
+
+// Wraps a real client and records what search.search and search.broadSearch return, because the tools trim meta and
+// the sub-queries away and result_type is only visible in that recorded SDK response.
+function spyingClient() {
+  const client = new Octen({ apiKey: apiKey ?? '' });
+  const web: Awaited<ReturnType<Octen['search']['search']>>[] = [];
+  const broad: Awaited<ReturnType<Octen['search']['broadSearch']>>[] = [];
+  const search = client.search;
+  const searchOnce = search.search.bind(search);
+  const broadOnce = search.broadSearch.bind(search);
+  search.search = async (...args) => {
+    const res = await searchOnce(...args);
+    web.push(res);
+    return res;
+  };
+  search.broadSearch = async (...args) => {
+    const res = await broadOnce(...args);
+    broad.push(res);
+    return res;
+  };
+  return { client, web, broad };
+}
+
+describe('live: result_type against production', () => {
+  // The server echoes the type it used (default 'standard'), so a dropped developer option comes back as 'standard'.
+  it('octenWebSearch sends the developer result_type: dynamic is echoed in meta', { timeout: TIMEOUT }, async () => {
+    const rec = spyingClient();
+    const out = await runTool(octenWebSearch({ client: rec.client, defaults: { count: 3, result_type: 'dynamic' } }), {
+      query: 'EU AI Act enforcement timeline',
+    });
+    expect(rec.web).toHaveLength(1);
+    expect(rec.web[0]?.meta?.result_type).toBe('dynamic');
+    expect(count(out['results'])).toBeGreaterThan(0);
+    expect(count(out['results'])).toBeLessThanOrEqual(3);
+  });
+
+  // /broad-search does not echo result_type, so compare two calls that differ only in it, on the recorded SDK responses.
+  // Observed 2026-11-23: identical data.queries, 3 of 3 urls matched, dynamic/standard highlight length ratios 0.25, 0.37, 0.26.
+  // Query-specific: other queries left highlights unchanged that day. highlight has no max_tokens, as the tool default would cap it.
+  it('octenBroadSearch sends search_options.result_type: dynamic shortens a matched highlight versus the standard control', { timeout: TIMEOUT }, async () => {
+    const query = 'EU AI Act enforcement timeline';
+    const call = async (result_type: 'standard' | 'dynamic') => {
+      const rec = spyingClient();
+      const defaults = { max_queries: 1, search_options: { result_type, count: 3, highlight: { enable: true } } };
+      await runTool(octenBroadSearch({ client: rec.client, defaults }), { query });
+      expect(rec.broad).toHaveLength(1);
+      return rec.broad[0]!;
+    };
+    // The server writes the sub-queries itself, so two calls can differ; retry once, then fail as not comparable.
+    let standard = await call('standard');
+    let dynamic = await call('dynamic');
+    if (JSON.stringify(standard.data?.queries) !== JSON.stringify(dynamic.data?.queries)) {
+      console.log('sub-queries differ, retrying once');
+      standard = await call('standard');
+      dynamic = await call('dynamic');
+    }
+    expect(dynamic.data?.queries, 'not comparable: the sub-queries differ between the two calls').toEqual(standard.data?.queries);
+
+    const lengths = (res: typeof standard) =>
+      new Map((res.data?.search_results ?? []).flatMap((g) => g.results ?? []).map((r) => [r.url, r.highlight?.length ?? 0] as const));
+    const std = lengths(standard);
+    const pairs = [...lengths(dynamic)].filter(([url]) => std.has(url)).map(([url, d]) => ({ url, standard: std.get(url)!, dynamic: d }));
+    console.log(`broad result_type pairs ${JSON.stringify(pairs.map((p) => [p.standard, p.dynamic]))}`);
+    expect(pairs.length).toBeGreaterThanOrEqual(2);
+    expect(pairs.some((p) => p.standard > 0 && p.dynamic < p.standard / 2)).toBe(true);
+  });
+});

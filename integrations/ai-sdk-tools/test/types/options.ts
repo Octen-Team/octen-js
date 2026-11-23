@@ -1,6 +1,7 @@
 // Compile-time checks for the public option and result types; tsconfig.types.json type-checks this file.
 import { Octen } from '@octen.ai/sdk';
 import {
+  octenBroadSearch,
   octenBusinessSearch,
   octenDesignSearch,
   octenExtract,
@@ -81,6 +82,18 @@ export function premierOptions(): WebSearchPremierToolResult['results'] {
   octenWebSearchPremier({ client, defaults: { topic: 'news' } });
   const input: WebSearchPremierInput = { query: 'q', time_range: null };
   return input.query === '' ? [] : [{ title: 't', url: 'u' }];
+}
+
+// Web Search and Broad Search take result_type from the developer: top level for Web, inside search_options for Broad.
+export function resultTypeOptions(): void {
+  octenWebSearch({ client, defaults: { result_type: 'dynamic' } });
+  octenBroadSearch({ client, defaults: { search_options: { result_type: 'dynamic', highlight: { enable: true, max_tokens: 300 } } } });
+  // @ts-expect-error result_type is standard or dynamic
+  octenWebSearch({ client, defaults: { result_type: 'deep' } });
+  // @ts-expect-error result_type is standard or dynamic
+  octenBroadSearch({ client, defaults: { search_options: { result_type: 'deep' } } });
+  // @ts-expect-error Broad Search takes result_type inside search_options
+  octenBroadSearch({ client, defaults: { result_type: 'dynamic' } });
 }
 
 // Extract takes its own named options instead of `defaults`, so a misspelt or out-of-type option fails to compile.
