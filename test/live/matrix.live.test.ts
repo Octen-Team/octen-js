@@ -159,22 +159,21 @@ describe.skipIf(!enabled)('live matrix: success cases (billed, minimal counts)',
       const standard = await run('standard');
       const dynamic = await run('dynamic');
 
-      const standardByUrl = new Map<string, number>();
-      for (const g of standard.data?.search_results ?? []) {
-        for (const r of g.results ?? []) if (r.url !== undefined) standardByUrl.set(r.url, r.highlight?.length ?? 0);
-      }
-      const pairs: Array<{ standard: number; dynamic: number }> = [];
-      for (const g of dynamic.data?.search_results ?? []) {
-        for (const r of g.results ?? []) {
-          const std = r.url === undefined ? undefined : standardByUrl.get(r.url);
-          if (std !== undefined) pairs.push({ standard: std, dynamic: r.highlight?.length ?? 0 });
+      // Pair distinct, non-empty urls only; a result without a url is ignored and a repeated url counts once.
+      const byUrl = (res: typeof standard) => {
+        const m = new Map<string, number>();
+        for (const g of res.data?.search_results ?? []) {
+          for (const r of g.results ?? []) if (r.url !== undefined && r.url !== '' && !m.has(r.url)) m.set(r.url, r.highlight?.length ?? 0);
         }
-      }
+        return m;
+      };
+      const std = byUrl(standard);
+      const pairs = [...byUrl(dynamic)].filter(([url]) => std.has(url)).map(([url, d]) => ({ standard: std.get(url)!, dynamic: d }));
       console.log(`[live-matrix] broadSearch result_type pairs=${JSON.stringify(pairs.map((p) => [p.standard, p.dynamic]))}`);
       if (JSON.stringify(standard.data?.queries) !== JSON.stringify(dynamic.data?.queries)) ctx.skip('queries differ');
-      if (pairs.length < 2) ctx.skip('fewer than 2 paired results');
       // An empty highlight is "shorter than half" of anything, so both sides must be non-empty to count.
-      if (!pairs.some((p) => p.standard > 0 && p.dynamic > 0 && p.dynamic < p.standard / 2)) ctx.skip('no paired highlight under half');
+      const halved = pairs.filter((p) => p.standard > 0 && p.dynamic > 0 && p.dynamic < p.standard / 2);
+      if (halved.length < 2) ctx.skip('fewer than 2 pairs under half');
     });
 
     it('max_queries: 2 -> at most 2 sub-queries', async () => {

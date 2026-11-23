@@ -645,6 +645,7 @@ function spyingClient() {
   const client = new Octen({ apiKey: apiKey ?? '' });
   const web: Awaited<ReturnType<Octen['search']['search']>>[] = [];
   const broad: Awaited<ReturnType<Octen['search']['broadSearch']>>[] = [];
+  const broadParams: Parameters<Octen['search']['broadSearch']>[0][] = [];
   const search = client.search;
   const searchOnce = search.search.bind(search);
   const broadOnce = search.broadSearch.bind(search);
@@ -654,11 +655,12 @@ function spyingClient() {
     return res;
   };
   search.broadSearch = async (...args) => {
+    broadParams.push(args[0]);
     const res = await broadOnce(...args);
     broad.push(res);
     return res;
   };
-  return { client, web, broad };
+  return { client, web, broad, broadParams };
 }
 
 describe('live: result_type against production', () => {
@@ -683,19 +685,27 @@ describe('live: result_type against production', () => {
       const defaults = { max_queries: 1, search_options: { result_type, count: 3, highlight: { enable: true } } };
       await runTool(octenBroadSearch({ client: rec.client, defaults }), { query: 'EU AI Act enforcement timeline' });
       expect(rec.broad).toHaveLength(1);
+      // Deterministic part: what the tool forwarded to the SDK. A failure here fails the test; only the comparison below skips.
+      expect(rec.broadParams[0]?.search_options?.result_type).toBe(result_type);
       return rec.broad[0]!;
     };
     const standard = await call('standard');
     const dynamic = await call('dynamic');
 
-    const lengths = (res: typeof standard) =>
-      new Map((res.data?.search_results ?? []).flatMap((g) => g.results ?? []).map((r) => [r.url, r.highlight?.length ?? 0] as const));
-    const std = lengths(standard);
-    const pairs = [...lengths(dynamic)].filter(([url]) => std.has(url)).map(([url, d]) => ({ url, standard: std.get(url)!, dynamic: d }));
+    // Pair distinct, non-empty urls only; a result without a url is ignored and a repeated url counts once.
+    const byUrl = (res: typeof standard) => {
+      const m = new Map<string, number>();
+      for (const g of res.data?.search_results ?? []) {
+        for (const r of g.results ?? []) if (r.url !== undefined && r.url !== '' && !m.has(r.url)) m.set(r.url, r.highlight?.length ?? 0);
+      }
+      return m;
+    };
+    const std = byUrl(standard);
+    const pairs = [...byUrl(dynamic)].filter(([url]) => std.has(url)).map(([url, d]) => ({ standard: std.get(url)!, dynamic: d }));
     console.log(`broad result_type pairs ${JSON.stringify(pairs.map((p) => [p.standard, p.dynamic]))}`);
     if (JSON.stringify(standard.data?.queries) !== JSON.stringify(dynamic.data?.queries)) ctx.skip('queries differ');
-    if (pairs.length < 2) ctx.skip('fewer than 2 paired results');
     // An empty highlight is "shorter than half" of anything, so both sides must be non-empty to count.
-    if (!pairs.some((p) => p.standard > 0 && p.dynamic > 0 && p.dynamic < p.standard / 2)) ctx.skip('no paired highlight under half');
+    const halved = pairs.filter((p) => p.standard > 0 && p.dynamic > 0 && p.dynamic < p.standard / 2);
+    if (halved.length < 2) ctx.skip('fewer than 2 pairs under half');
   });
 });
