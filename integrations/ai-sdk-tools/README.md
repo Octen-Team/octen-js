@@ -80,7 +80,7 @@ const premier = octenWebSearchPremier({
 });
 ```
 
-`result_type` is `standard` (the default) or `dynamic`. `standard` returns results as your parameters specify; `dynamic` returns only relevant results, up to `count`, and adjusts highlight length per result. With `dynamic`, Octen may adjust `highlight.max_tokens` per result, so use `standard` when you need a fixed number of results or a fixed highlight length. It works the same for Web, Web Search Premier and Broad Search. Only you set it: the model never sees it. Broad Search takes it inside `search_options`, which replaces the tool's own `search_options` as a whole (see [Options and precedence](#options-and-precedence)), so write the highlight option there as well if you want to keep it:
+`result_type` is `standard` (the default) or `dynamic`. `standard` returns results as your parameters specify; `dynamic` returns only relevant results, up to `count`, and adjusts highlight length per result. With `dynamic`, `count` is a maximum, and `highlight.max_tokens` is a cap that Octen may adjust per result. It works the same for Web, Web Search Premier and Broad Search. Only you set it: the model never sees it. Broad Search takes it inside `search_options`, which replaces the tool's own `search_options` as a whole (see [Options and precedence](#options-and-precedence)), so write the highlight option there as well if you want to keep it:
 
 ```ts
 import { octenBroadSearch, octenWebSearch } from '@octen.ai/ai-sdk-tools';
