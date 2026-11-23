@@ -221,12 +221,17 @@ describe('octenBroadSearch result_type', () => {
     const long = 'long highlight '.repeat(400);
     const reply = (search_results: unknown[]) => () =>
       jsonResponse({ ...broadFixture, data: { query: 'q', queries: ['q'], search_results } });
-    const defaults = { search_options: { result_type: 'dynamic', highlight: { enable: true } } } as const;
+    // search_options replaces the tool default whole, so set the limits this test is about: count above the one mocked
+    // result and a 300-token highlight cap far below the ~1500-token mocked highlight.
+    const defaults = {
+      search_options: { result_type: 'dynamic', count: 10, highlight: { enable: true, max_tokens: 300 } },
+    } as const;
 
     const one = recordingFetch(reply([{ query: 'q', results: [{ ...source, highlight: long }] }]));
     const out = (await run(octenBroadSearch({ client: clientFor(one.fakeFetch), defaults }), { query: 'q' })) as {
       search_results: { results: { highlight?: string }[] }[];
     };
+    expect((one.calls[0]?.body as { search_options?: unknown }).search_options).toEqual(defaults.search_options);
     expect(out.search_results).toHaveLength(1);
     expect(out.search_results[0]?.results).toHaveLength(1);
     expect(out.search_results[0]?.results[0]?.highlight).toBe(long);

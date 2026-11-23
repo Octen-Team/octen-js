@@ -206,6 +206,8 @@ describe('octenWebSearch result_type', () => {
 
     const one = recordingFetch(reply([{ ...source, highlight: long }]));
     const out = (await run(octenWebSearch({ client: clientFor(one.fakeFetch), ...options }), { query: 'q' })) as { results: { highlight?: string }[] };
+    // The tool defaults apply: count 5 is above the one mocked result, and the 300-token cap is far below the ~1500-token highlight.
+    expect(one.calls[0]?.body).toMatchObject({ count: 5, highlight: { enable: true, max_tokens: 300 }, result_type: 'dynamic' });
     expect(out.results).toHaveLength(1);
     expect(out.results[0]?.highlight).toBe(long);
 
