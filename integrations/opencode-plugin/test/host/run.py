@@ -10,7 +10,9 @@ checks what OpenCode offers the model and what a tool call returns.
 
 These checks do not run in CI: they need the network and the hosted Octen MCP server, the tool
 call rows need a real key (one billed search), and the sign-in rows need a credential file that
-only a person can produce. A row whose precondition is missing prints SKIP, which is not a pass.
+only a person can produce. Use a sign-in made for these tests, not the one you work with: when a
+run refreshes the tokens, the server rotates the refresh token, and the file you passed is spent;
+sign in again before the next run. A row whose precondition is missing prints SKIP, which is not a pass.
 All OpenCode state goes under --state; nothing touches the real OpenCode configuration.
 Put --state outside any OpenCode project: OpenCode also reads the configuration of the
 directories above the one it runs in.
@@ -112,9 +114,9 @@ class Host:
         return home
 
     def env(self, home: Path, key: str | None) -> dict[str, str]:
-        # These point OpenCode at configuration outside --state, so they are dropped too.
-        dropped = {"OCTEN_API_KEY", "OPENCODE_CONFIG", "OPENCODE_CONFIG_DIR", "OPENCODE_CONFIG_CONTENT"}
-        env = {name: value for name, value in os.environ.items() if name not in dropped}
+        # Every inherited OPENCODE_ setting is dropped: some point OpenCode at configuration
+        # outside --state, others switch off the per-row configuration the rows rely on.
+        env = {name: value for name, value in os.environ.items() if name != "OCTEN_API_KEY" and not name.startswith("OPENCODE_")}
         env.update(
             HOME=str(home),
             XDG_CONFIG_HOME=str(home / ".config"),

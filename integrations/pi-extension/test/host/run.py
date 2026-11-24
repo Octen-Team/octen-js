@@ -11,7 +11,9 @@ Octen MCP server and what a tool call returns.
 These checks do not run in CI: they need the network and the hosted Octen MCP server. Rows that
 only look at what Pi offers the model use a local stand-in for the model. Rows that make a tool
 call need a real model, given by the three MODEL_ variables, and a real key (billed searches).
-The sign-in rows need a credential file that only a person can produce. A row whose
+The sign-in rows need a credential file that only a person can produce. Use a sign-in made for
+these tests, not the one you work with: when a run refreshes the tokens, the server rotates the
+refresh token, and the file you passed is spent; sign in again before the next run. A row whose
 precondition is missing prints SKIP, which is not a pass.
 
 All Pi state goes under --state, and Pi is started with --no-context-files so that no
@@ -147,7 +149,14 @@ class Host:
         """One non-interactive run in JSON mode. Returns the events Pi printed."""
         self.stub.seen.clear()
         args = ["--mode", "json", "--no-context-files", "--session-dir", str(self.logs / f"sessions-{name}"), "--model", model]
-        output = self.command(name, [*args, "--exclude-tools", "bash,edit,write", *extra, prompt], key, home)
+        if model.startswith("stub/"):
+            # The stand-in never calls a tool, and Pi lists skills only while read is enabled.
+            tools = ["--exclude-tools", "bash,edit,write"]
+        else:
+            # A real model gets only codemode and the MCP tools: with read, bash or edit it could
+            # open files under --state, the copied sign-in included, and send them to its provider.
+            tools = ["--tools", "codemode"]
+        output = self.command(name, [*args, *tools, *extra, prompt], key, home)
         events = []
         for line in output.splitlines():
             try:

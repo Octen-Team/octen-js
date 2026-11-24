@@ -66,6 +66,8 @@ By default the model is offered every tool the server has. To offer only some, p
 
 Use the server's tool names, without the `octen_` prefix. A name the server does not know makes the connection fail, and `opencode mcp list` shows `✗ octen failed`.
 
+The list becomes part of the server's address, and OpenCode keeps a browser sign-in per address. If you signed in through the browser, run `opencode mcp auth octen` again after changing `tools`.
+
 ## If you already configured Octen by hand
 
 An `octen` entry under `mcp` in your own configuration is left as it is and used instead of the plugin's.
