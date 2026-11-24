@@ -12,20 +12,28 @@ Like run.py, this needs the network and the hosted Octen MCP server, and the too
 makes one billed search. Browser sign-in is not covered here: on 2.x it is checked by hand.
 A row whose precondition is missing prints SKIP, which is not a pass.
 OpenCode 2.x runs a background service per home; every row stops it when done, and the run
-stops it on exit. All OpenCode state goes under --state, which must be outside any project.
+stops it on exit. The service listens on a fixed local port, so run one of these at a time and
+stop any other OpenCode 2.x service first. All OpenCode state goes under --state, which must be
+outside any project.
 """
 from __future__ import annotations
 
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
 import threading
 import time
 from pathlib import Path
 
-from run import MCP_URL, PACKAGE_DIR, WRONG_KEY, Stub, hosted_tools, pack
+from run import MCP_URL, PACKAGE, PACKAGE_DIR, WRONG_KEY, Stub, hosted_tools, pack
+
+# OpenCode 2.0.x and 2.1.x resolve a local plugin directory only through server or index files at its
+# root, so --by-name loads the build the way users do, by package name: OpenCode installs this published
+# release from npm, and the run replaces the installed files with the packed build.
+BY_NAME_SPEC = f"{PACKAGE}@0.1.0"
 
 LIST_OCTEN = 'const r = await search({ namespace: "octen", limit: 100 }); return r.items.map((i) => i.path);'
 CALL_SEARCH = 'return await tools.octen.search({ query: "latest Node.js LTS release", count: 1 });'
@@ -120,6 +128,9 @@ class Host:
                 raise RuntimeError(f"`opencode mcp list` exited with {self.last_exit}; see {name}.stderr")
             line = next((text.strip() for text in listing.splitlines() if "octen" in text), "")
             if line and "pending" not in line:
+                # Before 2.2.0 a session can start before the tool catalog lists a server that just
+                # connected, so give the catalog a moment to catch up.
+                time.sleep(5)
                 return line
             time.sleep(2)
         return line
@@ -153,11 +164,31 @@ class Host:
         return {path.removeprefix("tools.octen.") for path in json.loads(output)}
 
 
+def install_by_name(host: Host, package: Path) -> str:
+    work = host.workdir("install-by-name", {"plugins": [BY_NAME_SPEC]})
+    cache = host.home / ".cache" / "opencode" / "npm" / BY_NAME_SPEC
+    deadline = time.time() + 300
+    installed: list[Path] = []
+    while time.time() < deadline and not installed:
+        host.raw("install-by-name", work, ["plugin", "list"], None)
+        installed = list(cache.glob(f"*/node_modules/{PACKAGE}/package.json"))
+        time.sleep(3)
+    host.stop()
+    if len(installed) != 1:
+        sys.exit(f"OpenCode did not install {BY_NAME_SPEC} under {cache}: found {len(installed)} copies")
+    target = installed[0].parent
+    shutil.rmtree(target)
+    shutil.copytree(package, target)
+    print(f"--by-name: {BY_NAME_SPEC} replaced by the packed build at {target}")
+    return BY_NAME_SPEC
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--opencode", required=True, help="path to the opencode 2.x executable")
     parser.add_argument("--state", required=True, type=Path, help="an empty directory for all OpenCode state")
     parser.add_argument("--only", help="run only the rows whose name contains this text")
+    parser.add_argument("--by-name", action="store_true", help="load the plugin by package name; needed before OpenCode 2.2.0")
     args = parser.parse_args()
     state: Path = args.state.resolve()
     if state.exists() and any(state.iterdir()):
@@ -165,11 +196,17 @@ def main() -> int:
     state.mkdir(parents=True, exist_ok=True)
     state.chmod(0o700)
     key = os.environ.get("OCTEN_API_KEY", "").strip() or None
+    # Another service would hold the port this run's services need, and commands could reach it.
+    running = subprocess.run(["pgrep", "-f", "serve --service"], capture_output=True, text=True).stdout.split()
+    if running:
+        sys.exit(f"an OpenCode background service is already running (PID {', '.join(running)}); stop it first")
 
     stub = Stub()
     threading.Thread(target=stub.serve_forever, daemon=True).start()
     host = Host(args.opencode, state, stub)
     plugin = str(pack(state))
+    if args.by_name:
+        plugin = install_by_name(host, Path(plugin))
     version = host.raw("version", state, ["--version"], None).strip().splitlines()[-1]
     print(f"opencode {version}; plugin packed from {PACKAGE_DIR}")
     if not version.startswith("opencode v2."):
