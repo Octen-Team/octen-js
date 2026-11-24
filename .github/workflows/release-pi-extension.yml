@@ -1,0 +1,66 @@
+name: Release pi-extension
+
+on:
+  push:
+    tags: ["pi-extension-v*"]
+
+# No workflow-level grants: only the publish job gets id-token.
+permissions: {}
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: integrations/pi-extension
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the main-branch check needs history
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.22.2
+          cache: npm
+          cache-dependency-path: integrations/pi-extension/package-lock.json
+      - name: Release guards
+        run: bash scripts/release-guard.sh
+      - run: npm ci
+      - name: Type-check
+        run: npm run typecheck
+      - name: Test
+        run: npm test
+
+  publish:
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # npm OIDC trusted publishing and provenance; no token needed
+    defaults:
+      run:
+        working-directory: integrations/pi-extension
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          # npm 12.2.1 declares engines.node ^22.22.2 || ^24.15.0 || >=26; a bare "22" can resolve to an older cached 22.x
+          node-version: 22.22.2
+          registry-url: "https://registry.npmjs.org"
+      - name: Release guards
+        run: bash scripts/release-guard.sh
+      # Nothing to install or build: Pi loads the TypeScript source as shipped.
+      # npm 12.2.1 runs through npx: upgrading the bundled npm in place fails on the runner (MODULE_NOT_FOUND).
+      # Pinned on purpose: `npm@latest` would let an unreviewed npm release run with our publish rights.
+      - name: Print toolchain versions
+        run: |
+          echo "node $(node --version)"
+          echo "npm $(npx --yes npm@12.2.1 --version)"
+      # No NODE_AUTH_TOKEN: with id-token: write and a trusted publisher configured on npmjs.com
+      # (repo Octen-Team/octen-js, workflow release-pi-extension.yml), npm authenticates via OIDC.
+      # --ignore-scripts: the verify job already ran the checks.
+      - name: Publish to npm (OIDC, provenance)
+        run: npx --yes npm@12.2.1 publish --provenance --access public --ignore-scripts
