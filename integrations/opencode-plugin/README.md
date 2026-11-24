@@ -51,7 +51,7 @@ OpenCode opens the Octen authorization page. Sign in and choose the API key that
 opencode mcp list
 ```
 
-should show `✓ octen connected`. The model then has the Octen tools, each named `octen_` plus the tool's name: `octen_search`, `octen_news_search`, `octen_extract` and so on. The [MCP server page](https://docs.octen.ai/integrations/octen-mcp-server) describes every tool.
+should show `✓ octen connected`. On 1.x the model then has the Octen tools, each named `octen_` plus the tool's name: `octen_search`, `octen_news_search`, `octen_extract` and so on. The [MCP server page](https://docs.octen.ai/integrations/octen-mcp-server) describes every tool.
 
 The plugin also adds one skill, `octen-search-guide`, which helps the model pick the right tool.
 
@@ -88,7 +88,9 @@ OpenCode 2.x (npm `@opencode/cli`) runs plugins in a background service, so a fe
 
   OpenCode stores the value in `~/.config/opencode/service.json`, readable only by you. `opencode service unset env OCTEN_API_KEY` removes it.
 - **Browser sign-in.** Without a key, run `opencode mcp auth octen`, as on 1.x.
+- **Tools.** 2.x runs MCP tools in Code Mode: the model calls them inside its `execute` tool as `tools.octen.search(...)`, `tools.octen.news_search(...)` and so on, instead of as separate `octen_` tools.
 - **Checking.** The service connects to MCP servers in the background, so right after it starts `opencode mcp list` can show no servers yet. Run it again after a few seconds.
+- **Load errors.** If the plugin fails to load, for example on a misspelt option, the reason is in the service log, `~/.local/share/opencode/log/opencode.log`, under `failed to load plugin`.
 - **Your own entry.** A hand-written server lives under `mcp.servers.octen`; the plugin leaves it as it is.
 
 ## Updating
@@ -112,7 +114,7 @@ When OpenCode loads its configuration, the plugin adds a remote MCP server named
 
 The key then sits in OpenCode's resolved configuration, exactly as it does when you write the entry yourself with `{env:OCTEN_API_KEY}`. OpenCode 1.18.x prints that configuration as it is with `opencode debug config`, key included; 1.19.6 masks the headers. Do not paste that output anywhere if you use a key.
 
-Tested with OpenCode 1.18.29 and 1.19.6.
+Tested with OpenCode 1.18.29, 1.19.6 and 2.4.1.
 
 ## Development
 
@@ -121,7 +123,7 @@ npm ci
 npm run typecheck && npm test && npm run build
 ```
 
-`test/host/run.py` drives a real OpenCode with the packed plugin: `OCTEN_API_KEY=<key> python3 test/host/run.py --opencode <path to opencode> --state <empty directory>`. It needs the network, makes billed searches, and is not part of `npm test`; its header explains the rows and what each one needs.
+`test/host/run.py` drives a real OpenCode 1.x with the packed plugin: `OCTEN_API_KEY=<key> python3 test/host/run.py --opencode <path to opencode> --state <empty directory>`. `test/host/run_v2.py` does the same for OpenCode 2.x, with the same arguments. Both need the network, make billed searches, and are not part of `npm test`; their headers explain the rows and what each one needs.
 
 **Releasing.** Bump `version` in `package.json`, add a `CHANGELOG.md` entry, run the host tests, and merge to `main`. Then push the tag `opencode-plugin-v<version>` on that commit: `release-opencode-plugin.yml` checks the tag against `package.json` and publishes. The first version is published by hand, as the repository README describes for the SDK, with `release-opencode-plugin.yml` as the trusted publisher's workflow.
 
