@@ -14,9 +14,12 @@ for its parameters. This guide is about choosing between the tools and chaining
 them well. It does not list every tool, and a tool it does not mention is still
 fine to use.
 
-In OpenCode each tool's name starts with `octen_`: `search` is `octen_search`,
-`news_search` is `octen_news_search`, and so on. This guide uses the short
-names.
+In OpenCode 1.x each tool's name starts with `octen_`: `search` is
+`octen_search`, `news_search` is `octen_news_search`, and so on. OpenCode 2.x
+runs MCP tools in Code Mode instead: call them inside `execute` as
+`tools.octen.search(...)`, `tools.octen.news_search(...)` and so on, and find
+them with `search({ namespace: "octen" })` when they are not in the catalog.
+This guide uses the short names.
 
 ## Choose the tool
 

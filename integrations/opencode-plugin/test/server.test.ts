@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { afterEach, expect, it, vi } from 'vitest';
 import plugin from '../src/server.js';
 import type { HostConfig } from '../src/mcp.js';
+import type { SkillInfo, V2Context } from '../src/v2.js';
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -54,4 +55,24 @@ it('fails to load on a misspelt option', async () => {
 
 it('returns only the config hook', async () => {
   expect(Object.keys(await plugin.server({}, undefined))).toEqual(['config']);
+});
+
+// OpenCode 2.x loads the same default export and calls setup instead of server.
+it('registers the server and the skill through the 2.x setup entry', async () => {
+  vi.stubEnv('OCTEN_API_KEY', 'k3');
+  const servers = new Map<string, unknown>();
+  const skills = new Map<string, SkillInfo>();
+  const ctx: V2Context = {
+    options: { tools: ['search'] },
+    mcp: { transform: async (edit) => edit({ get: (n) => servers.get(n), set: (n, c) => void servers.set(n, c) }) },
+    skill: { transform: async (edit) => edit({ get: (id) => skills.get(id), add: (s) => void skills.set(s.id, s) }) },
+  };
+  await plugin.setup(ctx);
+  expect(servers.get('octen')).toEqual({
+    type: 'remote',
+    url: 'https://mcp.octen.ai/mcp?tools=search',
+    oauth: false,
+    headers: { 'x-api-key': 'k3' },
+  });
+  expect(existsSync(skills.get('octen-search-guide')?.path ?? '')).toBe(true);
 });

@@ -47,6 +47,7 @@ class Stub(ThreadingHTTPServer):
     def __init__(self) -> None:
         super().__init__(("127.0.0.1", 0), StubHandler)
         self.seen: list[list[str]] = []
+        self.bodies: list[dict] = []
         self.call: dict | None = None
 
 
@@ -61,6 +62,7 @@ class StubHandler(BaseHTTPRequestHandler):
         body = json.loads(self.rfile.read(length) or b"{}")
         names = [tool.get("function", {}).get("name") for tool in body.get("tools") or []]
         self.server.seen.append([name for name in names if name])
+        self.server.bodies.append(body)
         answered = any(message.get("role") == "tool" for message in body.get("messages", []))
         call = self.server.call if names and not answered else None
 
