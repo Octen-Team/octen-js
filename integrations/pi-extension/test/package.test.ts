@@ -69,6 +69,25 @@ describe('files that ship', () => {
   });
 });
 
+describe('skill', () => {
+  const skill = read('skills/octen-search-guide/SKILL.md');
+
+  it('has the front matter a skill needs', () => {
+    expect(skill).toMatch(/^---\nname: octen-search-guide\ndescription: >-\n {2}\S/);
+  });
+
+  // The hosted server owns the roster, so the guide must not go stale when it changes.
+  it('does not state how many tools there are', () => {
+    expect(skill).not.toMatch(/\b(\d+|eight|nine|ten|eleven|twelve|thirteen)\s+(read-only\s+)?tools\b/i);
+  });
+
+  it('is guidance only: no commands to run against the API, no key, no plain-http link', () => {
+    expect(skill).not.toContain('curl');
+    expect(skill).not.toContain('OCTEN_API_KEY');
+    expect(skill).not.toContain('http://');
+  });
+});
+
 describe('source', () => {
   // Pi loads this file as it is, so it must not need anything installed next to it.
   it('imports nothing, makes no request and prints nothing', () => {
