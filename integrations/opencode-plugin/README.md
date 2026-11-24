@@ -87,7 +87,7 @@ OpenCode 2.x (npm `@opencode/cli`) runs plugins in a background service, so a fe
 
 - **Config.** Use `"plugins": ["@octen.ai/opencode-plugin"]`. Options go in an object: `{ "package": "@octen.ai/opencode-plugin", "options": { "tools": ["search", "extract"] } }`. A 1.x `plugin` entry is also read.
 - **API key.** The service reads `OCTEN_API_KEY` when it starts. An `export` reaches it only if that shell starts the service; a service that is already running does not see it. Use `opencode service set env` as shown in [API key](#api-key). OpenCode stores the value in `~/.config/opencode/service.json`, readable only by you. `opencode service unset env OCTEN_API_KEY` removes it.
-- **Browser sign-in.** Without a key, run `opencode mcp auth octen`, as on 1.x.
+- **Browser sign-in.** Without a key, run `opencode mcp auth octen`, as on 1.x. To switch from a key to the browser sign-in, run `opencode service unset env OCTEN_API_KEY`, remove any `export` of the key from the shell that starts OpenCode, and run `opencode service restart` first: while the service has a key, the plugin turns the sign-in off.
 - **Tools.** 2.x runs MCP tools in Code Mode: the model calls them inside its `execute` tool as `tools.octen.search(...)`, `tools.octen.news_search(...)` and so on, instead of as separate `octen_` tools.
 - **Checking.** The service connects to MCP servers in the background, so right after it starts `opencode mcp list` can show no servers yet. Run it again after a few seconds.
 - **Load errors.** If the plugin fails to load, for example on a misspelt option, the reason is in the service log, `~/.local/share/opencode/log/opencode.log`, under `failed to load plugin`.
