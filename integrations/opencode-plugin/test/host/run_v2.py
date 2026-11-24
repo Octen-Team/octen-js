@@ -90,6 +90,10 @@ class Host:
 
     def stop(self) -> None:
         self.raw("service-stop", self.state, ["service", "stop"], None)
+        status = self.raw("service-status", self.state, ["service", "status"], None).strip()
+        # A service that survives would hand the next row this row's environment.
+        if status.splitlines()[-1:] != ["stopped"]:
+            raise RuntimeError(f"the OpenCode service did not stop: `service status` says {status!r}")
         self.service_key = "none started"
 
     def command(self, name: str, work: Path, args: list[str], key: str | None) -> str:
@@ -125,6 +129,8 @@ class Host:
         self.stub.bodies.clear()
         self.stub.call = call
         output = self.command(name, work, ["run", "--auto", "--format", "json", "hi"], key)
+        if self.last_exit != 0:
+            raise RuntimeError(f"`opencode run` exited with {self.last_exit}; see {name}.stderr")
         for line in output.splitlines():
             try:
                 event = json.loads(line)
@@ -173,8 +179,10 @@ def main() -> int:
             status, detail = check()
         except Exception as error:
             status, detail = "FAIL", f"{type(error).__name__}: {error}"
-        finally:
+        try:
             host.stop()
+        except Exception as error:  # a row that leaves the service running fails
+            status, detail = "FAIL", f"{detail}; {error}"
         results.append((status, name, detail))
         print(f"{status:4}  {name}  |  {detail}", flush=True)
 

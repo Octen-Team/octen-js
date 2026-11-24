@@ -17,7 +17,7 @@ Add the plugin to `opencode.json`:
 
 OpenCode installs it the next time it starts. The first time OpenCode loads any plugin it also installs its own plugin runtime, which took about three minutes in our test; later starts are not affected.
 
-This works on OpenCode 1.x and 2.x. OpenCode 2.x reads the same entry, and its own config key is `plugins`; see [OpenCode 2.x](#opencode-2x) for what differs.
+This works on OpenCode 1.x (1.18.29 or later) and 2.x (2.2.0 or later). OpenCode 2.x reads the same entry, and its own config key is `plugins`; see [OpenCode 2.x](#opencode-2x) for what differs.
 
 ## Sign in
 
@@ -83,7 +83,7 @@ An `octen` entry under `mcp` in your own configuration is left as it is and used
 
 ## OpenCode 2.x
 
-OpenCode 2.x (npm `@opencode/cli`) runs plugins in a background service, so a few things differ from 1.x:
+OpenCode 2.x (npm `@opencode/cli`) runs plugins in a background service, so a few things differ from 1.x. Use 2.2.0 or later: in our tests, 2.0.x and 2.1.x releases did not load the plugin and logged nothing.
 
 - **Config.** Use `"plugins": ["@octen.ai/opencode-plugin"]`. Options go in an object: `{ "package": "@octen.ai/opencode-plugin", "options": { "tools": ["search", "extract"] } }`. A 1.x `plugin` entry is also read.
 - **API key.** The service reads `OCTEN_API_KEY` when it starts. An `export` reaches it only if that shell starts the service; a service that is already running does not see it. Use `opencode service set env` as shown in [API key](#api-key). OpenCode stores the value in `~/.config/opencode/service.json`, readable only by you. `opencode service unset env OCTEN_API_KEY` removes it.
@@ -114,7 +114,7 @@ When OpenCode loads its configuration, the plugin adds a remote MCP server named
 
 The key then sits in OpenCode's resolved configuration, exactly as it does when you write the entry yourself with `{env:OCTEN_API_KEY}`. OpenCode 1.18.x prints that configuration as it is with `opencode debug config`, key included; 1.19.6 masks the headers. Do not paste that output anywhere if you use a key.
 
-Tested with OpenCode 1.18.29, 1.19.6 and 2.4.1.
+Tested with OpenCode 1.18.29, 1.19.6, 2.2.0, 2.2.7 and 2.4.1.
 
 ## Development
 

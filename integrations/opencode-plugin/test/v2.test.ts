@@ -77,15 +77,14 @@ describe('setupV2: skill', () => {
     const { ctx, skills } = fakeContext();
     await setupV2(ctx, {}, SKILL_FILE);
     const skill = skills.get('octen-search-guide');
-    // OpenCode 2.0.0-2.0.3 named the field location; 2.0.4 and later name it path.
-    expect(skill).toMatchObject({ id: 'octen-search-guide', name: 'octen-search-guide', path: SKILL_FILE, location: SKILL_FILE });
+    expect(skill).toMatchObject({ id: 'octen-search-guide', name: 'octen-search-guide', path: SKILL_FILE });
     expect(skill?.description).toMatch(/^Choose the right Octen tool for live web information\. /);
     expect(skill?.content.startsWith('# Octen search guide')).toBe(true);
     expect(skill?.content).not.toContain('description:');
   });
 
   it('does not add the skill again when one with that id exists', async () => {
-    const existing: SkillInfo = { id: 'octen-search-guide', name: 'octen-search-guide', path: '/x/SKILL.md', location: '/x/SKILL.md', content: 'mine' };
+    const existing: SkillInfo = { id: 'octen-search-guide', name: 'octen-search-guide', path: '/x/SKILL.md', content: 'mine' };
     const { ctx, skills } = fakeContext(undefined, { skills: [existing] });
     await setupV2(ctx, {}, SKILL_FILE);
     expect(skills.get('octen-search-guide')).toBe(existing);
@@ -95,7 +94,7 @@ describe('setupV2: skill', () => {
 describe('parseSkill', () => {
   it('joins a folded description into one line', () => {
     const file = tempSkill('---\nname: demo\ndescription: >-\n  first line\n  second line.\n---\n\n# Body\n');
-    expect(parseSkill(file)).toEqual({ id: 'demo', name: 'demo', description: 'first line second line.', path: file, location: file, content: '# Body' });
+    expect(parseSkill(file)).toEqual({ id: 'demo', name: 'demo', description: 'first line second line.', path: file, content: '# Body' });
   });
 
   it('reads plain and quoted values', () => {
@@ -106,7 +105,7 @@ describe('parseSkill', () => {
   // A Windows checkout can pack the skill with CRLF line endings.
   it('reads a file with CRLF line endings', () => {
     const file = tempSkill('---\r\nname: demo\r\ndescription: >-\r\n  first line\r\n  second line.\r\n---\r\n\r\n# Body\r\n');
-    expect(parseSkill(file)).toEqual({ id: 'demo', name: 'demo', description: 'first line second line.', path: file, location: file, content: '# Body' });
+    expect(parseSkill(file)).toEqual({ id: 'demo', name: 'demo', description: 'first line second line.', path: file, content: '# Body' });
   });
 
   it('rejects a file without front matter', () => {
