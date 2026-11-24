@@ -117,19 +117,23 @@ class Host:
 
     def agent(self, name: str, work: Path, key: str | None, code: str) -> tuple[str, str]:
         """One headless run in which the model runs `code` in Code Mode. Returns the tool status and output."""
+        return self.call_tool(name, work, key, execute(code))
+
+    def call_tool(self, name: str, work: Path, key: str | None, call: dict) -> tuple[str, str]:
+        """One headless run in which the model makes `call`. Returns the tool status and output."""
         self.stub.seen.clear()
         self.stub.bodies.clear()
-        self.stub.call = execute(code)
+        self.stub.call = call
         output = self.command(name, work, ["run", "--auto", "--format", "json", "hi"], key)
         for line in output.splitlines():
             try:
                 event = json.loads(line)
             except ValueError:
                 continue
-            if isinstance(event, dict) and event.get("type") == "tool_use" and event.get("part", {}).get("tool") == "execute":
+            if isinstance(event, dict) and event.get("type") == "tool_use" and event.get("part", {}).get("tool") == call["name"]:
                 state = event["part"].get("state", {})
                 return state.get("status", ""), str(state.get("output") or state.get("error") or "")
-        raise RuntimeError("the run made no execute call; see the logs for this row")
+        raise RuntimeError(f"the run made no {call['name']} call; see the logs for this row")
 
     def listed(self, name: str, work: Path, key: str | None) -> set[str]:
         status, output = self.agent(name, work, key, LIST_OCTEN)
@@ -243,6 +247,14 @@ def main() -> int:
         ok = "<id>octen-search-guide</id>" in prompt
         return ("PASS" if ok else "FAIL"), f"octen-search-guide offered to the model: {ok}"
 
+    def skill_opens():
+        # Listing is not enough: OpenCode reads the skill's file location when the model opens it.
+        work = host.workdir("skill-open", {"plugins": [plugin]})
+        host.octen_line("skill-open-list", work, key)
+        status, output = host.call_tool("skill-open", work, key, {"name": "skill", "arguments": {"id": "octen-search-guide"}})
+        ok = status == "completed" and "# Octen search guide" in output
+        return ("PASS" if ok else "FAIL"), f"status {status!r}; guide text returned: {'# Octen search guide' in output}"
+
     def signed_out():
         work = host.workdir("signed-out", {"plugins": [plugin]})
         line = host.octen_line("signed-out-list", work, None)
@@ -287,6 +299,7 @@ def main() -> int:
         row("tools.octen.search with the key", need_key(tool_call))
         row("tools.octen.search with a wrong key", wrong_key)
         row("the bundled skill is offered", need_key(skill))
+        row("the bundled skill opens", need_key(skill_opens))
         row("no key and not signed in", signed_out)
         row("a key set with `opencode service set env`", service_env)
         row("the key is not written to disk", need_key(key_on_disk))
