@@ -1,0 +1,53 @@
+{
+  "name": "@octen.ai/opencode-plugin",
+  "version": "0.1.0",
+  "description": "Octen web search, news, company, place and page-reading tools for OpenCode",
+  "keywords": [
+    "octen",
+    "opencode",
+    "opencode-plugin",
+    "web-search",
+    "mcp"
+  ],
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/server.js",
+  "exports": {
+    "./server": "./dist/server.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "skills",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "engines": {
+    "opencode": ">=1.19.6 <2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Octen-Team/octen-js.git",
+    "directory": "integrations/opencode-plugin"
+  },
+  "homepage": "https://github.com/Octen-Team/octen-js/tree/main/integrations/opencode-plugin#readme",
+  "bugs": {
+    "url": "https://github.com/Octen-Team/octen-js/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "build": "tsup",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "20.19.43",
+    "tsup": "8.5.1",
+    "typescript": "6.0.3",
+    "vitest": "4.1.12"
+  }
+}
