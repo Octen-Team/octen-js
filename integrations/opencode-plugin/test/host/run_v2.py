@@ -197,7 +197,10 @@ def main() -> int:
     state.chmod(0o700)
     key = os.environ.get("OCTEN_API_KEY", "").strip() or None
     # Another service would hold the port this run's services need, and commands could reach it.
-    running = subprocess.run(["pgrep", "-f", "serve --service"], capture_output=True, text=True).stdout.split()
+    # A service that was just stopped can take a few seconds to exit.
+    deadline = time.time() + 15
+    while (running := subprocess.run(["pgrep", "-f", "serve --service"], capture_output=True, text=True).stdout.split()) and time.time() < deadline:
+        time.sleep(1)
     if running:
         sys.exit(f"an OpenCode background service is already running (PID {', '.join(running)}); stop it first")
 
@@ -205,8 +208,6 @@ def main() -> int:
     threading.Thread(target=stub.serve_forever, daemon=True).start()
     host = Host(args.opencode, state, stub)
     plugin = str(pack(state))
-    if args.by_name:
-        plugin = install_by_name(host, Path(plugin))
     version = host.raw("version", state, ["--version"], None).strip().splitlines()[-1]
     print(f"opencode {version}; plugin packed from {PACKAGE_DIR}")
     if not version.startswith("opencode v2."):
@@ -348,6 +349,9 @@ def main() -> int:
         return ("PASS" if hits == 0 else "FAIL"), f"{scanned} files scanned, {hits} contain the key"
 
     try:
+        # Installing by name starts a service, so it runs inside the cleanup below.
+        if args.by_name:
+            plugin = install_by_name(host, Path(plugin))
         row("no plugin: no Octen tool in Code Mode", need_key(control))
         row("plugin: Code Mode has the hosted roster", need_key(with_plugin))
         row('a 1.x "plugin" entry is read', need_key(v1_key))
@@ -369,7 +373,8 @@ def main() -> int:
         return 1
     counts = {status: sum(1 for result in results if result[0] == status) for status in ("PASS", "FAIL", "SKIP")}
     print(f"\n{counts['PASS']} passed, {counts['FAIL']} failed, {counts['SKIP']} skipped; logs in {host.logs}")
-    return 1 if counts["FAIL"] else 0
+    # A run in which nothing passed proved nothing, even when every row was skipped.
+    return 1 if counts["FAIL"] or not counts["PASS"] else 0
 
 
 if __name__ == "__main__":
