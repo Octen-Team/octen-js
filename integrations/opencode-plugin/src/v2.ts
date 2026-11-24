@@ -30,7 +30,7 @@ export async function setupV2(ctx: V2Context, env: { OCTEN_API_KEY?: string | un
 
 // Reads the plain, quoted and folded (>-) values our SKILL.md uses; not a general YAML parser.
 export function parseSkill(path: string): SkillInfo {
-  const raw = readFileSync(path, 'utf8');
+  const raw = readFileSync(path, 'utf8').replace(/\r\n/g, '\n');
   const fence = /^---\n([\s\S]*?)\n---\n?/.exec(raw);
   if (fence === null) throw new Error(`${PREFIX}${path} has no front matter.`);
   const fields: Record<string, string> = {};

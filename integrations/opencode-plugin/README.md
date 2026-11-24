@@ -31,6 +31,13 @@ Create a key in the [API Platform](https://octen.ai/platform/api-keys) and put i
 export OCTEN_API_KEY=your-api-key
 ```
 
+On OpenCode 2.x the plugin runs in a background service, which keeps the environment it started with. Set the key on the service so it does not depend on which shell started it, then restart the service:
+
+```bash
+opencode service set env OCTEN_API_KEY your-api-key
+opencode service restart
+```
+
 ### Browser sign-in
 
 With no `OCTEN_API_KEY` set, run:
@@ -79,14 +86,7 @@ An `octen` entry under `mcp` in your own configuration is left as it is and used
 OpenCode 2.x (npm `@opencode/cli`) runs plugins in a background service, so a few things differ from 1.x:
 
 - **Config.** Use `"plugins": ["@octen.ai/opencode-plugin"]`. Options go in an object: `{ "package": "@octen.ai/opencode-plugin", "options": { "tools": ["search", "extract"] } }`. A 1.x `plugin` entry is also read.
-- **API key.** `export OCTEN_API_KEY` in your shell does not reach the service. Set it on the service instead, then restart it:
-
-  ```bash
-  opencode service set env OCTEN_API_KEY your-api-key
-  opencode service restart
-  ```
-
-  OpenCode stores the value in `~/.config/opencode/service.json`, readable only by you. `opencode service unset env OCTEN_API_KEY` removes it.
+- **API key.** The service reads `OCTEN_API_KEY` when it starts. An `export` reaches it only if that shell starts the service; a service that is already running does not see it. Use `opencode service set env` as shown in [API key](#api-key). OpenCode stores the value in `~/.config/opencode/service.json`, readable only by you. `opencode service unset env OCTEN_API_KEY` removes it.
 - **Browser sign-in.** Without a key, run `opencode mcp auth octen`, as on 1.x.
 - **Tools.** 2.x runs MCP tools in Code Mode: the model calls them inside its `execute` tool as `tools.octen.search(...)`, `tools.octen.news_search(...)` and so on, instead of as separate `octen_` tools.
 - **Checking.** The service connects to MCP servers in the background, so right after it starts `opencode mcp list` can show no servers yet. Run it again after a few seconds.
@@ -106,7 +106,7 @@ OpenCode keeps the copy it installed. To move to a newer version, name it: `"@oc
 | A tool returns `code=401 msg=Invalid API Key` | With `OCTEN_API_KEY` set, the key is wrong or was deleted. After a browser sign-in, the key you chose is no longer active: run `opencode mcp logout octen` and sign in again. |
 | `opencode mcp list` shows no `octen` at all | The plugin did not load. OpenCode only writes the reason to its log: run `opencode mcp list --print-logs` and look for `failed to load plugin`. A misspelt option is the usual cause. |
 | No `octen` and nothing in the log | On 1.x: your OpenCode version is outside the range in this package's `engines.opencode`; OpenCode then skips the plugin without a message. |
-| On 2.x, `⚠ octen needs authentication` although you set `OCTEN_API_KEY` | The key is in your shell, not in the service. See [OpenCode 2.x](#opencode-2x). |
+| On 2.x, `⚠ octen needs authentication` although you set `OCTEN_API_KEY` | The service was already running when you set the key. Use `opencode service set env` and restart the service; see [API key](#api-key). |
 
 ## How it works
 

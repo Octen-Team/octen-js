@@ -203,15 +203,18 @@ def main() -> int:
         log = host.home / ".local" / "share" / "opencode" / "log" / "opencode.log"
         text = log.read_text(errors="replace") if log.exists() else ""
         reported = "failed to load plugin" in text and '@octen.ai/opencode-plugin: unknown option \\"tool\\"' in text
-        ok = "connected" not in line and reported
-        return ("PASS" if ok else "FAIL"), f"mcp list says {line!r}; the service log names the bad option: {reported}"
+        ok = line == "" and reported
+        return ("PASS" if ok else "FAIL"), f"octen in mcp list: {line!r}; the service log names the bad option: {reported}"
 
     def user_entry():
         mine = {"type": "remote", "url": f"{MCP_URL}?tools=search", "oauth": False, "headers": {"x-api-key": "{env:OCTEN_API_KEY}"}}
         work = host.workdir("user-entry", {"plugins": [plugin], "mcp": {"servers": {"octen": mine}}})
         line = host.octen_line("user-entry-list", work, key)
         found = host.listed("user-entry", work, key)
-        return ("PASS" if found == {"search"} else "FAIL"), f"mcp list says {line!r}; found {sorted(found)}"
+        # The hand-written entry alone would also give exactly "search"; the skill shows the plugin ran.
+        loaded = bool(stub.bodies) and "<id>octen-search-guide</id>" in json.dumps(stub.bodies[-1]["messages"])
+        ok = found == {"search"} and loaded
+        return ("PASS" if ok else "FAIL"), f"mcp list says {line!r}; found {sorted(found)}; plugin loaded (skill offered): {loaded}"
 
     def tool_call():
         work = host.workdir("call", {"plugins": [plugin]})

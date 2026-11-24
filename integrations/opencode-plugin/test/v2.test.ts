@@ -102,6 +102,12 @@ describe('parseSkill', () => {
     expect(parseSkill(file)).toMatchObject({ name: 'demo', description: 'One line.', content: 'Body' });
   });
 
+  // A Windows checkout can pack the skill with CRLF line endings.
+  it('reads a file with CRLF line endings', () => {
+    const file = tempSkill('---\r\nname: demo\r\ndescription: >-\r\n  first line\r\n  second line.\r\n---\r\n\r\n# Body\r\n');
+    expect(parseSkill(file)).toEqual({ id: 'demo', name: 'demo', description: 'first line second line.', path: file, content: '# Body' });
+  });
+
   it('rejects a file without front matter', () => {
     expect(() => parseSkill(tempSkill('# No front matter\n'))).toThrow(/^@octen\.ai\/opencode-plugin: .*front matter/);
   });
