@@ -301,7 +301,8 @@ def main() -> int:
         mine = {"url": f"{MCP_URL}?tools=search", "headers": {"x-api-key": "${OCTEN_API_KEY}"}, "exposure": "direct"}
         (agent / "mcp.json").write_text(json.dumps({"mcpServers": {"octen": mine}}, indent=2))
         # The first prompt can go out before the server has connected, so a run that declared
-        # nothing is retried; one that declared anything else is a failure.
+        # nothing is retried; one that declared anything else is a failure. Three runs were
+        # always enough on Pi 1.5.2 and 1.6.0; a slower connection can still end in a FAIL.
         for attempt in (1, 2, 3):
             events = host.session(f"user-entry-{attempt}", "stub/model", "hi", key, ["--no-skills", *extension], "home-user-entry")
             section = system_prompt(events).get("sections", {}).get("mcp_servers") or ""
@@ -337,8 +338,8 @@ def main() -> int:
 
     row("no extension: Pi names no MCP server to the model", need(control, a_key=True))
     row("extension: Pi names the octen server to the model", need(registered, a_key=True))
-    row("mcp__octen__search with the key", need(tool_call, a_key=True, a_model=True))
-    row("mcp__octen__search with a wrong key", need(wrong_key, a_model=True))
+    row("an Octen tool call with the key", need(tool_call, a_key=True, a_model=True))
+    row("an Octen tool call with a wrong key", need(wrong_key, a_model=True))
     row("signed in, no key", need(signed_in, a_model=True, a_login=True))
     row("signed in, and a key is set: the key is used", need(key_beats_login, a_model=True, a_login=True))
     row("an octen entry in the user's mcp.json wins", need(user_entry, a_key=True))

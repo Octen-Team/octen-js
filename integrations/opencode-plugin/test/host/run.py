@@ -12,6 +12,8 @@ These checks do not run in CI: they need the network and the hosted Octen MCP se
 call rows need a real key (one billed search), and the sign-in rows need a credential file that
 only a person can produce. A row whose precondition is missing prints SKIP, which is not a pass.
 All OpenCode state goes under --state; nothing touches the real OpenCode configuration.
+Put --state outside any OpenCode project: OpenCode also reads the configuration of the
+directories above the one it runs in.
 """
 from __future__ import annotations
 
@@ -322,8 +324,14 @@ def main() -> int:
         return ("PASS" if "octen-search-guide" in output else "FAIL"), f"octen-search-guide listed: {'octen-search-guide' in output}"
 
     def signed_out():
-        offered, _ = host.agent("signed-out", host.workdir("signed-out", {"plugin": [plugin]}), None, home="home-signed-out")
-        return ("PASS" if not offered else "FAIL"), f"octen tools offered: {len(offered)}"
+        # The server must still be registered, only waiting for a sign-in: no tools alone would
+        # also be what a plugin that failed to load looks like.
+        work = host.workdir("signed-out", {"plugin": [plugin]})
+        offered, _ = host.agent("signed-out", work, None, home="home-signed-out")
+        listing = host.command("signed-out-list", work, ["mcp", "list"], None, "home-signed-out")
+        line = next((text.strip() for text in listing.splitlines() if "octen" in text), "")
+        ok = not offered and "needs authentication" in line
+        return ("PASS" if ok else "FAIL"), f"octen tools offered: {len(offered)}; mcp list says: {line!r}"
 
     def login_home() -> None:
         # Copied once per run: OpenCode refreshes expired tokens in place, and copying the
