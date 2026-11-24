@@ -195,6 +195,7 @@ def main() -> int:
     parser.add_argument("--pi", required=True, help="path to the pi executable")
     parser.add_argument("--state", required=True, type=Path, help="an empty directory for all Pi state")
     parser.add_argument("--login-state", type=Path, help="an mcp-auth.json written by /mcp login octen")
+    parser.add_argument("--only", help="run only the rows whose name contains this text")
     args = parser.parse_args()
     state: Path = args.state.resolve()
     if state.exists() and any(state.iterdir()):
@@ -217,6 +218,8 @@ def main() -> int:
     results: list[tuple[str, str, str]] = []
 
     def row(name: str, check) -> None:
+        if args.only and args.only not in name:
+            return
         try:
             status, detail = check()
         except Exception as error:  # a crashed row is a failed row, not a crashed run
@@ -272,12 +275,19 @@ def main() -> int:
         return ("PASS" if ok else "FAIL"), f"mcp__octen__search isError={failed}; result starts {result[:90]!r}"
 
     def user_entry():
+        # Pi gives an entry in mcp.json precedence over a registered server of the same name.
+        # The entry asks for direct exposure. If it is the one in effect, Pi does not list octen
+        # among the servers "whose tools are not declared to you", which it does for the
+        # extension's own registration (see the row above). That part of the prompt comes from
+        # the configuration, so it does not depend on how fast the server connects.
         agent = host.home("home-user-entry") / ".pi" / "agent"
-        mine = {"url": f"{MCP_URL}?tools=search", "headers": {"Authorization": "Bearer ${OCTEN_API_KEY}"}, "exposure": "direct"}
+        mine = {"url": f"{MCP_URL}?tools=search", "headers": {"x-api-key": "${OCTEN_API_KEY}"}, "exposure": "direct"}
         (agent / "mcp.json").write_text(json.dumps({"mcpServers": {"octen": mine}}, indent=2))
-        host.session("user-entry", "stub/model", "hi", key, ["--no-skills", *extension], "home-user-entry")
-        offered = sorted({tool for request in stub.seen for tool in request if tool.startswith("mcp__octen__")})
-        return ("PASS" if offered == ["mcp__octen__search"] else "FAIL"), f"octen tools declared to the model: {offered}"
+        events = host.session("user-entry", "stub/model", "hi", key, ["--no-skills", *extension], "home-user-entry")
+        section = system_prompt(events).get("sections", {}).get("mcp_servers") or ""
+        declared = sorted({tool for request in stub.seen for tool in request if tool.startswith("mcp__octen__")})
+        ok = "mcp__octen" not in section and set(declared) <= {"mcp__octen__search"}
+        return ("PASS" if ok else "FAIL"), f"octen listed as not declared: {'mcp__octen' in section}; declared on the first request: {declared}"
 
     def installed():
         home = "home-install"
