@@ -95,3 +95,67 @@ jobs:
       - name: Version matrix, oldest pair
         if: matrix.node-version == 24
         run: bash scripts/matrix.sh 5.0.291 3.25.76
+
+  opencode-plugin:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [20, 22, 24]
+    defaults:
+      run:
+        working-directory: integrations/opencode-plugin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+          cache-dependency-path: integrations/opencode-plugin/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - name: Check the packed files
+        run: |
+          npm pack --dry-run --json | node -e "
+            const files = JSON.parse(require('fs').readFileSync(0, 'utf8'))[0].files.map((f) => f.path);
+            const need = ['dist/server.js', 'skills/octen-search-guide/SKILL.md', 'README.md', 'CHANGELOG.md', 'LICENSE'];
+            const missing = need.filter((n) => !files.includes(n));
+            const extra = files.filter((f) => f.startsWith('src/') || f.startsWith('test/'));
+            if (missing.length || extra.length) { console.error({ missing, extra }); process.exit(1); }
+            console.log('package contains', files.join(', '));
+          "
+      - name: Load the built entry
+        run: node --input-type=module -e "const m=await import('./dist/server.js'); if (m.default.id!=='octen'||typeof m.default.server!=='function') process.exit(1)"
+
+  pi-extension:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [20, 22, 24]
+    defaults:
+      run:
+        working-directory: integrations/pi-extension
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+          cache-dependency-path: integrations/pi-extension/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      # Pi loads the TypeScript source as shipped, so there is no build step.
+      - name: Check the packed files
+        run: |
+          npm pack --dry-run --json | node -e "
+            const files = JSON.parse(require('fs').readFileSync(0, 'utf8'))[0].files.map((f) => f.path);
+            const need = ['src/index.ts', 'skills/octen-search-guide/SKILL.md', 'README.md', 'CHANGELOG.md', 'LICENSE'];
+            const missing = need.filter((n) => !files.includes(n));
+            const extra = files.filter((f) => f.startsWith('test/'));
+            if (missing.length || extra.length) { console.error({ missing, extra }); process.exit(1); }
+            console.log('package contains', files.join(', '));
+          "

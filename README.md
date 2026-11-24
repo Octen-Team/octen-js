@@ -344,6 +344,8 @@ Compared with `octen-py` 0.13.0:
 ## Integrations
 
 - [`@octen.ai/ai-sdk-tools`](integrations/ai-sdk-tools): Octen search tools for the Vercel AI SDK (`generateText` and `streamText`), built on this SDK.
+- [`@octen.ai/opencode-plugin`](integrations/opencode-plugin): Octen tools for OpenCode. It connects OpenCode to the hosted Octen MCP server and does not use this SDK.
+- [`@octen.ai/pi-extension`](integrations/pi-extension): Octen tools for the Pi coding agent, connected the same way.
 
 ## Development and releasing
 

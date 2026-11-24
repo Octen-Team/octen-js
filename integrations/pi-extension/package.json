@@ -1,0 +1,52 @@
+{
+  "name": "@octen.ai/pi-extension",
+  "version": "0.1.0",
+  "description": "Octen web search, news, company, place and page-reading tools for the Pi coding agent",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "octen",
+    "web-search",
+    "mcp"
+  ],
+  "license": "MIT",
+  "type": "module",
+  "files": [
+    "src",
+    "skills",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Octen-Team/octen-js.git",
+    "directory": "integrations/pi-extension"
+  },
+  "homepage": "https://github.com/Octen-Team/octen-js/tree/main/integrations/pi-extension#readme",
+  "bugs": {
+    "url": "https://github.com/Octen-Team/octen-js/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "prepublishOnly": "npm run typecheck && npm test"
+  },
+  "devDependencies": {
+    "@types/node": "20.19.43",
+    "typescript": "6.0.3",
+    "vitest": "4.1.12"
+  }
+}
