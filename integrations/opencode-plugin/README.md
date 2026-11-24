@@ -46,9 +46,9 @@ With no `OCTEN_API_KEY` set, run:
 opencode mcp auth octen
 ```
 
-OpenCode opens the Octen authorization page. Sign in and choose the API key that calls should be billed to; you need at least one key in your account. OpenCode stores the resulting tokens in `~/.local/share/opencode/mcp-auth.json` and refreshes them on its own.
+OpenCode opens the Octen authorization page. Sign in and choose the API key that calls should be billed to; you need at least one key in your account. OpenCode keeps the resulting tokens and refreshes them on its own: 1.x in `~/.local/share/opencode/mcp-auth.json`, 2.x in its own credential store.
 
-- `opencode mcp auth list` shows whether you are signed in.
+- On 1.x, `opencode mcp auth list` shows whether you are signed in. On 2.x, `opencode mcp list` shows `✓ octen connected` once you are.
 - `opencode mcp logout octen` signs you out.
 - The sign-in needs a browser on the same machine. On a remote host or in CI, use an API key.
 

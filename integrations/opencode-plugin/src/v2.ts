@@ -3,7 +3,8 @@ import { buildEntry, parseOptions, SERVER_NAME, type McpEntry } from './mcp.js';
 
 const PREFIX = '@octen.ai/opencode-plugin: ';
 
-export type SkillInfo = { id: string; name: string; description?: string; path: string; content: string };
+// OpenCode 2.0.0-2.0.3 read location; 2.0.4 and later read path. Both carry the same file.
+export type SkillInfo = { id: string; name: string; description?: string; path: string; location: string; content: string };
 
 // The slice of OpenCode 2.x's plugin context this plugin touches; typed locally to avoid a dependency.
 export type V2Context = {
@@ -50,7 +51,7 @@ export function parseSkill(path: string): SkillInfo {
   }
   const name = fields['name'];
   if (name === undefined || name === '') throw new Error(`${PREFIX}${path} front matter has no name.`);
-  const skill: SkillInfo = { id: name, name, path, content: raw.slice(fence[0].length).trim() };
+  const skill: SkillInfo = { id: name, name, path, location: path, content: raw.slice(fence[0].length).trim() };
   if (fields['description'] !== undefined) skill.description = fields['description'];
   return skill;
 }

@@ -53,6 +53,7 @@ class Host:
         (config / "opencode.jsonc").write_text(json.dumps({"providers": {"stub": provider}, "model": "stub/model"}, indent=2))
         (state / "tmp").mkdir()
         self.service_key: object = "none started"
+        self.last_exit = 0
 
     def env(self, key: str | None, work: Path) -> dict[str, str]:
         env = {name: value for name, value in os.environ.items() if name != "OCTEN_API_KEY" and not name.startswith("OPENCODE_")}
@@ -84,6 +85,7 @@ class Host:
         )
         (self.logs / f"{name}.stdout").write_text(done.stdout)
         (self.logs / f"{name}.stderr").write_text(done.stderr)
+        self.last_exit = done.returncode
         return done.stdout + done.stderr
 
     def stop(self) -> None:
@@ -104,6 +106,9 @@ class Host:
         line = ""
         while time.time() < deadline:
             listing = self.command(name, work, ["mcp", "list"], key)
+            # A listing that failed says nothing about which servers are registered.
+            if self.last_exit != 0:
+                raise RuntimeError(f"`opencode mcp list` exited with {self.last_exit}; see {name}.stderr")
             line = next((text.strip() for text in listing.splitlines() if "octen" in text), "")
             if line and "pending" not in line:
                 return line
