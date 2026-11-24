@@ -219,6 +219,7 @@ def main() -> int:
     parser.add_argument("--opencode", required=True, help="path to the opencode executable")
     parser.add_argument("--state", required=True, type=Path, help="an empty directory for all OpenCode state")
     parser.add_argument("--login-state", type=Path, help="an mcp-auth.json written by `opencode mcp auth octen`")
+    parser.add_argument("--only", help="run only the rows whose name contains this text")
     args = parser.parse_args()
     state: Path = args.state.resolve()
     if state.exists() and any(state.iterdir()):
@@ -244,6 +245,8 @@ def main() -> int:
     results: list[tuple[str, str, str]] = []
 
     def row(name: str, check) -> None:
+        if args.only and args.only not in name:
+            return
         try:
             status, detail = check()
         except Exception as error:  # a crashed row is a failed row, not a crashed run
