@@ -88,7 +88,8 @@ class StubHandler(BaseHTTPRequestHandler):
 
 class Host:
     def __init__(self, opencode: str, state: Path, stub: Stub) -> None:
-        self.opencode = opencode
+        # A path is resolved now, because every run starts in a directory under --state.
+        self.opencode = str(Path(opencode).resolve()) if os.sep in opencode else opencode
         self.state = state
         self.stub = stub
         self.logs = state / "logs"
@@ -109,7 +110,9 @@ class Host:
         return home
 
     def env(self, home: Path, key: str | None) -> dict[str, str]:
-        env = {name: value for name, value in os.environ.items() if name != "OCTEN_API_KEY"}
+        # These point OpenCode at configuration outside --state, so they are dropped too.
+        dropped = {"OCTEN_API_KEY", "OPENCODE_CONFIG", "OPENCODE_CONFIG_DIR", "OPENCODE_CONFIG_CONTENT"}
+        env = {name: value for name, value in os.environ.items() if name not in dropped}
         env.update(
             HOME=str(home),
             XDG_CONFIG_HOME=str(home / ".config"),
@@ -323,7 +326,11 @@ def main() -> int:
         return ("PASS" if not offered else "FAIL"), f"octen tools offered: {len(offered)}"
 
     def login_home() -> None:
+        # Copied once per run: OpenCode refreshes expired tokens in place, and copying the
+        # original file back would replace the refreshed tokens with stale ones.
         target = host.home("home-login") / ".local" / "share" / "opencode" / "mcp-auth.json"
+        if target.exists():
+            return
         target.parent.mkdir(parents=True, exist_ok=True)
         copy_private(args.login_state, target)
 
@@ -343,11 +350,18 @@ def main() -> int:
         return ("PASS" if ok else "FAIL"), f"mcp list says: {line!r}; call status {status!r}"
 
     def key_beats_login():
-        login_home()  # this row must not depend on the row before it having run
-        _, calls = host.agent("key-beats-login", host.workdir("key-beats-login", {"plugin": [plugin]}), WRONG_KEY, search, "home-login")
+        # First show the sign-in works on its own in this home: a wrong key failing would also be
+        # what a missing or expired sign-in looks like.
+        login_home()
+        work = host.workdir("key-beats-login", {"plugin": [plugin]})
+        _, calls = host.agent("key-beats-login-nokey", work, None, search, "home-login")
+        status, _ = call_state(calls)
+        if status != "completed":
+            return "FAIL", f"without a key the signed-in call did not succeed (status {status!r}), so the sign-in is not usable"
+        _, calls = host.agent("key-beats-login", work, WRONG_KEY, search, "home-login")
         status, output = call_state(calls)
         ok = status == "error" and "Invalid API Key" in output
-        return ("PASS" if ok else "FAIL"), f"status {status!r}; error {output[:80]!r}"
+        return ("PASS" if ok else "FAIL"), f"signed in, no key: completed; with a wrong key: status {status!r}, error {output[:80]!r}"
 
     def key_on_disk():
         # Make sure OpenCode has run with the key, even when --only skipped every other row.
@@ -375,6 +389,9 @@ def main() -> int:
     row("signed in, and a key is set: the key is used", need_login(key_beats_login))
     row("the key is not written to disk", need_key(key_on_disk))
 
+    if not results:
+        print(f"--only {args.only!r} matched no row")
+        return 1
     counts = {status: sum(1 for result in results if result[0] == status) for status in ("PASS", "FAIL", "SKIP")}
     print(f"\n{counts['PASS']} passed, {counts['FAIL']} failed, {counts['SKIP']} skipped; logs in {host.logs}")
     return 1 if counts["FAIL"] else 0

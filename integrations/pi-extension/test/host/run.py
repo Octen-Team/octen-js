@@ -79,7 +79,8 @@ class StubHandler(BaseHTTPRequestHandler):
 
 class Host:
     def __init__(self, pi: str, state: Path, stub: Stub, model: dict | None) -> None:
-        self.pi = pi
+        # A path is resolved now, because every run starts in a directory under --state.
+        self.pi = str(Path(pi).resolve()) if os.sep in pi else pi
         self.state = state
         self.stub = stub
         self.model = model
@@ -171,10 +172,14 @@ def system_prompt(events: list[dict]) -> dict:
 
 
 def search_result(events: list[dict]) -> tuple[bool | None, str]:
-    """The outcome of the last mcp__octen__search call: (isError, result text)."""
+    """The outcome of the last call to an Octen tool: (isError, result text).
+
+    The model picks the tool, usually mcp__octen__search, sometimes another one such as
+    mcp__octen__pulse_search; any of them shows the server and its credential at work.
+    """
     outcome: tuple[bool | None, str] = (None, "")
     for event in events:
-        if event.get("type") == "tool_execution_end" and event.get("toolName") == "mcp__octen__search":
+        if event.get("type") == "tool_execution_end" and str(event.get("toolName", "")).startswith("mcp__octen__"):
             outcome = (bool(event.get("isError")), json.dumps(event.get("result")))
     return outcome
 
@@ -252,15 +257,19 @@ def main() -> int:
     def tool_call():
         failed, result = call("call", key)
         ok = failed is False and "http" in result
-        return ("PASS" if ok else "FAIL"), f"mcp__octen__search isError={failed}; result starts {result[:70]!r}"
+        return ("PASS" if ok else "FAIL"), f"Octen call isError={failed}; result starts {result[:70]!r}"
 
     def wrong_key():
         failed, result = call("wrong-key", WRONG_KEY)
         ok = failed is True and "Invalid API Key" in result
-        return ("PASS" if ok else "FAIL"), f"mcp__octen__search isError={failed}; result starts {result[:90]!r}"
+        return ("PASS" if ok else "FAIL"), f"Octen call isError={failed}; result starts {result[:90]!r}"
 
     def login_home() -> None:
+        # Copied once per run: Pi refreshes expired tokens in place, and copying the original
+        # file back would replace the refreshed tokens with stale ones.
         target = host.home("home-login") / ".pi" / "agent" / "mcp-auth.json"
+        if target.exists():
+            return
         descriptor = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
         with os.fdopen(descriptor, "wb") as out:
             out.write(args.login_state.read_bytes())
@@ -269,13 +278,18 @@ def main() -> int:
         login_home()
         failed, result = call("signed-in", None, "home-login")
         ok = failed is False and "http" in result
-        return ("PASS" if ok else "FAIL"), f"mcp__octen__search isError={failed}; result starts {result[:70]!r}"
+        return ("PASS" if ok else "FAIL"), f"Octen call isError={failed}; result starts {result[:70]!r}"
 
     def key_beats_login():
-        login_home()  # this row must not depend on the row before it having run
+        # First show the sign-in works on its own in this home: a wrong key failing would also be
+        # what a missing or expired sign-in looks like.
+        login_home()
+        failed, _ = call("key-beats-login-nokey", None, "home-login")
+        if failed is not False:
+            return "FAIL", f"without a key the signed-in call did not succeed (isError={failed}), so the sign-in is not usable"
         failed, result = call("key-beats-login", WRONG_KEY, "home-login")
         ok = failed is True and "Invalid API Key" in result
-        return ("PASS" if ok else "FAIL"), f"mcp__octen__search isError={failed}; result starts {result[:90]!r}"
+        return ("PASS" if ok else "FAIL"), f"signed in, no key: succeeded; with a wrong key: isError={failed}, result starts {result[:90]!r}"
 
     def user_entry():
         # Pi gives an entry in mcp.json precedence over a registered server of the same name.
@@ -286,11 +300,16 @@ def main() -> int:
         agent = host.home("home-user-entry") / ".pi" / "agent"
         mine = {"url": f"{MCP_URL}?tools=search", "headers": {"x-api-key": "${OCTEN_API_KEY}"}, "exposure": "direct"}
         (agent / "mcp.json").write_text(json.dumps({"mcpServers": {"octen": mine}}, indent=2))
-        events = host.session("user-entry", "stub/model", "hi", key, ["--no-skills", *extension], "home-user-entry")
-        section = system_prompt(events).get("sections", {}).get("mcp_servers") or ""
-        declared = sorted({tool for request in stub.seen for tool in request if tool.startswith("mcp__octen__")})
-        ok = "mcp__octen" not in section and set(declared) <= {"mcp__octen__search"}
-        return ("PASS" if ok else "FAIL"), f"octen listed as not declared: {'mcp__octen' in section}; declared on the first request: {declared}"
+        # The first prompt can go out before the server has connected, so a run that declared
+        # nothing is retried; one that declared anything else is a failure.
+        for attempt in (1, 2, 3):
+            events = host.session(f"user-entry-{attempt}", "stub/model", "hi", key, ["--no-skills", *extension], "home-user-entry")
+            section = system_prompt(events).get("sections", {}).get("mcp_servers") or ""
+            declared = sorted({tool for request in stub.seen for tool in request if tool.startswith("mcp__octen__")})
+            if declared or "mcp__octen" in section:
+                break
+        ok = "mcp__octen" not in section and declared == ["mcp__octen__search"]
+        return ("PASS" if ok else "FAIL"), f"octen listed as not declared: {'mcp__octen' in section}; declared: {declared} (attempt {attempt})"
 
     def installed():
         home = "home-install"
@@ -326,6 +345,9 @@ def main() -> int:
     row("installed with pi install: listed, server and skill in the prompt", need(installed, a_key=True))
     row("the key is not written to disk", need(key_on_disk, a_key=True))
 
+    if not results:
+        print(f"--only {args.only!r} matched no row")
+        return 1
     counts = {status: sum(1 for result in results if result[0] == status) for status in ("PASS", "FAIL", "SKIP")}
     print(f"\n{counts['PASS']} passed, {counts['FAIL']} failed, {counts['SKIP']} skipped; logs in {host.logs}")
     return 1 if counts["FAIL"] else 0
