@@ -206,6 +206,13 @@ def install_in_cache(home: Path, spec: str, package: Path, engines: str | None =
         (installed / "package.json").write_text(json.dumps(manifest, indent=2))
 
 
+def copy_private(source: Path, target: Path) -> None:
+    """Copies a credential file so that only the owner can read the copy."""
+    descriptor = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(descriptor, "wb") as out:
+        out.write(source.read_bytes())
+
+
 def call_state(calls: list[dict]) -> tuple[str, str]:
     for part in calls:
         if part.get("tool") == "octen_search":
@@ -225,6 +232,7 @@ def main() -> int:
     if state.exists() and any(state.iterdir()):
         sys.exit(f"{state} is not empty")
     state.mkdir(parents=True, exist_ok=True)
+    state.chmod(0o700)  # the runs leave credentials and tokens under here
     key = os.environ.get("OCTEN_API_KEY", "").strip() or None
 
     stub = Stub()
@@ -315,9 +323,9 @@ def main() -> int:
         return ("PASS" if not offered else "FAIL"), f"octen tools offered: {len(offered)}"
 
     def login_home() -> None:
-        target = host.home("home-login") / ".local" / "share" / "opencode"
-        target.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(args.login_state, target / "mcp-auth.json")
+        target = host.home("home-login") / ".local" / "share" / "opencode" / "mcp-auth.json"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        copy_private(args.login_state, target)
 
     def need_login(check):
         if not args.login_state:
@@ -335,12 +343,17 @@ def main() -> int:
         return ("PASS" if ok else "FAIL"), f"mcp list says: {line!r}; call status {status!r}"
 
     def key_beats_login():
+        login_home()  # this row must not depend on the row before it having run
         _, calls = host.agent("key-beats-login", host.workdir("key-beats-login", {"plugin": [plugin]}), WRONG_KEY, search, "home-login")
         status, output = call_state(calls)
         ok = status == "error" and "Invalid API Key" in output
         return ("PASS" if ok else "FAIL"), f"status {status!r}; error {output[:80]!r}"
 
     def key_on_disk():
+        # Make sure OpenCode has run with the key, even when --only skipped every other row.
+        offered, _ = host.agent("key-on-disk", host.workdir("key-on-disk", {"plugin": [plugin]}), key)
+        if not offered:
+            return "FAIL", "the run with the key offered no Octen tool, so the scan would prove nothing"
         hits = scanned = 0
         for path in state.rglob("*"):
             if path.is_file():

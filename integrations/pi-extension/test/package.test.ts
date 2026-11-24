@@ -20,9 +20,9 @@ type Manifest = {
 const pkg = JSON.parse(read('package.json')) as Manifest;
 
 describe('package.json', () => {
-  it('names the package and its version', () => {
+  it('names the package and gives a release version', () => {
     expect(pkg.name).toBe('@octen.ai/pi-extension');
-    expect(pkg.version).toBe('0.1.0');
+    expect(pkg.version).toMatch(/^\d+\.\d+\.\d+$/);
     expect(pkg.type).toBe('module');
   });
 

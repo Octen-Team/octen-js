@@ -88,6 +88,8 @@ OpenCode keeps the copy it installed. To move to a newer version, name it: `"@oc
 
 When OpenCode loads its configuration, the plugin adds a remote MCP server named `octen` at `https://mcp.octen.ai/mcp`, with your API key as the `x-api-key` header if `OCTEN_API_KEY` is set, and adds its skills directory. That is all it does: it makes no requests of its own and writes no files.
 
+The key then sits in OpenCode's resolved configuration, exactly as it does when you write the entry yourself with `{env:OCTEN_API_KEY}`. OpenCode 1.18.x prints that configuration as it is with `opencode debug config`, key included; 1.19.6 masks the headers. Do not paste that output anywhere if you use a key.
+
 Tested with OpenCode 1.18.29 and 1.19.6.
 
 ## Development

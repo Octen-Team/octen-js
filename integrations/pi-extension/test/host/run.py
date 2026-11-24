@@ -22,7 +22,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import shutil
 import subprocess
 import sys
 import tarfile
@@ -201,6 +200,7 @@ def main() -> int:
     if state.exists() and any(state.iterdir()):
         sys.exit(f"{state} is not empty")
     state.mkdir(parents=True, exist_ok=True)
+    state.chmod(0o700)  # the runs leave credentials and tokens under here
     key = os.environ.get("OCTEN_API_KEY", "").strip() or None
     model = None
     if all(os.environ.get(name) for name in ("MODEL_BASE_URL", "MODEL_ID", "MODEL_API_KEY")):
@@ -260,8 +260,10 @@ def main() -> int:
         return ("PASS" if ok else "FAIL"), f"mcp__octen__search isError={failed}; result starts {result[:90]!r}"
 
     def login_home() -> None:
-        agent = host.home("home-login") / ".pi" / "agent"
-        shutil.copyfile(args.login_state, agent / "mcp-auth.json")
+        target = host.home("home-login") / ".pi" / "agent" / "mcp-auth.json"
+        descriptor = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(descriptor, "wb") as out:
+            out.write(args.login_state.read_bytes())
 
     def signed_in():
         login_home()
@@ -270,6 +272,7 @@ def main() -> int:
         return ("PASS" if ok else "FAIL"), f"mcp__octen__search isError={failed}; result starts {result[:70]!r}"
 
     def key_beats_login():
+        login_home()  # this row must not depend on the row before it having run
         failed, result = call("key-beats-login", WRONG_KEY, "home-login")
         ok = failed is True and "Invalid API Key" in result
         return ("PASS" if ok else "FAIL"), f"mcp__octen__search isError={failed}; result starts {result[:90]!r}"
@@ -302,6 +305,10 @@ def main() -> int:
         return ("PASS" if ok else "FAIL"), detail + ("" if ok else f"; install said: {install.strip()[:120]!r}")
 
     def key_on_disk():
+        # Make sure Pi has run with the key, even when --only skipped every other row.
+        prompt = system_prompt(host.session("key-on-disk", "stub/model", "hi", key, ["--no-skills", *extension]))
+        if "mcp__octen" not in (prompt.get("sections", {}).get("mcp_servers") or ""):
+            return "FAIL", "the run with the key did not register the octen server, so the scan would prove nothing"
         hits = scanned = 0
         for path in state.rglob("*"):
             if path.is_file():
