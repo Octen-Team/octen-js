@@ -33,9 +33,9 @@ describe('package.json', () => {
     expect(pkg.main).toBe('./dist/server.js');
   });
 
-  // OpenCode 1.x checks this range; 2.x ignores it and loads the setup entry.
-  it('accepts the OpenCode versions it was tested on and stops below 3', () => {
-    expect(pkg.engines['opencode']).toMatch(/^>=\d+\.\d+\.\d+ <3$/);
+  // OpenCode 1.x checks this range; 2.x ignores it. 2.0.x and 2.1.x do not load the plugin.
+  it('accepts 1.x from the tested floor and 2.x from 2.2.0, and stops below 3', () => {
+    expect(pkg.engines['opencode']).toMatch(/^>=1\.\d+\.\d+ <2 \|\| >=2\.2\.0 <3$/);
   });
 
   it('names its directory in the repository, as npm provenance requires', () => {

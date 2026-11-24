@@ -3,7 +3,7 @@
 ## 0.2.0
 
 - Supports OpenCode 2.x, from 2.2.0. The same package now also exports the 2.x `setup` entry, which registers the hosted server and the skill through 2.x's plugin API. OpenCode 1.x behaves as in 0.1.0.
-- `engines.opencode` is now `>=1.18.29 <3`.
+- `engines.opencode` is now `>=1.18.29 <2 || >=2.2.0 <3`.
 
 ## 0.1.0
 

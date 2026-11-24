@@ -286,9 +286,11 @@ def main() -> int:
 
     def key_on_disk():
         work = host.workdir("key-on-disk", {"plugins": [plugin]})
-        line = host.octen_line("key-on-disk-list", work, key)
-        if "connected" not in line:
-            return "FAIL", f"the run with the key did not connect ({line!r}), so the scan would prove nothing"
+        host.octen_line("key-on-disk-list", work, key)
+        # A wrong key also connects, so only an authenticated call shows OpenCode used this key.
+        status, output = host.agent("key-on-disk", work, key, CALL_SEARCH)
+        if status != "completed" or "http" not in output:
+            return "FAIL", f"the call with the key did not succeed ({status!r}), so the scan would prove nothing"
         host.stop()
         hits = scanned = 0
         for path in state.rglob("*"):
