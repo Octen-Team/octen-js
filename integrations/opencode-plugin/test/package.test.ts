@@ -33,8 +33,9 @@ describe('package.json', () => {
     expect(pkg.main).toBe('./dist/server.js');
   });
 
-  it('accepts the OpenCode versions it was tested on and stops below 2', () => {
-    expect(pkg.engines['opencode']).toMatch(/^>=\d+\.\d+\.\d+ <2$/);
+  // OpenCode 1.x checks this range; 2.x ignores it and loads the setup entry.
+  it('accepts the OpenCode versions it was tested on and stops below 3', () => {
+    expect(pkg.engines['opencode']).toMatch(/^>=\d+\.\d+\.\d+ <3$/);
   });
 
   it('names its directory in the repository, as npm provenance requires', () => {
@@ -101,5 +102,14 @@ describe('source', () => {
     expect(source).not.toContain('fetch(');
     expect(source).not.toContain('console.');
     expect(source).not.toContain('node:fs');
+  });
+
+  // OpenCode 2.x takes skills as content, so this file reads the bundled SKILL.md and nothing else.
+  it('src/v2.ts makes no request, prints nothing and only reads files', () => {
+    const source = read('src/v2.ts');
+    expect(source).not.toContain('fetch(');
+    expect(source).not.toContain('console.');
+    expect(source).toContain("import { readFileSync } from 'node:fs';");
+    expect(source.match(/node:fs/g)).toHaveLength(1);
   });
 });

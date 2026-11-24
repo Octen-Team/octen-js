@@ -17,6 +17,8 @@ Add the plugin to `opencode.json`:
 
 OpenCode installs it the next time it starts. The first time OpenCode loads any plugin it also installs its own plugin runtime, which took about three minutes in our test; later starts are not affected.
 
+This works on OpenCode 1.x and 2.x. OpenCode 2.x reads the same entry, and its own config key is `plugins`; see [OpenCode 2.x](#opencode-2x) for what differs.
+
 ## Sign in
 
 Use an API key or a browser sign-in. When both are present, the API key is used.
@@ -72,6 +74,23 @@ The list becomes part of the server's address, and OpenCode keeps a browser sign
 
 An `octen` entry under `mcp` in your own configuration is left as it is and used instead of the plugin's.
 
+## OpenCode 2.x
+
+OpenCode 2.x (npm `@opencode/cli`) runs plugins in a background service, so a few things differ from 1.x:
+
+- **Config.** Use `"plugins": ["@octen.ai/opencode-plugin"]`. Options go in an object: `{ "package": "@octen.ai/opencode-plugin", "options": { "tools": ["search", "extract"] } }`. A 1.x `plugin` entry is also read.
+- **API key.** `export OCTEN_API_KEY` in your shell does not reach the service. Set it on the service instead, then restart it:
+
+  ```bash
+  opencode service set env OCTEN_API_KEY your-api-key
+  opencode service restart
+  ```
+
+  OpenCode stores the value in `~/.config/opencode/service.json`, readable only by you. `opencode service unset env OCTEN_API_KEY` removes it.
+- **Browser sign-in.** Without a key, run `opencode mcp auth octen`, as on 1.x.
+- **Checking.** The service connects to MCP servers in the background, so right after it starts `opencode mcp list` can show no servers yet. Run it again after a few seconds.
+- **Your own entry.** A hand-written server lives under `mcp.servers.octen`; the plugin leaves it as it is.
+
 ## Updating
 
 OpenCode keeps the copy it installed. To move to a newer version, name it: `"@octen.ai/opencode-plugin@<version>"`.
@@ -84,11 +103,12 @@ OpenCode keeps the copy it installed. To move to a newer version, name it: `"@oc
 | `opencode mcp list` shows `✗ octen failed` | Check the names in the `tools` option, and that the machine can reach `mcp.octen.ai`. |
 | A tool returns `code=401 msg=Invalid API Key` | With `OCTEN_API_KEY` set, the key is wrong or was deleted. After a browser sign-in, the key you chose is no longer active: run `opencode mcp logout octen` and sign in again. |
 | `opencode mcp list` shows no `octen` at all | The plugin did not load. OpenCode only writes the reason to its log: run `opencode mcp list --print-logs` and look for `failed to load plugin`. A misspelt option is the usual cause. |
-| No `octen` and nothing in the log | Your OpenCode version is outside the range in this package's `engines.opencode`; OpenCode then skips the plugin without a message. |
+| No `octen` and nothing in the log | On 1.x: your OpenCode version is outside the range in this package's `engines.opencode`; OpenCode then skips the plugin without a message. |
+| On 2.x, `⚠ octen needs authentication` although you set `OCTEN_API_KEY` | The key is in your shell, not in the service. See [OpenCode 2.x](#opencode-2x). |
 
 ## How it works
 
-When OpenCode loads its configuration, the plugin adds a remote MCP server named `octen` at `https://mcp.octen.ai/mcp`, with your API key as the `x-api-key` header if `OCTEN_API_KEY` is set, and adds its skills directory. That is all it does: it makes no requests of its own and writes no files.
+When OpenCode loads its configuration, the plugin adds a remote MCP server named `octen` at `https://mcp.octen.ai/mcp`, with your API key as the `x-api-key` header if `OCTEN_API_KEY` is set, and adds its skill. On 1.x it adds the skills directory; on 2.x, which takes skills as content, it reads the bundled `SKILL.md`. That is all it does: it makes no requests of its own and writes no files.
 
 The key then sits in OpenCode's resolved configuration, exactly as it does when you write the entry yourself with `{env:OCTEN_API_KEY}`. OpenCode 1.18.x prints that configuration as it is with `opencode debug config`, key included; 1.19.6 masks the headers. Do not paste that output anywhere if you use a key.
 
