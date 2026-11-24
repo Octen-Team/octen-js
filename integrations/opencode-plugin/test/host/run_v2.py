@@ -31,6 +31,11 @@ LIST_OCTEN = 'const r = await search({ namespace: "octen", limit: 100 }); return
 CALL_SEARCH = 'return await tools.octen.search({ query: "latest Node.js LTS release", count: 1 });'
 
 
+def searched(status: str, output: str) -> bool:
+    """True when the execute call returned a successful Octen search, not an MCP error."""
+    return status == "completed" and output.lstrip().startswith("## Result")
+
+
 def execute(code: str) -> dict:
     return {"name": "execute", "arguments": {"code": code}}
 
@@ -237,8 +242,7 @@ def main() -> int:
         work = host.workdir("call", {"plugins": [plugin]})
         host.octen_line("call-list", work, key)
         status, output = host.agent("call", work, key, CALL_SEARCH)
-        ok = status == "completed" and "http" in output
-        return ("PASS" if ok else "FAIL"), f"status {status!r}; output starts {output[:60]!r}"
+        return ("PASS" if searched(status, output) else "FAIL"), f"status {status!r}; output starts {output[:60]!r}"
 
     def wrong_key():
         work = host.workdir("wrong-key", {"plugins": [plugin]})
@@ -276,20 +280,27 @@ def main() -> int:
         work = host.workdir("service-env", {"plugins": [plugin]})
         host.stop()
         host.raw("service-env-set", work, ["service", "set", "env", "OCTEN_API_KEY", WRONG_KEY], None)
+        if host.last_exit != 0:
+            return "FAIL", f"`service set env` exited with {host.last_exit}"
         try:
             host.service_key = None
             line = host.octen_line("service-env-list", work, None)
         finally:
             host.raw("service-env-unset", work, ["service", "unset", "env", "OCTEN_API_KEY"], None)
+            unset_exit = host.last_exit
+            left = host.raw("service-env-get", work, ["service", "get"], None)
+        # The override persists across restarts; a leftover would leak into the rows after this one.
+        if unset_exit != 0 or "OCTEN_API_KEY" in left:
+            return "FAIL", f"the service env override was not removed (exit {unset_exit}); `service get` says {left.strip()!r}"
         ok = "connected" in line
-        return ("PASS" if ok else "FAIL"), f"key only in `service set env`: mcp list says {line!r}"
+        return ("PASS" if ok else "FAIL"), f"key only in `service set env`: mcp list says {line!r}; override removed"
 
     def key_on_disk():
         work = host.workdir("key-on-disk", {"plugins": [plugin]})
         host.octen_line("key-on-disk-list", work, key)
         # A wrong key also connects, so only an authenticated call shows OpenCode used this key.
         status, output = host.agent("key-on-disk", work, key, CALL_SEARCH)
-        if status != "completed" or "http" not in output:
+        if not searched(status, output):
             return "FAIL", f"the call with the key did not succeed ({status!r}), so the scan would prove nothing"
         host.stop()
         hits = scanned = 0
