@@ -1,0 +1,20 @@
+{
+  "name": "octen",
+  "displayName": "Octen",
+  "description": "Search the web, news, companies and places, and read full pages as clean markdown with Octen",
+  "shortDescription": "Web search and page extraction",
+  "version": "0.1.0",
+  "homepage": "https://octen.ai",
+  "repository": "https://github.com/Octen-Team/octen-js",
+  "license": "MIT",
+  "logo": "logo.png",
+  "keywords": [
+    "AI & Machine Learning",
+    "Productivity"
+  ],
+  "mcpServers": {
+    "octen": {
+      "url": "https://mcp.octen.ai/mcp"
+    }
+  }
+}

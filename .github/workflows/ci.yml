@@ -159,3 +159,13 @@ jobs:
             if (missing.length || extra.length) { console.error({ missing, extra }); process.exit(1); }
             console.log('package contains', files.join(', '));
           "
+
+  devin-plugin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Check the plugin manifest and skill
+        run: node --test 'integrations/devin-plugin/test/*.test.mjs'
