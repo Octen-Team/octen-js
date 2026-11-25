@@ -347,6 +347,7 @@ Compared with `octen-py` 0.13.0:
 - [`@octen.ai/opencode-plugin`](integrations/opencode-plugin): Octen tools for OpenCode. It connects OpenCode to the hosted Octen MCP server and does not use this SDK.
 - [`@octen.ai/pi-extension`](integrations/pi-extension): Octen tools for the Pi coding agent, connected the same way.
 - [Devin plugin](integrations/devin-plugin): Octen tools for Devin, connected the same way. It is installed with `devin plugins install`, not from npm.
+- [Kiro power](integrations/kiro-power): Octen tools for Kiro, connected the same way. It is installed as a Kiro power, not from npm.
 
 ## Development and releasing
 
