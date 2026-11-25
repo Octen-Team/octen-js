@@ -19,6 +19,8 @@ git clone --depth 1 https://github.com/Octen-Team/octen-js.git
 kiro-cli powers install octen-js/integrations/kiro-power
 ```
 
+Powers run on Kiro's V3 agent, the default in the Kiro CLI. If you set V2 as your default, start chats with `kiro-cli chat --v3`.
+
 ## Sign in
 
 The power signs in through your browser; there is no API key to paste. Kiro names the server `power-octen-octen`. When Kiro reports that it requires OAuth, press Ctrl+Y in the Kiro CLI, or run:
@@ -35,7 +37,7 @@ Kiro activates the power when a request matches its keywords, such as search, ne
 
 ## Update or remove
 
-To update, install the power again. To remove it:
+To update in the Kiro IDE, use **Check for updates** in the Powers panel. With the Kiro CLI, pull the latest copy (`git -C octen-js pull`) and install the power again. To remove it:
 
 ```bash
 kiro-cli powers uninstall octen

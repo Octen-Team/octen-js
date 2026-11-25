@@ -16,8 +16,11 @@ test('plugin.json keeps to the Agent Plugins fields and has what Kiro requires',
   assert.equal(plugin.$schema, 'https://agent-plugins.org/schemas/1.0.0/plugin.schema.json');
   assert.equal(plugin.name, 'octen');
   assert.match(plugin.version, /^\d+\.\d+\.\d+$/);
-  assert.ok(plugin.description.length > 0);
+  assert.ok(typeof plugin.description === 'string' && plugin.description.length > 0);
+  assert.deepEqual(Object.keys(plugin.author).filter((k) => !['name', 'email', 'url'].includes(k)), []);
+  assert.ok(Object.values(plugin.author).every((v) => typeof v === 'string'));
   assert.equal(typeof plugin.author.name, 'string');
+  for (const k of ['homepage', 'repository', 'license']) assert.equal(typeof plugin[k], 'string');
   assert.ok(plugin.keywords.length > 0 && plugin.keywords.every((k) => typeof k === 'string' && k === k.toLowerCase()));
 });
 

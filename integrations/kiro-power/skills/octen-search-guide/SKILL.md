@@ -88,13 +88,14 @@ This guide uses the tool names, such as `search` and `extract`.
 
 ## When a call fails
 
+- `code=401 msg=Invalid API Key`: the key chosen at sign-in is no longer
+  active. The user signs in to `power-octen-octen` again and chooses an active
+  key; in the Kiro CLI, `/mcp logout power-octen-octen` and then
+  `/mcp auth power-octen-octen`. Stop and ask; do not retry until they have.
 - Kiro reports that `power-octen-octen` requires OAuth, or the Octen tools fail
-  with a 401: the user is not signed in, or the sign-in was revoked. In the Kiro
-  CLI they press Ctrl+Y when Kiro offers to authenticate, or run
+  with another 401: the user is not signed in, or the sign-in was revoked. In
+  the Kiro CLI they press Ctrl+Y when Kiro offers to authenticate, or run
   `/mcp auth power-octen-octen`; in the Kiro IDE they choose Authenticate on the
   server in the MCP servers panel. Stop and ask; do not retry until they have.
-- `code=401 msg=Invalid API Key`: the key chosen at sign-in is no longer
-  active. The user signs out with `/mcp logout power-octen-octen`, signs in
-  again and chooses an active key. Stop and ask; do not retry until they have.
 - Any other error: report the message as returned, including its `request_id`,
   and continue with what the other results support.
