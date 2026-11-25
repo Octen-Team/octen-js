@@ -11,7 +11,7 @@ const mcp = JSON.parse(read('mcp.json'));
 // Fields from the Agent Plugins 1.0.0 schema (additionalProperties: false); Kiro's create guide also requires
 // version, description, author and keywords: https://kiro.dev/docs/powers/create/
 test('plugin.json keeps to the Agent Plugins fields and has what Kiro requires', () => {
-  const allowed = ['$schema', 'name', 'version', 'description', 'author', 'homepage', 'repository', 'license', 'keywords', 'extensions'];
+  const allowed = ['$schema', 'name', 'version', 'description', 'author', 'homepage', 'repository', 'license', 'keywords'];
   assert.deepEqual(Object.keys(plugin).filter((k) => !allowed.includes(k)), []);
   assert.equal(plugin.$schema, 'https://agent-plugins.org/schemas/1.0.0/plugin.schema.json');
   assert.equal(plugin.name, 'octen');
@@ -60,6 +60,7 @@ test('the guide is written for Kiro', () => {
   assert.doesNotMatch(text, /opencode|\bPi\b|codemode|Devin|devin /i);
 });
 
-test('no Kiro-unknown manifest files', () => {
+// POWER.md is Kiro's legacy format; shipping it beside plugin.json would leave two manifests.
+test('plugin.json is the only manifest', () => {
   for (const f of ['.devin-plugin', '.claude-plugin', '.mcp.json', 'POWER.md']) assert.ok(!existsSync(root + f), `${f} must not exist`);
 });

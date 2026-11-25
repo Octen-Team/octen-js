@@ -15,8 +15,10 @@ them well. It does not list every tool, and a tool it does not mention is still
 fine to use.
 
 In Kiro the tools come with the Octen power, on the MCP server Kiro names
-`power-octen-octen`; activate the power and call them through `kiro_powers`.
-This guide uses the tool names, such as `search` and `extract`.
+`power-octen-octen`. Use the power tools your session provides; in the Kiro CLI
+that is `load_resource` with an id such as `plugin::octen::tool::octen::search`,
+then `tool_call` with the same id. This guide uses the tool names, such as
+`search` and `extract`.
 
 ## Choose the tool
 
@@ -85,6 +87,9 @@ This guide uses the tool names, such as `search` and `extract`.
   `images.enable` to false when only the other is needed.
 - `news_search`: domain filters narrow the articles only. When the user restricts
   the sources, answer from the articles, not from `subjects`.
+- `business_search`: domain, time and language filters narrow the ranked results
+  only, never the cards. When the user restricts the sources, answer from those
+  results, and set `entities.enable` to false when the cards are not needed.
 
 ## When a call fails
 
@@ -93,9 +98,8 @@ This guide uses the tool names, such as `search` and `extract`.
   key; in the Kiro CLI, `/mcp logout power-octen-octen` and then
   `/mcp auth power-octen-octen`. Stop and ask; do not retry until they have.
 - Kiro reports that `power-octen-octen` requires OAuth, or the Octen tools fail
-  with another 401: the user is not signed in, or the sign-in was revoked. In
-  the Kiro CLI they press Ctrl+Y when Kiro offers to authenticate, or run
-  `/mcp auth power-octen-octen`; in the Kiro IDE they choose Authenticate on the
-  server in the MCP servers panel. Stop and ask; do not retry until they have.
+  with another 401: the user is not signed in, or the sign-in was revoked. They
+  sign in when Kiro offers to authenticate; in the Kiro CLI, Ctrl+Y or
+  `/mcp auth power-octen-octen`. Stop and ask; do not retry until they have.
 - Any other error: report the message as returned, including its `request_id`,
   and continue with what the other results support.
