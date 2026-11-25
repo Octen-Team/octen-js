@@ -1,0 +1,36 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "octen",
+  "version": "0.1.0",
+  "description": "Search the web, news, companies and places, find images and design references, and read full pages as clean markdown with Octen.",
+  "author": {
+    "name": "Octen",
+    "email": "support@octen.ai",
+    "url": "https://octen.ai"
+  },
+  "homepage": "https://octen.ai",
+  "repository": "https://github.com/Octen-Team/octen-js",
+  "license": "MIT",
+  "keywords": [
+    "octen",
+    "search",
+    "web-search",
+    "web",
+    "internet",
+    "lookup",
+    "latest",
+    "news",
+    "company",
+    "people",
+    "place",
+    "local",
+    "images",
+    "design",
+    "extract",
+    "read-page",
+    "url",
+    "research",
+    "sources",
+    "citations"
+  ]
+}

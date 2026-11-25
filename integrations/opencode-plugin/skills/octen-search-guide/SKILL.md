@@ -88,6 +88,9 @@ This guide uses the short names.
   `images.enable` to false when only the other is needed.
 - `news_search`: domain filters narrow the articles only. When the user restricts
   the sources, answer from the articles, not from `subjects`.
+- `business_search`: domain, time and language filters narrow the ranked results
+  only, never the cards. When the user restricts the sources, answer from those
+  results, and set `entities.enable` to false when the cards are not needed.
 
 ## When a call fails
 
