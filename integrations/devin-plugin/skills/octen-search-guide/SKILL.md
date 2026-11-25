@@ -44,6 +44,7 @@ names, such as `search` and `extract`.
    `full_content: {"enable": true}` only when the page body is needed, because it
    is heavier and costs more context. `pulse_search` ignores both in its default
    mode; `design_search` and `place_search` take them inside `web_search`.
+   `place_search` returns no pages unless `web_search.enable` is true.
 4. To read a result in full, call `extract` with its URL. Leave `query` unset to
    get the whole page; with `query` set it returns highlights instead.
 5. Cite the URLs the answer relies on.
@@ -87,11 +88,12 @@ names, such as `search` and `extract`.
 
 ## When a call fails
 
-- The `octen` server is missing, cannot list its tools, or answers with a 401
-  or `invalid_token` error: it is not signed in, its sign-in was revoked, or it
-  did not connect. Ask the user to run `devin mcp list`, then
-  `devin mcp logout octen` and `devin mcp login octen` to sign in again, and
-  start a new session.
+- The `octen` server is missing: ask the user to run `devin mcp list`. If
+  `octen` is not listed, the plugin is not installed (`devin plugins list`); if
+  it is disabled, they run `devin mcp enable octen`. Then start a new session.
+- The `octen` server is listed but answers with a 401 or `invalid_token` error:
+  it is not signed in or its sign-in was revoked. Ask the user to run
+  `devin mcp logout octen` and `devin mcp login octen`, then start a new session.
 - `code=401 msg=Invalid API Key`: the key in use was rejected. The key the user
   chose at sign-in is no longer active: they run `devin mcp logout octen`, sign
   in again with `devin mcp login octen` and choose an active key. Stop and ask;

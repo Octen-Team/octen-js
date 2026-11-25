@@ -47,6 +47,7 @@ This guide uses the short names.
    `full_content: {"enable": true}` only when the page body is needed, because it
    is heavier and costs more context. `pulse_search` ignores both in its default
    mode; `design_search` and `place_search` take them inside `web_search`.
+   `place_search` returns no pages unless `web_search.enable` is true.
 4. To read a result in full, call `extract` with its URL. Leave `query` unset to
    get the whole page; with `query` set it returns highlights instead.
 5. Cite the URLs the answer relies on.
