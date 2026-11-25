@@ -6,7 +6,7 @@ The power connects Kiro to Octen's hosted MCP server and adds one skill, `octen-
 
 ## Install
 
-In the Kiro IDE, open the Powers panel, choose **Add Custom Power**, then **Import power from a repository URL**, and enter:
+In the Kiro IDE 1.0.288 or later, open the Powers panel, choose **Add Custom Power**, then **Import power from a repository URL**, and enter:
 
 ```
 https://github.com/Octen-Team/octen-js/tree/main/integrations/kiro-power
@@ -19,7 +19,7 @@ git clone --depth 1 https://github.com/Octen-Team/octen-js.git
 kiro-cli powers install octen-js/integrations/kiro-power
 ```
 
-Powers run on Kiro's V3 agent, the default in the Kiro CLI. If you set V2 as your default, start chats with `kiro-cli chat --v3`.
+Powers run on Kiro's V3 agent. Interactive chats use V3 by default, but headless runs (`--no-interactive`), Linux machines with an older glibc, and a V2 default you set yourself use V2; pass `--v3` where your system supports it. See [agent harness](https://kiro.dev/docs/cli/agent-harness/).
 
 ## Sign in
 

@@ -11,8 +11,12 @@ const mcp = JSON.parse(read('mcp.json'));
 // Fields from the Agent Plugins 1.0.0 schema (additionalProperties: false); Kiro's create guide also requires
 // version, description, author and keywords: https://kiro.dev/docs/powers/create/
 test('plugin.json keeps to the Agent Plugins fields and has what Kiro requires', () => {
-  const allowed = ['$schema', 'name', 'version', 'description', 'author', 'homepage', 'repository', 'license', 'keywords'];
+  const allowed = ['$schema', 'name', 'version', 'description', 'author', 'homepage', 'repository', 'license', 'keywords', 'extensions'];
   assert.deepEqual(Object.keys(plugin).filter((k) => !allowed.includes(k)), []);
+  if ('extensions' in plugin) {
+    const isObject = (v) => typeof v === 'object' && v !== null && !Array.isArray(v);
+    assert.ok(isObject(plugin.extensions) && Object.values(plugin.extensions).every(isObject));
+  }
   assert.equal(plugin.$schema, 'https://agent-plugins.org/schemas/1.0.0/plugin.schema.json');
   assert.equal(plugin.name, 'octen');
   assert.match(plugin.version, /^\d+\.\d+\.\d+$/);
