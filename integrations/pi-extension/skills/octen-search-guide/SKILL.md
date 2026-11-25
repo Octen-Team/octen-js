@@ -45,6 +45,7 @@ the `mcp__octen` namespace and call them from a codemode script.
    `full_content: {"enable": true}` only when the page body is needed, because it
    is heavier and costs more context. `pulse_search` ignores both in its default
    mode; `design_search` and `place_search` take them inside `web_search`.
+   `place_search` returns no pages unless `web_search.enable` is true.
 4. To read a result in full, call `extract` with its URL. Leave `query` unset to
    get the whole page; with `query` set it returns highlights instead.
 5. Cite the URLs the answer relies on.
@@ -78,8 +79,9 @@ the `mcp__octen` namespace and call them from a codemode script.
   do not use it by default.
 - `design_search`: a page section or slide carries a `group_id`. To get the rest
   of that page or deck, call again with `images.group_id` set to that id and
-  `images.count` set to the group's total; the default returns only the first
-  few. That call needs no `query`. The image links are signed and expire, so use
+  `images.count` set to the group's total, at most 100; the default returns
+  only the first few, and a longer group returns its first 100. That call needs
+  no `query`. The image links are signed and expire, so use
   them straight away. The response is large; set `web_search.enable` or
   `images.enable` to false when only the other is needed.
 - `news_search`: domain filters narrow the articles only. When the user restricts
