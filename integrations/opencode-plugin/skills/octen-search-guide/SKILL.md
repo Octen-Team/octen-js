@@ -80,8 +80,9 @@ This guide uses the short names.
   do not use it by default.
 - `design_search`: a page section or slide carries a `group_id`. To get the rest
   of that page or deck, call again with `images.group_id` set to that id and
-  `images.count` set to the group's total; the default returns only the first
-  few. That call needs no `query`. The image links are signed and expire, so use
+  `images.count` set to the group's total, at most 100; the default returns
+  only the first few, and a longer group returns its first 100. That call needs
+  no `query`. The image links are signed and expire, so use
   them straight away. The response is large; set `web_search.enable` or
   `images.enable` to false when only the other is needed.
 - `news_search`: domain filters narrow the articles only. When the user restricts

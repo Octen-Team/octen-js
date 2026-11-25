@@ -77,8 +77,9 @@ names, such as `search` and `extract`.
   do not use it by default.
 - `design_search`: a page section or slide carries a `group_id`. To get the rest
   of that page or deck, call again with `images.group_id` set to that id and
-  `images.count` set to the group's total; the default returns only the first
-  few. That call needs no `query`. The image links are signed and expire, so use
+  `images.count` set to the group's total, at most 100; the default returns
+  only the first few, and a longer group returns its first 100. That call needs
+  no `query`. The image links are signed and expire, so use
   them straight away. The response is large; set `web_search.enable` or
   `images.enable` to false when only the other is needed.
 - `news_search`: domain filters narrow the articles only. When the user restricts
@@ -86,9 +87,11 @@ names, such as `search` and `extract`.
 
 ## When a call fails
 
-- The `octen` server is missing or cannot list its tools: it is not signed in
-  or did not connect. Ask the user to run `devin mcp list`, then
-  `devin mcp login octen` to sign in, and start a new session.
+- The `octen` server is missing, cannot list its tools, or answers with a 401
+  or `invalid_token` error: it is not signed in, its sign-in was revoked, or it
+  did not connect. Ask the user to run `devin mcp list`, then
+  `devin mcp logout octen` and `devin mcp login octen` to sign in again, and
+  start a new session.
 - `code=401 msg=Invalid API Key`: the key in use was rejected. The key the user
   chose at sign-in is no longer active: they run `devin mcp logout octen`, sign
   in again with `devin mcp login octen` and choose an active key. Stop and ask;
