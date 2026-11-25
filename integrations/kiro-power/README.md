@@ -33,11 +33,11 @@ Sign in and choose the API key that calls should be billed to; you need at least
 
 ## What the model gets
 
-Kiro activates the power when a request matches its keywords, such as search, news or extract, and calls the Octen tools through its `kiro_powers` tool. Kiro asks before it activates the power and before each tool call; you can allow them for the session, the workspace or always. The [MCP server page](https://docs.octen.ai/integrations/octen-mcp-server) describes every tool.
+Kiro activates the power when a request matches its keywords, such as search, news or extract, and calls the Octen tools through its `kiro_powers` tool. Whether Kiro asks before it activates the power or calls a tool depends on your workspace trust and [permission settings](https://kiro.dev/docs/cli/chat/permissions/). The [MCP server page](https://docs.octen.ai/integrations/octen-mcp-server) describes every tool.
 
 ## Update or remove
 
-To update in the Kiro IDE, use **Check for updates** in the Powers panel. With the Kiro CLI, pull the latest copy (`git -C octen-js pull`) and install the power again. To remove it:
+To update in the Kiro IDE, choose **Check for updates** in the Powers panel, then **Install updates**. With the Kiro CLI, pull the latest copy (`git -C octen-js pull`) and install the power again. To remove it:
 
 ```bash
 kiro-cli powers uninstall octen
