@@ -90,10 +90,11 @@ names, such as `search` and `extract`.
 
 - The `octen` server is missing: ask the user to run `devin mcp list`. If
   `octen` is not listed, the plugin is not installed (`devin plugins list`); if
-  it is disabled, they run `devin mcp enable octen`. Then start a new session.
-- The `octen` server is listed but answers with a 401 or `invalid_token` error:
-  it is not signed in or its sign-in was revoked. Ask the user to run
-  `devin mcp logout octen` and `devin mcp login octen`, then start a new session.
+  it is disabled, they run `devin mcp enable octen`.
+- The `octen` server says it needs authentication, or answers with a 401: it is
+  not signed in or its sign-in was revoked. On the user's machine, they run
+  `devin mcp logout octen` and `devin mcp login octen`. In a Devin Cloud
+  session, they connect Octen again in the Devin web app.
 - `code=401 msg=Invalid API Key`: the key in use was rejected. The key the user
   chose at sign-in is no longer active: they run `devin mcp logout octen`, sign
   in again with `devin mcp login octen` and choose an active key. Stop and ask;

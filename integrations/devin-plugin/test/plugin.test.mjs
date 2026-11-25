@@ -7,8 +7,8 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 const read = (path) => readFileSync(root + path, 'utf8');
 const manifest = JSON.parse(read('.devin-plugin/plugin.json'));
 
-// Fields Devin reads from a third-party plugin; description rules from CognitionAI/devin-marketplace adding-a-plugin.
-test('manifest keeps to the plugin fields Devin reads', () => {
+// Manifest fields from Devin's plugin docs and the marketplace's third-party plugins; card rules from its adding-a-plugin guide.
+test('manifest keeps to the known plugin fields', () => {
   const allowed = ['name', 'displayName', 'description', 'shortDescription', 'version', 'homepage', 'repository', 'license', 'logo', 'keywords', 'mcpServers'];
   assert.deepEqual(Object.keys(manifest).filter((k) => !allowed.includes(k)), []);
   assert.equal(manifest.name, 'octen');

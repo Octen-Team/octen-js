@@ -10,9 +10,11 @@ The plugin connects Devin to Octen's hosted MCP server and adds one skill, `octe
 devin plugins install Octen-Team/octen-js#integrations/devin-plugin
 ```
 
+Devin records the plugin in your Devin account, so it also loads on your other machines and in Devin Cloud sessions. Add `--local` to install it on this machine only.
+
 ## Sign in
 
-The plugin signs in through your browser; there is no API key to paste. Run:
+The plugin signs in through your browser; there is no API key to paste. In the CLI, run:
 
 ```bash
 devin mcp login octen
@@ -25,6 +27,8 @@ Check the connection with:
 ```bash
 devin mcp list
 ```
+
+Devin Cloud sessions use their own connection, made in the Devin web app. When a cloud session asks you to authorize Octen, approve it there.
 
 To use an API key instead of signing in, add the server yourself instead of installing this plugin, and export `OCTEN_API_KEY` in the shell you start Devin from:
 
