@@ -50,13 +50,13 @@ test('every skill has front matter naming its directory', () => {
 });
 
 // The guide is shared with the OpenCode and Pi packages; only the host-specific parts may differ.
-test('the search guide matches the OpenCode copy outside host-specific text', () => {
+for (const host of ['opencode-plugin', 'pi-extension']) test(`the search guide matches the ${host} copy outside host-specific text`, () => {
   const sections = (text) => {
     const [head, ...rest] = text.split('\n## ');
     return { head: head.split('\n\n').filter((p) => !/^In (Devin|Pi|OpenCode)/.test(p)), rest };
   };
   const ours = sections(read('skills/octen-search-guide/SKILL.md'));
-  const theirs = sections(readFileSync(root + '../opencode-plugin/skills/octen-search-guide/SKILL.md', 'utf8'));
+  const theirs = sections(readFileSync(`${root}../${host}/skills/octen-search-guide/SKILL.md`, 'utf8'));
   assert.deepEqual(ours.head, theirs.head);
   const failures = (s) => s.findIndex((x) => x.startsWith('When a call fails'));
   assert.deepEqual(ours.rest.filter((_, i) => i !== failures(ours.rest)), theirs.rest.filter((_, i) => i !== failures(theirs.rest)));
