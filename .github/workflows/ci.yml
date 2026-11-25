@@ -168,4 +168,4 @@ jobs:
         with:
           node-version: 24
       - name: Check the plugin manifest and skill
-        run: node --test 'integrations/devin-plugin/test/*.test.mjs'
+        run: node --test integrations/devin-plugin/test/plugin.test.mjs
