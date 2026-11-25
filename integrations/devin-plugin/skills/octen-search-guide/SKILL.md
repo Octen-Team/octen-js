@@ -89,13 +89,16 @@ names, such as `search` and `extract`.
 ## When a call fails
 
 - In a Devin Cloud session, Octen's connection is set up in the Devin web app.
-  If the `octen` server is missing, asks for authentication or answers with a
-  401, including `code=401 msg=Invalid API Key`, ask the user to check that
-  Octen is there and enabled, and to connect it again with an active key.
-  Stop and ask; do not retry until they have.
+  If the `octen` server is missing, ask the user to check there that Octen is
+  installed and enabled, then start a new session; plugins load when a session
+  starts. If it asks for authentication or answers with a 401, including
+  `code=401 msg=Invalid API Key`, ask them to connect it again there with an
+  active key. Stop and ask; do not retry until they have.
 - On the user's machine, if the `octen` server is missing, ask them to run
-  `devin mcp list`. If `octen` is not listed, the plugin is not installed
-  (`devin plugins list`); if it is disabled, they run `devin mcp enable octen`.
+  `devin plugins list`. If octen is not listed, they install the plugin; if it
+  is marked blocked, an organization policy blocks it and only its owner can
+  allow it; if the server is disabled in `devin mcp list`, they run
+  `devin mcp enable octen`. Then they start a new session.
 - On the user's machine, if the server asks for authentication or answers with
   a 401, including `code=401 msg=Invalid API Key`, it is not signed in, its
   sign-in was revoked, or the key chosen at sign-in is no longer active. They
