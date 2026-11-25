@@ -57,6 +57,8 @@ devin plugins update octen
 devin plugins remove octen
 ```
 
+If you installed with `--local`, remove it with `devin plugins remove octen --local`.
+
 ## License
 
 MIT

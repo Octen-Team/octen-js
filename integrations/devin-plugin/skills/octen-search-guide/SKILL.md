@@ -88,16 +88,18 @@ names, such as `search` and `extract`.
 
 ## When a call fails
 
-- The `octen` server is missing: ask the user to run `devin mcp list`. If
-  `octen` is not listed, the plugin is not installed (`devin plugins list`); if
-  it is disabled, they run `devin mcp enable octen`.
-- The `octen` server says it needs authentication, or answers with a 401: it is
-  not signed in or its sign-in was revoked. On the user's machine, they run
-  `devin mcp logout octen` and `devin mcp login octen`. In a Devin Cloud
-  session, they connect Octen again in the Devin web app.
-- `code=401 msg=Invalid API Key`: the key in use was rejected. The key the user
-  chose at sign-in is no longer active: they run `devin mcp logout octen`, sign
-  in again with `devin mcp login octen` and choose an active key. Stop and ask;
-  do not retry until they have.
+- In a Devin Cloud session, Octen's connection is set up in the Devin web app.
+  If the `octen` server is missing, asks for authentication or answers with a
+  401, including `code=401 msg=Invalid API Key`, ask the user to check that
+  Octen is there and enabled, and to connect it again with an active key.
+  Stop and ask; do not retry until they have.
+- On the user's machine, if the `octen` server is missing, ask them to run
+  `devin mcp list`. If `octen` is not listed, the plugin is not installed
+  (`devin plugins list`); if it is disabled, they run `devin mcp enable octen`.
+- On the user's machine, if the server asks for authentication or answers with
+  a 401, including `code=401 msg=Invalid API Key`, it is not signed in, its
+  sign-in was revoked, or the key chosen at sign-in is no longer active. They
+  run `devin mcp logout octen` and `devin mcp login octen` and choose an active
+  key. Stop and ask; do not retry until they have.
 - Any other error: report the message as returned, including its `request_id`,
   and continue with what the other results support.
