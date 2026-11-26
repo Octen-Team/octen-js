@@ -1,6 +1,6 @@
 {
   "name": "@octen.ai/pi-extension",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Octen web search, news, company, place and page-reading tools for the Pi coding agent",
   "keywords": [
     "pi-package",
