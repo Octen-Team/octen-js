@@ -39,6 +39,8 @@ const CARDINALITY = [
 const LIMIT_TEXT = [
   ['/extract', 'urls'],
   ['/vl-embedding', 'input'],
+  // "Exactly one of text, image or video" per item is stated only on the item schema
+  ['/vl-embedding', 'input.contents[]'],
 ] as const;
 
 // Value bounds the SDK relies on: the per-URL length bounds it checks, and the timeout range and default its HTTP timeout derives from
@@ -137,9 +139,13 @@ function cardinalityAll(spec: OpenAPI): Map<string, Bounds> {
   return new Map(CARDINALITY.map(([path, prop]) => [`${path} request.${prop}`, cardinality(spec, path, prop)]));
 }
 
-// The description text(s) of a request property, joined; "none" when it has none
+// The description text(s) of a request property, or of its items with a trailing "[]", joined; "none" when it has none
 function limitText(spec: OpenAPI, path: string, prop: string): string {
-  const texts = propertyNodes(spec, path, prop)
+  const items = prop.endsWith('[]');
+  const own = propertyNodes(spec, path, items ? prop.slice(0, -2) : prop);
+  const nodes = items ? own.flatMap((n) => expand(spec, n.items)) : own;
+  if (items && nodes.length === 0) throw new Error(`${path}: request property "${prop}" has no items`);
+  const texts = nodes
     .map((n) => n.description)
     .filter((d): d is string => typeof d === 'string');
   return texts.length === 0 ? 'none' : texts.join(' | ');
