@@ -2,7 +2,7 @@ import type { PulseSearchParams } from '@octen.ai/sdk';
 import { tool } from 'ai';
 import type { Tool } from 'ai';
 import { mergeParams, modelSchema, requestOptions, resolveClient, trimWebResults, warningOf } from '../shared.js';
-import type { ModelField, ModelWebResult, OctenToolOptions } from '../shared.js';
+import type { ModelField, ModelWebResult, OctenClient, OctenToolOptions } from '../shared.js';
 
 export type PulseSearchInput = { query: string };
 export type PulseSearchToolResult = { request_id: string; warning?: string; results: ModelWebResult[] };
@@ -14,7 +14,7 @@ const TOOL_DEFAULTS: Partial<PulseSearchParams> = { count: 5 };
 const MODEL_FIELDS = ['query'] as const satisfies readonly ModelField[];
 
 export function octenPulseSearch(
-  options: OctenToolOptions<PulseSearchParams> = {},
+  options: OctenToolOptions<PulseSearchParams, OctenClient> = {},
 ): Tool<PulseSearchInput, PulseSearchToolResult> {
   // One client per tool, reused by every call.
   const client = resolveClient(options);

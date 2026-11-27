@@ -18,12 +18,15 @@ export type OctenClient = {
 };
 
 // A union so that passing client with any client option is a compile error; resolveClient checks it at runtime too.
-export type OctenClientOptions = ({ client: OctenClient } & { [K in keyof ClientConfig]?: never }) | ({ client?: undefined } & ClientConfig);
+// C defaults to Octen so options typed with the exported types keep the full client; the tools accept any OctenClient.
+export type OctenClientOptions<C extends OctenClient = Octen> =
+  | ({ client: C } & { [K in keyof ClientConfig]?: never })
+  | ({ client?: undefined } & ClientConfig);
 
-export type OctenToolOptions<P> = {
+export type OctenToolOptions<P, C extends OctenClient = Octen> = {
   description?: string;
   defaults?: Partial<Omit<P, 'query'>>;
-} & OctenClientOptions;
+} & OctenClientOptions<C>;
 
 export type ModelWebResult = {
   title?: string;
@@ -38,7 +41,7 @@ export type ModelField = 'query' | 'time_range';
 
 const CLIENT_KEYS = ['apiKey', 'baseURL', 'timeout', 'maxRetries'] as const;
 
-export function resolveClient(options: OctenClientOptions): OctenClient {
+export function resolveClient(options: OctenClientOptions<OctenClient>): OctenClient {
   if (options.client !== undefined) {
     for (const key of CLIENT_KEYS) {
       if (options[key] !== undefined) {

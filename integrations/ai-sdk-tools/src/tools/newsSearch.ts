@@ -12,7 +12,7 @@ import {
   trimWebResults,
   warningOf,
 } from '../shared.js';
-import type { ModelField, ModelWebResult, OctenToolOptions, TimeRange } from '../shared.js';
+import type { ModelField, ModelWebResult, OctenClient, OctenToolOptions, TimeRange } from '../shared.js';
 
 export type NewsSearchInput = { query: string; time_range?: TimeRange | null };
 export type NewsSearchToolResult = {
@@ -49,7 +49,7 @@ function trimSubject(s: Record<string, unknown>): Subject {
 }
 
 export function octenNewsSearch(
-  options: OctenToolOptions<NewsSearchParams> = {},
+  options: OctenToolOptions<NewsSearchParams, OctenClient> = {},
 ): Tool<NewsSearchInput, NewsSearchToolResult> {
   // One client per tool, reused by every call.
   const client = resolveClient(options);

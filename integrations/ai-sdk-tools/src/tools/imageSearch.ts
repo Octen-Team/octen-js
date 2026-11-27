@@ -1,11 +1,11 @@
 import { OctenAPIError, isOctenError } from '@octen.ai/sdk';
-import type { ImageSearchParams } from '@octen.ai/sdk';
+import type { ImageSearchParams, Octen } from '@octen.ai/sdk';
 import { jsonSchema, tool } from 'ai';
 import type { Tool } from 'ai';
 import { z } from 'zod';
 import { checkInput, codePoints, defined, intIn, isNonBlank, oneOf, rejectUnknown, snapshot, stringList } from '../options.js';
 import { asList, isRecord, nonEmpty, requestOptions, resolveClient, warningOf } from '../shared.js';
-import type { OctenClientOptions } from '../shared.js';
+import type { OctenClient, OctenClientOptions } from '../shared.js';
 
 export type ImageSearchInput = {
   query?: string | null;
@@ -24,13 +24,13 @@ export type ModelImageResult = {
 };
 export type ImageSearchToolResult = { request_id: string; warning?: string; results: ModelImageResult[] };
 
-export type OctenImageSearchOptions = {
+export type OctenImageSearchOptions<C extends OctenClient = Octen> = {
   description?: string;
   count?: number;
   safesearch?: 'off' | 'strict';
   includeDomains?: readonly string[];
   excludeDomains?: readonly string[];
-} & OctenClientOptions;
+} & OctenClientOptions<C>;
 
 // Limits from docs.octen.ai/api-reference/image-search.
 const MAX_QUERY_LENGTH = 500;
@@ -92,7 +92,7 @@ function isHttpsUrl(value: string): boolean {
 type DomainField = 'include_domains' | 'exclude_domains';
 type DeveloperParams = Omit<ImageSearchParams, 'inputs'>;
 
-function developerParams(options: OctenImageSearchOptions): DeveloperParams {
+function developerParams(options: OctenImageSearchOptions<OctenClient>): DeveloperParams {
   return defined<DeveloperParams>([
     ['count', intIn(options.count, 1, 10, 'count')],
     ['safesearch', oneOf(options.safesearch, ['off', 'strict'], 'safesearch')],
@@ -213,7 +213,7 @@ const OPTION_KEYS = [
   'maxRetries',
 ] as const;
 
-export function octenImageSearch(given: OctenImageSearchOptions = {}): Tool<ImageSearchInput, ImageSearchToolResult> {
+export function octenImageSearch(given: OctenImageSearchOptions<OctenClient> = {}): Tool<ImageSearchInput, ImageSearchToolResult> {
   rejectUnknown(given, OPTION_KEYS);
   const options = snapshot(given, OPTION_KEYS);
   const fixed = developerParams(options);

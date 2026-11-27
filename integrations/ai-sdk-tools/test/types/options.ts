@@ -1,5 +1,6 @@
 // Compile-time checks for the public option and result types; tsconfig.types.json type-checks this file.
 import { Octen } from '@octen.ai/sdk';
+import type { SearchParams } from '@octen.ai/sdk';
 import {
   octenBroadSearch,
   octenBusinessSearch,
@@ -19,6 +20,10 @@ import type {
   ExtractToolResult,
   ImageSearchInput,
   ImageSearchToolResult,
+  OctenDesignSearchOptions,
+  OctenExtractOptions,
+  OctenImageSearchOptions,
+  OctenToolOptions,
   ModelCompany,
   ModelEntity,
   ModelPerson,
@@ -46,6 +51,23 @@ export function olderSdkClient(): void {
   octenWebSearch({ client: olderClient });
   octenExtract({ client: olderClient });
   octenDesignSearch({ client: olderClient });
+}
+
+// Options typed with the exported types keep the full Octen client, as before 0.3.2.
+export function typedOptionsKeepOcten(
+  web: OctenToolOptions<SearchParams>,
+  extract: OctenExtractOptions,
+  image: OctenImageSearchOptions,
+  design: OctenDesignSearchOptions,
+): void {
+  void web.client?.videoSearch.search;
+  void extract.client?.embedding.create;
+  void image.client?.vlEmbedding.create;
+  void design.client?.videoSearch.search;
+  octenWebSearch(web);
+  octenExtract(extract);
+  octenImageSearch(image);
+  octenDesignSearch(design);
 }
 
 export function clientConflicts(): void {

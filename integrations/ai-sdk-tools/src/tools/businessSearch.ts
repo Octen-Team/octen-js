@@ -12,7 +12,7 @@ import {
   trimWebResults,
   warningOf,
 } from '../shared.js';
-import type { ModelField, ModelWebResult, OctenToolOptions } from '../shared.js';
+import type { ModelField, ModelWebResult, OctenClient, OctenToolOptions } from '../shared.js';
 
 export type BusinessSearchInput = { query: string };
 export type ModelCompany = { type: 'company'; name?: string; summary?: string; website?: string };
@@ -57,7 +57,7 @@ function trimEntity(e: RawEntity): ModelEntity | undefined {
 }
 
 export function octenBusinessSearch(
-  options: OctenToolOptions<BusinessSearchParams> = {},
+  options: OctenToolOptions<BusinessSearchParams, OctenClient> = {},
 ): Tool<BusinessSearchInput, BusinessSearchToolResult> {
   // One client per tool, reused by every call.
   const client = resolveClient(options);

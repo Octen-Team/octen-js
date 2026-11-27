@@ -1,4 +1,4 @@
-import type { DesignSearchParams } from '@octen.ai/sdk';
+import type { DesignSearchParams, Octen } from '@octen.ai/sdk';
 import { jsonSchema, tool } from 'ai';
 import type { Tool } from 'ai';
 import { z } from 'zod';
@@ -19,7 +19,7 @@ import {
   stringList,
 } from '../options.js';
 import { asList, isRecord, nonEmpty, requestOptions, resolveClient, trimWebResults, warningOf } from '../shared.js';
-import type { ModelWebResult, OctenClientOptions, TimeRange } from '../shared.js';
+import type { ModelWebResult, OctenClient, OctenClientOptions, TimeRange } from '../shared.js';
 
 export type DesignSearchInput = { query?: string | null; group_id?: string | null };
 export type ModelDesignGroup = {
@@ -49,7 +49,7 @@ type TokenOption = { enable?: boolean; maxTokens?: number };
 export type DesignLanguage =
   | 'ar' | 'de' | 'en' | 'es' | 'fr' | 'hi' | 'id' | 'it' | 'ja' | 'ko' | 'nl' | 'pl' | 'pt' | 'ru' | 'th' | 'tr' | 'vi' | 'zh';
 
-export type OctenDesignSearchOptions = {
+export type OctenDesignSearchOptions<C extends OctenClient = Octen> = {
   description?: string;
   images?: { enable?: boolean; count?: number; designFacts?: boolean; snippet?: TokenOption };
   webSearch?: {
@@ -65,7 +65,7 @@ export type OctenDesignSearchOptions = {
     startTime?: string;
     endTime?: string;
   };
-} & OctenClientOptions;
+} & OctenClientOptions<C>;
 
 // Limits from docs.octen.ai/api-reference/design-search.
 const MAX_QUERY_LENGTH = 500;
@@ -275,7 +275,7 @@ function trimImage(r: Record<string, unknown>): ModelDesignImage {
 
 const OPTION_KEYS = ['description', 'images', 'webSearch', 'client', 'apiKey', 'baseURL', 'timeout', 'maxRetries'] as const;
 
-export function octenDesignSearch(given: OctenDesignSearchOptions = {}): Tool<DesignSearchInput, DesignSearchToolResult> {
+export function octenDesignSearch(given: OctenDesignSearchOptions<OctenClient> = {}): Tool<DesignSearchInput, DesignSearchToolResult> {
   rejectUnknown(given, OPTION_KEYS);
   const options = snapshot(given, OPTION_KEYS);
   const images = imagesParams(options.images);
