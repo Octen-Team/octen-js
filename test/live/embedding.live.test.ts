@@ -37,20 +37,26 @@ describe.skipIf(!enabled)('live: Embedding and VL Embedding', () => {
     expect(res.meta?.usage?.input_tokens).toBeGreaterThan(0);
   });
 
-  it('embedding_batch_order: results follow the input order', async () => {
+  // Four sequential calls with a 30 s timeout each, so the test needs more than the 60 s default
+  it('embedding_batch_order: each index maps to its input', { timeout: 150_000 }, async () => {
     const texts = ['red apple', 'blue ocean', 'green forest'];
     const params = { model: 'octen-embedding-0.6b', dimension: 8 } as const;
     const batch = await client().embedding.create({ input: texts, ...params });
-    expect(batch.data?.results?.map((r) => r.index)).toEqual([0, 1, 2]);
+    const results = batch.data?.results ?? [];
+    // Callers match by index, not by position: every input index exactly once
+    expect(results.map((r) => r.index).sort()).toEqual([0, 1, 2]);
     // Control: each text embedded alone. Batched values differ by about 1e-4 (seen 2026-11-27), so the batch
-    // vector at position i must be the one closest to text i alone, not equal to it.
+    // vector for index i must be the one closest to text i alone, not equal to it.
     const alone: number[][] = [];
     for (const text of texts) {
       const single = await client().embedding.create({ input: [text], ...params });
-      alone.push(single.data?.results?.[0]?.embedding ?? []);
+      const a = single.data?.results?.[0]?.embedding ?? [];
+      expect(a).toHaveLength(8);
+      alone.push(a);
     }
-    for (const i of texts.keys()) {
-      const b = batch.data?.results?.[i]?.embedding ?? [];
+    for (const r of results) {
+      const i = r.index ?? -1;
+      const b = r.embedding ?? [];
       expect(b).toHaveLength(8);
       const sims = alone.map((a) => cosine(a, b));
       expect(sims[i]).toBeGreaterThan(0.99);
