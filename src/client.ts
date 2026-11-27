@@ -3,6 +3,7 @@ import { OctenValidationError } from './core/errors';
 import { normalizeHeaders } from './core/headers';
 import { assertValidTimeout, HttpCore } from './core/http';
 import { DesignSearchResource } from './resources/designSearch';
+import { EmbeddingResource } from './resources/embedding';
 import { ExtractResource } from './resources/extract';
 import { ImageSearchResource } from './resources/imageSearch';
 import { PlaceSearchResource } from './resources/placeSearch';
@@ -100,6 +101,7 @@ export default class Octen {
   readonly videoSearch: VideoSearchResource;
   readonly designSearch: DesignSearchResource;
   readonly extract: ExtractResource;
+  readonly embedding: EmbeddingResource;
 
   constructor(opts: ClientOptions = {}) {
     if (isBrowser() && opts.dangerouslyAllowBrowser !== true) {
@@ -129,5 +131,6 @@ export default class Octen {
     this.videoSearch = new VideoSearchResource(http);
     this.designSearch = new DesignSearchResource(http);
     this.extract = new ExtractResource(http, opts.timeout !== undefined);
+    this.embedding = new EmbeddingResource(http);
   }
 }

@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { BroadSearchRequestDesc, BroadSearchResponseDesc } from '../../src/schema/broadSearch';
 import { BusinessSearchRequestDesc, BusinessSearchResponseDesc } from '../../src/schema/businessSearch';
 import { DesignSearchRequestDesc, DesignSearchResponseDesc } from '../../src/schema/designSearch';
+import { EmbeddingRequestDesc, EmbeddingResponseDesc } from '../../src/schema/embedding';
 import { ExtractRequestDesc, ExtractResponseDesc } from '../../src/schema/extract';
 import { ImageSearchRequestDesc, ImageSearchResponseDesc } from '../../src/schema/imageSearch';
 import { NewsSearchRequestDesc, NewsSearchResponseDesc } from '../../src/schema/newsSearch';
@@ -16,6 +17,7 @@ import {
 import { VideoSearchRequestDesc, VideoSearchResponseDesc } from '../../src/schema/videoSearch';
 import type { ObjectDesc } from '../../src/schema/descriptor';
 import { DesignSearchResource } from '../../src/resources/designSearch';
+import { EmbeddingResource } from '../../src/resources/embedding';
 import { ExtractResource } from '../../src/resources/extract';
 import { ImageSearchResource } from '../../src/resources/imageSearch';
 import { PlaceSearchResource } from '../../src/resources/placeSearch';
@@ -105,6 +107,12 @@ const endpoints: Endpoint[] = [
     request: ['ExtractRequest', ExtractRequestDesc],
     response: ['ExtractResponse', ExtractResponseDesc],
     send: (core) => new ExtractResource(core).extract({ urls: ['https://example.com'] }),
+  },
+  {
+    name: 'embedding',
+    request: ['EmbeddingRequest', EmbeddingRequestDesc],
+    response: ['EmbeddingResponse', EmbeddingResponseDesc],
+    send: (core) => new EmbeddingResource(core).create({ input: ['a'] }),
   },
 ];
 

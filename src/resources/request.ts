@@ -79,6 +79,19 @@ export function assertQueryOrGroup(params: unknown): void {
   throw new OctenValidationError('query', 'query is required unless images.group_id is set; both are missing or blank.');
 }
 
+const EMBEDDING_MAX_INPUTS = 1000;
+
+/** /embedding: 1 to 1000 strings, none empty or only whitespace (the server accepts and bills blank items). */
+export function assertEmbeddingInput(params: unknown): void {
+  const input = field(params, 'input');
+  if (!Array.isArray(input) || input.length === 0 || input.length > EMBEDDING_MAX_INPUTS) {
+    throw new OctenValidationError('input', `input is required and must be an array of 1 to ${EMBEDDING_MAX_INPUTS} strings.`);
+  }
+  input.forEach((item: unknown, i) => {
+    if (!isNonBlank(item)) throw new OctenValidationError(`input[${i}]`, `input[${i}] must be a non-empty string.`);
+  });
+}
+
 const EXTRACT_MAX_URLS = 20;
 const EXTRACT_MAX_URL_LENGTH = 2048;
 
