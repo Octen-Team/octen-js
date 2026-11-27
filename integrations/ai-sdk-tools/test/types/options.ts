@@ -61,8 +61,8 @@ export function typedOptionsKeepOcten(
   design: OctenDesignSearchOptions,
 ): void {
   void web.client?.videoSearch.search;
-  void extract.client?.embedding.create;
-  void image.client?.vlEmbedding.create;
+  void extract.client?.videoSearch.search;
+  void image.client?.videoSearch.search;
   void design.client?.videoSearch.search;
   octenWebSearch(web);
   octenExtract(extract);
