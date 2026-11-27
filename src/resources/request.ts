@@ -95,8 +95,12 @@ export function assertEmbeddingInput(params: unknown): void {
 const VL_MAX_CONTENTS = 20;
 const VL_MODALITIES = ['text', 'image', 'video'] as const;
 
-/** /vl-embedding: 1 to 20 contents, each with exactly one non-blank text, image or video, as the API reference says. */
-export function assertVLContents(params: unknown): void {
+/** /vl-embedding: a non-blank model (its value is left to the server) and 1 to 20 contents, each with exactly one
+ * non-blank text, image or video, as the API reference says. */
+export function assertVLEmbeddingInput(params: unknown): void {
+  if (!isNonBlank(field(params, 'model'))) {
+    throw new OctenValidationError('model', 'model is required and must be a non-empty string.');
+  }
   const contents = field(field(params, 'input'), 'contents');
   if (!Array.isArray(contents) || contents.length === 0 || contents.length > VL_MAX_CONTENTS) {
     throw new OctenValidationError(

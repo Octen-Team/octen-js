@@ -1,6 +1,6 @@
 import type { HttpCore, RequestOptions } from '../core/http';
 import { VLEmbeddingRequestDesc, type VLEmbeddingParams, type VLEmbeddingResponse } from '../schema/vlEmbedding';
-import { assertVLContents, prepareCheckedBody } from './request';
+import { assertVLEmbeddingInput, prepareCheckedBody } from './request';
 
 export class VLEmbeddingResource {
   private readonly http: HttpCore;
@@ -14,6 +14,6 @@ export class VLEmbeddingResource {
    * `enable_fusion: true`. A large video can take longer than the default timeout; raise `timeout` for it.
    */
   async create(params: VLEmbeddingParams, options?: RequestOptions): Promise<VLEmbeddingResponse> {
-    return await this.http.post('/vl-embedding', prepareCheckedBody(VLEmbeddingRequestDesc, params, assertVLContents), options);
+    return await this.http.post('/vl-embedding', prepareCheckedBody(VLEmbeddingRequestDesc, params, assertVLEmbeddingInput), options);
   }
 }

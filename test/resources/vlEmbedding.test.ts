@@ -58,6 +58,16 @@ describe('VLEmbeddingResource.create: local validation', () => {
     await rejectWith(() => vl(core).create(withContents(many)), fetchImpl, 'input.contents');
   });
 
+  // model is required by the API reference; its value is left to the server
+  test('rejects a missing or blank model, sends an unknown one', async () => {
+    const { core, fetchImpl, calls } = makeFetch();
+    const contents = { contents: [{ text: 'a' }] };
+    await rejectWith(() => vl(core).create({ input: contents } as unknown as Params), fetchImpl, 'model');
+    await rejectWith(() => vl(core).create({ model: ' ', input: contents } as unknown as Params), fetchImpl, 'model');
+    await vl(core).create({ model: 'not-a-model', input: contents } as unknown as Params);
+    expect(calls).toHaveLength(1);
+  });
+
   test('accepts 20 contents', async () => {
     const { core, calls } = makeFetch();
     await vl(core).create(withContents(Array.from({ length: 20 }, () => ({ text: 'a' }))));

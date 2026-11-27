@@ -24,12 +24,14 @@ const ENDPOINTS = [
   '/vl-embedding',
 ];
 
-// flattenSchema drops minItems/maxItems; these arrays are checked locally (exactly one input, 1-20 URLs, 1-1000 texts), so compare their bounds too
+// flattenSchema drops minItems/maxItems; these arrays are checked locally (exactly one input, 1-20 URLs, 1-1000 texts,
+// 1-20 VL contents), so compare their bounds too
 const CARDINALITY = [
   ['/image-search', 'inputs'],
   ['/video-search', 'inputs'],
   ['/extract', 'urls'],
   ['/embedding', 'input'],
+  ['/vl-embedding', 'input.contents'],
 ] as const;
 
 // The spec states the urls limits (20 URLs, 2048 characters each) and the VL contents limit (at most 20 items) only in
@@ -109,12 +111,15 @@ function expand(spec: OpenAPI, node: unknown, stack: readonly string[] = []): Ra
   return out;
 }
 
-// Every node defining a request property, resolved through $ref and allOf
+// Every node defining a request property (dotted for nested objects), resolved through $ref and allOf
 function propertyNodes(spec: OpenAPI, path: string, prop: string): Raw[] {
-  const schema = expand(spec, { $ref: schemaRef(spec, path, 'request') });
-  const defs = schema.map((n) => (isRaw(n.properties) ? n.properties[prop] : undefined)).filter(isRaw);
-  if (defs.length === 0) throw new Error(`${path}: request property "${prop}" not found`);
-  return defs.flatMap((d) => expand(spec, d));
+  let nodes = expand(spec, { $ref: schemaRef(spec, path, 'request') });
+  for (const key of prop.split('.')) {
+    const defs = nodes.map((n) => (isRaw(n.properties) ? n.properties[key] : undefined)).filter(isRaw);
+    if (defs.length === 0) throw new Error(`${path}: request property "${prop}" not found`);
+    nodes = defs.flatMap((d) => expand(spec, d));
+  }
+  return nodes;
 }
 
 // minItems / maxItems of a request property ("none" when absent)
