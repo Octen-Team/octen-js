@@ -34,4 +34,5 @@ export type {
   SearchResponse,
 } from './schema/search';
 export type { VideoSearchParams, VideoSearchResponse } from './schema/videoSearch';
+export type { VLEmbeddingParams, VLEmbeddingResponse } from './schema/vlEmbedding';
 export { VERSION } from './version';

@@ -92,6 +92,27 @@ export function assertEmbeddingInput(params: unknown): void {
   });
 }
 
+const VL_MAX_CONTENTS = 20;
+const VL_MODALITIES = ['text', 'image', 'video'] as const;
+
+/** /vl-embedding: 1 to 20 contents, each with exactly one non-blank text, image or video, as the API reference says. */
+export function assertVLContents(params: unknown): void {
+  const contents = field(field(params, 'input'), 'contents');
+  if (!Array.isArray(contents) || contents.length === 0 || contents.length > VL_MAX_CONTENTS) {
+    throw new OctenValidationError(
+      'input.contents',
+      `input.contents is required and must be an array of 1 to ${VL_MAX_CONTENTS} items.`,
+    );
+  }
+  contents.forEach((item: unknown, i) => {
+    const path = `input.contents[${i}]`;
+    const set = isPlainObject(item) ? VL_MODALITIES.filter((k) => item[k] !== undefined) : [];
+    if (set.length !== 1 || !isNonBlank(field(item, set[0] as string))) {
+      throw new OctenValidationError(path, `${path} must set exactly one of text, image or video to a non-empty string.`);
+    }
+  });
+}
+
 const EXTRACT_MAX_URLS = 20;
 const EXTRACT_MAX_URL_LENGTH = 2048;
 

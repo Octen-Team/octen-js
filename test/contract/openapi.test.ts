@@ -15,6 +15,7 @@ import {
   SearchResponseDesc,
 } from '../../src/schema/search';
 import { VideoSearchRequestDesc, VideoSearchResponseDesc } from '../../src/schema/videoSearch';
+import { VLEmbeddingRequestDesc, VLEmbeddingResponseDesc } from '../../src/schema/vlEmbedding';
 import type { ObjectDesc } from '../../src/schema/descriptor';
 import { DesignSearchResource } from '../../src/resources/designSearch';
 import { EmbeddingResource } from '../../src/resources/embedding';
@@ -23,6 +24,7 @@ import { ImageSearchResource } from '../../src/resources/imageSearch';
 import { PlaceSearchResource } from '../../src/resources/placeSearch';
 import { SearchResource } from '../../src/resources/search';
 import { VideoSearchResource } from '../../src/resources/videoSearch';
+import { VLEmbeddingResource } from '../../src/resources/vlEmbedding';
 import { BASE, makeFetch } from '../resources/helpers';
 import { compareRequest, compareResponse, loadKnownDiffs } from './compare';
 import { flattenSchema, loadSnapshot } from './flatten';
@@ -113,6 +115,13 @@ const endpoints: Endpoint[] = [
     request: ['EmbeddingRequest', EmbeddingRequestDesc],
     response: ['EmbeddingResponse', EmbeddingResponseDesc],
     send: (core) => new EmbeddingResource(core).create({ input: ['a'] }),
+  },
+  {
+    name: 'vl-embedding',
+    request: ['VLEmbeddingRequest', VLEmbeddingRequestDesc],
+    response: ['VLEmbeddingResponse', VLEmbeddingResponseDesc],
+    send: (core) =>
+      new VLEmbeddingResource(core).create({ model: 'octen-vl-embedding', input: { contents: [{ text: 'a' }] } }),
   },
 ];
 

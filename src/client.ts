@@ -9,6 +9,7 @@ import { ImageSearchResource } from './resources/imageSearch';
 import { PlaceSearchResource } from './resources/placeSearch';
 import { SearchResource } from './resources/search';
 import { VideoSearchResource } from './resources/videoSearch';
+import { VLEmbeddingResource } from './resources/vlEmbedding';
 
 const DEFAULT_BASE_URL = 'https://api.octen.ai';
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -102,6 +103,7 @@ export default class Octen {
   readonly designSearch: DesignSearchResource;
   readonly extract: ExtractResource;
   readonly embedding: EmbeddingResource;
+  readonly vlEmbedding: VLEmbeddingResource;
 
   constructor(opts: ClientOptions = {}) {
     if (isBrowser() && opts.dangerouslyAllowBrowser !== true) {
@@ -132,5 +134,6 @@ export default class Octen {
     this.designSearch = new DesignSearchResource(http);
     this.extract = new ExtractResource(http, opts.timeout !== undefined);
     this.embedding = new EmbeddingResource(http);
+    this.vlEmbedding = new VLEmbeddingResource(http);
   }
 }
