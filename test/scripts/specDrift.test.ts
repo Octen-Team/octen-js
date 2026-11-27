@@ -93,6 +93,31 @@ describe('scripts/spec-drift.ts', { timeout: 30_000 }, () => {
     expect(r.status).toBe(1);
   });
 
+  // The SDK checks 1 to 20 VL contents locally; the bound sits on the nested VLEmbeddingInput.contents.
+  test.each([
+    ['maxItems', 30, '/vl-embedding request.input.contents: maxItems 20 -> 30'],
+    ['minItems', 2, '/vl-embedding request.input.contents: minItems none -> 2'],
+  ] as const)('VL contents %s changed to %d exits 1', (key, value, expected) => {
+    const live = writeSpec(`cardinality-vl-contents-${key}.json`, (s) => {
+      s.components.schemas.VLEmbeddingInput!.properties.contents![key] = value;
+    });
+    const r = run(live);
+    expect(r.out).toContain(expected);
+    expect(r.status).toBe(1);
+  });
+
+  // The SDK rejects a VL content item with zero or several modalities; the spec states that rule only in the
+  // VLEmbeddingContent description.
+  test('a changed VL content item description exits 1', () => {
+    const live = writeSpec('vl-content-text.json', (s) => {
+      const schemas = s.components.schemas as unknown as Record<string, { description: string }>;
+      schemas.VLEmbeddingContent!.description = 'A single content element. Each object may combine text, image and video.';
+    });
+    const r = run(live);
+    expect(r.out).toContain('/vl-embedding request.input.contents[]: description');
+    expect(r.status).toBe(1);
+  });
+
   // The SDK checks the urls limits locally; the spec states them only in the description, so a change there is drift.
   test('a changed urls description of /extract exits 1', () => {
     const live = writeSpec('extract-urls-text.json', (s) => {

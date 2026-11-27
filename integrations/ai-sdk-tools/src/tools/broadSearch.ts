@@ -12,7 +12,7 @@ import {
   trimWebResults,
   warningOf,
 } from '../shared.js';
-import type { ModelField, ModelWebResult, OctenToolOptions } from '../shared.js';
+import type { ModelField, ModelWebResult, OctenClient, OctenToolOptions } from '../shared.js';
 
 export type BroadSearchInput = { query: string };
 export type BroadSearchToolResult = {
@@ -30,7 +30,7 @@ const TOOL_DEFAULTS: Partial<BroadSearchParams> = { search_options: { highlight:
 const MODEL_FIELDS = ['query'] as const satisfies readonly ModelField[];
 
 export function octenBroadSearch(
-  options: OctenToolOptions<BroadSearchParams> = {},
+  options: OctenToolOptions<BroadSearchParams, OctenClient> = {},
 ): Tool<BroadSearchInput, BroadSearchToolResult> {
   // One client per tool, reused by every call.
   const client = resolveClient(options);

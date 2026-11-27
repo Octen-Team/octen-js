@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.2
+
+- No tool or API change: the dependency range for `@octen.ai/sdk` now also accepts 0.4.x (`^0.3.0 || ^0.4.0`), so installing it next to `@octen.ai/sdk` 0.4.0 shares one copy of the SDK. The tools use the same SDK methods as before.
+- The tool factories accept any `client` that has the SDK methods they call, so a client from a different SDK version than the tools' own copy (for example an app on 0.3.x while the tools resolve 0.4.x) type-checks. The exported option types (`OctenToolOptions`, `OctenExtractOptions`, `OctenImageSearchOptions`, `OctenDesignSearchOptions`) take the client type as an optional last parameter that defaults to `Octen`, so existing annotations keep the full client; pass your own `Octen` type there when the app uses another SDK version.
+
 ## 0.3.1
 
 - No tool or API change: `result_type` (`standard` or `dynamic`) was already accepted through `defaults` by `octenWebSearch` (top level) and `octenBroadSearch` (inside `search_options`). This release adds tests and type checks for it and documents it in the README. The model still never sees it.

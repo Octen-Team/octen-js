@@ -7,13 +7,26 @@ export type TimeRange = (typeof TIME_RANGES)[number];
 
 type ClientConfig = { apiKey?: string; baseURL?: string; timeout?: number; maxRetries?: number };
 
-// A union so that passing client with any client option is a compile error; resolveClient checks it at runtime too.
-export type OctenClientOptions = ({ client: Octen } & { [K in keyof ClientConfig]?: never }) | ({ client?: undefined } & ClientConfig);
+// Only the methods the tools call: the SDK's resource classes have private members, so TypeScript treats the
+// classes of two SDK versions (an app's copy and the tools' copy) as unrelated; plain method types are not.
+export type OctenClient = {
+  search: Pick<Octen['search'], 'search' | 'searchPremier' | 'broadSearch' | 'newsSearch' | 'businessSearch' | 'pulseSearch'>;
+  imageSearch: Pick<Octen['imageSearch'], 'search'>;
+  placeSearch: Pick<Octen['placeSearch'], 'search'>;
+  designSearch: Pick<Octen['designSearch'], 'search'>;
+  extract: Pick<Octen['extract'], 'extract'>;
+};
 
-export type OctenToolOptions<P> = {
+// A union so that passing client with any client option is a compile error; resolveClient checks it at runtime too.
+// C defaults to Octen so options typed with the exported types keep the full client; the tools accept any OctenClient.
+export type OctenClientOptions<C extends OctenClient = Octen> =
+  | ({ client: C } & { [K in keyof ClientConfig]?: never })
+  | ({ client?: undefined } & ClientConfig);
+
+export type OctenToolOptions<P, C extends OctenClient = Octen> = {
   description?: string;
   defaults?: Partial<Omit<P, 'query'>>;
-} & OctenClientOptions;
+} & OctenClientOptions<C>;
 
 export type ModelWebResult = {
   title?: string;
@@ -28,7 +41,7 @@ export type ModelField = 'query' | 'time_range';
 
 const CLIENT_KEYS = ['apiKey', 'baseURL', 'timeout', 'maxRetries'] as const;
 
-export function resolveClient(options: OctenClientOptions): Octen {
+export function resolveClient(options: OctenClientOptions<OctenClient>): OctenClient {
   if (options.client !== undefined) {
     for (const key of CLIENT_KEYS) {
       if (options[key] !== undefined) {

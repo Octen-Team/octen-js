@@ -2,7 +2,7 @@ import type { SearchParams } from '@octen.ai/sdk';
 import { tool } from 'ai';
 import type { Tool } from 'ai';
 import { mergeParams, modelSchema, requestOptions, resolveClient, trimWebResults, warningOf } from '../shared.js';
-import type { ModelField, ModelWebResult, OctenToolOptions, TimeRange } from '../shared.js';
+import type { ModelField, ModelWebResult, OctenClient, OctenToolOptions, TimeRange } from '../shared.js';
 
 export type WebSearchInput = { query: string; time_range?: TimeRange | null };
 export type WebSearchToolResult = { request_id: string; warning?: string; results: ModelWebResult[] };
@@ -13,7 +13,7 @@ const DESCRIPTION =
 const TOOL_DEFAULTS: Partial<SearchParams> = { count: 5, highlight: { enable: true, max_tokens: 300 } };
 const MODEL_FIELDS = ['query', 'time_range'] as const satisfies readonly ModelField[];
 
-export function octenWebSearch(options: OctenToolOptions<SearchParams> = {}): Tool<WebSearchInput, WebSearchToolResult> {
+export function octenWebSearch(options: OctenToolOptions<SearchParams, OctenClient> = {}): Tool<WebSearchInput, WebSearchToolResult> {
   // One client per tool, reused by every call.
   const client = resolveClient(options);
   return tool({

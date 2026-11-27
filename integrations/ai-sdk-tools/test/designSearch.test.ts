@@ -161,7 +161,7 @@ describe('octenDesignSearch query or group_id', () => {
 
 describe('octenDesignSearch model input', () => {
   it('exposes only query and group_id, none required', async () => {
-    const json = await modelJsonSchema(octenDesignSearch({ ...ALL_OPTIONS, client: new Octen({ apiKey: 'test-key' }) } as OctenDesignSearchOptions));
+    const json = await modelJsonSchema(octenDesignSearch({ ...ALL_OPTIONS, client: new Octen({ apiKey: 'test-key' }) } as unknown as OctenDesignSearchOptions));
     expect(Object.keys(json.properties ?? {}).sort()).toEqual(['group_id', 'query']);
     expect(json.required ?? []).toEqual([]);
     expect(json.properties?.['query']).toMatchObject({ anyOf: [{ type: 'string', minLength: 1, maxLength: 500 }, { type: 'null' }] });

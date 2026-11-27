@@ -1,10 +1,10 @@
-import type { ExtractParams } from '@octen.ai/sdk';
+import type { ExtractParams, Octen } from '@octen.ai/sdk';
 import { jsonSchema, tool } from 'ai';
 import type { Tool } from 'ai';
 import { z } from 'zod';
 import { bool, codePoints, intIn, invalid, oneOf, snapshot } from '../options.js';
 import { asList, isRecord, nonEmpty, requestOptions, resolveClient, warningOf } from '../shared.js';
-import type { OctenClientOptions } from '../shared.js';
+import type { OctenClient, OctenClientOptions } from '../shared.js';
 
 export type ExtractInput = { urls: string[]; query?: string | null };
 export type ModelClassification = { primary: string; secondary?: string };
@@ -28,7 +28,7 @@ export type ModelExtractResult = {
 };
 export type ExtractToolResult = { request_id: string; warning?: string; results: ModelExtractResult[] };
 
-export type OctenExtractOptions = {
+export type OctenExtractOptions<C extends OctenClient = Octen> = {
   description?: string;
   maxUrls?: number;
   mode?: 'standard' | 'advanced' | 'auto';
@@ -39,7 +39,7 @@ export type OctenExtractOptions = {
   includeVideos?: boolean;
   includeAudio?: boolean;
   includeLinks?: { scope?: 'prefer_internal' | 'prefer_external'; maxLinks?: number };
-} & OctenClientOptions;
+} & OctenClientOptions<C>;
 
 // Limits from docs.octen.ai/api-reference/extract; the model's URL cap defaults lower to bound one call's cost.
 const API_MAX_URLS = 20;
@@ -71,7 +71,7 @@ function links(value: unknown): DeveloperParams['include_links'] {
 }
 
 // Validates the developer options once and maps them to the API's names; unset options are left out.
-function developerParams(options: OctenExtractOptions): DeveloperParams {
+function developerParams(options: OctenExtractOptions<OctenClient>): DeveloperParams {
   const entries: [keyof DeveloperParams, unknown][] = [
     ['mode', oneOf(options.mode, ['standard', 'advanced', 'auto'], 'mode')],
     ['format', oneOf(options.format, ['markdown', 'text'], 'format')],
@@ -217,7 +217,7 @@ const OPTION_KEYS = [
   'maxRetries',
 ] as const;
 
-export function octenExtract(given: OctenExtractOptions = {}): Tool<ExtractInput, ExtractToolResult> {
+export function octenExtract(given: OctenExtractOptions<OctenClient> = {}): Tool<ExtractInput, ExtractToolResult> {
   const options = snapshot(given, OPTION_KEYS);
   const maxUrls = intIn(options.maxUrls, 1, API_MAX_URLS, 'maxUrls') ?? DEFAULT_MAX_URLS;
   const fixed = developerParams(options);

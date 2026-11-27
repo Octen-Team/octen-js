@@ -1,5 +1,6 @@
 // Compile-time checks for the public option and result types; tsconfig.types.json type-checks this file.
 import { Octen } from '@octen.ai/sdk';
+import type { SearchParams } from '@octen.ai/sdk';
 import {
   octenBroadSearch,
   octenBusinessSearch,
@@ -19,6 +20,10 @@ import type {
   ExtractToolResult,
   ImageSearchInput,
   ImageSearchToolResult,
+  OctenDesignSearchOptions,
+  OctenExtractOptions,
+  OctenImageSearchOptions,
+  OctenToolOptions,
   ModelCompany,
   ModelEntity,
   ModelPerson,
@@ -28,6 +33,42 @@ import type {
 } from '@octen.ai/ai-sdk-tools';
 
 const client = new Octen({ apiKey: 'test-key' });
+
+// A client from another SDK copy (an app on 0.3.x while the tools resolve 0.4.x): its resources carry a private
+// member from a different declaration, which TypeScript treats as unrelated, and it lacks the newer resources.
+declare class OtherCopy {
+  private http: unknown;
+}
+type FromOtherCopy<R> = Omit<R, never> & OtherCopy;
+declare const olderClient: {
+  search: FromOtherCopy<Octen['search']>;
+  imageSearch: FromOtherCopy<Octen['imageSearch']>;
+  placeSearch: FromOtherCopy<Octen['placeSearch']>;
+  designSearch: FromOtherCopy<Octen['designSearch']>;
+  extract: FromOtherCopy<Octen['extract']>;
+};
+export function olderSdkClient(): void {
+  octenWebSearch({ client: olderClient });
+  octenExtract({ client: olderClient });
+  octenDesignSearch({ client: olderClient });
+}
+
+// Options typed with the exported types keep the full Octen client, as before 0.3.2.
+export function typedOptionsKeepOcten(
+  web: OctenToolOptions<SearchParams>,
+  extract: OctenExtractOptions,
+  image: OctenImageSearchOptions,
+  design: OctenDesignSearchOptions,
+): void {
+  void web.client?.videoSearch.search;
+  void extract.client?.videoSearch.search;
+  void image.client?.videoSearch.search;
+  void design.client?.videoSearch.search;
+  octenWebSearch(web);
+  octenExtract(extract);
+  octenImageSearch(image);
+  octenDesignSearch(design);
+}
 
 export function clientConflicts(): void {
   // @ts-expect-error client already carries its own apiKey

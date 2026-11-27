@@ -2,7 +2,7 @@ import type { SearchPremierParams } from '@octen.ai/sdk';
 import { tool } from 'ai';
 import type { Tool } from 'ai';
 import { mergeParams, modelSchema, requestOptions, resolveClient, trimWebResults, warningOf } from '../shared.js';
-import type { ModelField, ModelWebResult, OctenToolOptions, TimeRange } from '../shared.js';
+import type { ModelField, ModelWebResult, OctenClient, OctenToolOptions, TimeRange } from '../shared.js';
 
 export type WebSearchPremierInput = { query: string; time_range?: TimeRange | null };
 export type WebSearchPremierToolResult = { request_id: string; warning?: string; results: ModelWebResult[] };
@@ -16,7 +16,7 @@ const TOOL_DEFAULTS: Partial<SearchPremierParams> = { count: 5, highlight: { ena
 const MODEL_FIELDS = ['query', 'time_range'] as const satisfies readonly ModelField[];
 
 export function octenWebSearchPremier(
-  options: OctenToolOptions<SearchPremierParams> = {},
+  options: OctenToolOptions<SearchPremierParams, OctenClient> = {},
 ): Tool<WebSearchPremierInput, WebSearchPremierToolResult> {
   // One client per tool, reused by every call.
   const client = resolveClient(options);

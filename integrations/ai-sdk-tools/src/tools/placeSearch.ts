@@ -12,7 +12,7 @@ import {
   trimWebResults,
   warningOf,
 } from '../shared.js';
-import type { ModelField, ModelWebResult, OctenToolOptions } from '../shared.js';
+import type { ModelField, ModelWebResult, OctenClient, OctenToolOptions } from '../shared.js';
 
 export type PlaceSearchInput = { query: string };
 export type ModelPlace = {
@@ -57,7 +57,7 @@ function trimPlace(p: Record<string, unknown>): ModelPlace {
 }
 
 export function octenPlaceSearch(
-  options: OctenToolOptions<PlaceSearchParams> = {},
+  options: OctenToolOptions<PlaceSearchParams, OctenClient> = {},
 ): Tool<PlaceSearchInput, PlaceSearchToolResult> {
   // One client per tool, reused by every call.
   const client = resolveClient(options);

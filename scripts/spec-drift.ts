@@ -20,17 +20,28 @@ const ENDPOINTS = [
   '/video-search',
   '/design-search',
   '/extract',
+  '/embedding',
+  '/vl-embedding',
 ];
 
-// flattenSchema drops minItems/maxItems; these arrays are checked locally (exactly one input, 1-20 URLs), so compare their bounds too
+// flattenSchema drops minItems/maxItems; these arrays are checked locally (exactly one input, 1-20 URLs, 1-1000 texts,
+// 1-20 VL contents), so compare their bounds too
 const CARDINALITY = [
   ['/image-search', 'inputs'],
   ['/video-search', 'inputs'],
   ['/extract', 'urls'],
+  ['/embedding', 'input'],
+  ['/vl-embedding', 'input.contents'],
 ] as const;
 
-// The spec states the urls limits (20 URLs, 2048 characters each) only in the description, so compare it verbatim
-const LIMIT_TEXT = [['/extract', 'urls']] as const;
+// The spec states the urls limits (20 URLs, 2048 characters each) and the VL contents limit (at most 20 items) only in
+// descriptions, so compare them verbatim
+const LIMIT_TEXT = [
+  ['/extract', 'urls'],
+  ['/vl-embedding', 'input'],
+  // "Exactly one of text, image or video" per item is stated only on the item schema
+  ['/vl-embedding', 'input.contents[]'],
+] as const;
 
 // Value bounds the SDK relies on: the per-URL length bounds it checks, and the timeout range and default its HTTP timeout derives from
 const VALUE_BOUNDS = [
@@ -102,12 +113,15 @@ function expand(spec: OpenAPI, node: unknown, stack: readonly string[] = []): Ra
   return out;
 }
 
-// Every node defining a request property, resolved through $ref and allOf
+// Every node defining a request property (dotted for nested objects), resolved through $ref and allOf
 function propertyNodes(spec: OpenAPI, path: string, prop: string): Raw[] {
-  const schema = expand(spec, { $ref: schemaRef(spec, path, 'request') });
-  const defs = schema.map((n) => (isRaw(n.properties) ? n.properties[prop] : undefined)).filter(isRaw);
-  if (defs.length === 0) throw new Error(`${path}: request property "${prop}" not found`);
-  return defs.flatMap((d) => expand(spec, d));
+  let nodes = expand(spec, { $ref: schemaRef(spec, path, 'request') });
+  for (const key of prop.split('.')) {
+    const defs = nodes.map((n) => (isRaw(n.properties) ? n.properties[key] : undefined)).filter(isRaw);
+    if (defs.length === 0) throw new Error(`${path}: request property "${prop}" not found`);
+    nodes = defs.flatMap((d) => expand(spec, d));
+  }
+  return nodes;
 }
 
 // minItems / maxItems of a request property ("none" when absent)
@@ -125,9 +139,13 @@ function cardinalityAll(spec: OpenAPI): Map<string, Bounds> {
   return new Map(CARDINALITY.map(([path, prop]) => [`${path} request.${prop}`, cardinality(spec, path, prop)]));
 }
 
-// The description text(s) of a request property, joined; "none" when it has none
+// The description text(s) of a request property, or of its items with a trailing "[]", joined; "none" when it has none
 function limitText(spec: OpenAPI, path: string, prop: string): string {
-  const texts = propertyNodes(spec, path, prop)
+  const items = prop.endsWith('[]');
+  const own = propertyNodes(spec, path, items ? prop.slice(0, -2) : prop);
+  const nodes = items ? own.flatMap((n) => expand(spec, n.items)) : own;
+  if (items && nodes.length === 0) throw new Error(`${path}: request property "${prop}" has no items`);
+  const texts = nodes
     .map((n) => n.description)
     .filter((d): d is string => typeof d === 'string');
   return texts.length === 0 ? 'none' : texts.join(' | ');

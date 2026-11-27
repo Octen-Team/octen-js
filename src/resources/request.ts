@@ -79,6 +79,44 @@ export function assertQueryOrGroup(params: unknown): void {
   throw new OctenValidationError('query', 'query is required unless images.group_id is set; both are missing or blank.');
 }
 
+const EMBEDDING_MAX_INPUTS = 1000;
+
+/** /embedding: 1 to 1000 strings, none empty or only whitespace (the server accepts and bills blank items). */
+export function assertEmbeddingInput(params: unknown): void {
+  const input = field(params, 'input');
+  if (!Array.isArray(input) || input.length === 0 || input.length > EMBEDDING_MAX_INPUTS) {
+    throw new OctenValidationError('input', `input is required and must be an array of 1 to ${EMBEDDING_MAX_INPUTS} strings.`);
+  }
+  input.forEach((item: unknown, i) => {
+    if (!isNonBlank(item)) throw new OctenValidationError(`input[${i}]`, `input[${i}] must be a non-empty string.`);
+  });
+}
+
+const VL_MAX_CONTENTS = 20;
+const VL_MODALITIES = ['text', 'image', 'video'] as const;
+
+/** /vl-embedding: a non-blank model (its value is left to the server) and 1 to 20 contents, each with exactly one
+ * non-blank text, image or video, as the API reference says. */
+export function assertVLEmbeddingInput(params: unknown): void {
+  if (!isNonBlank(field(params, 'model'))) {
+    throw new OctenValidationError('model', 'model is required and must be a non-empty string.');
+  }
+  const contents = field(field(params, 'input'), 'contents');
+  if (!Array.isArray(contents) || contents.length === 0 || contents.length > VL_MAX_CONTENTS) {
+    throw new OctenValidationError(
+      'input.contents',
+      `input.contents is required and must be an array of 1 to ${VL_MAX_CONTENTS} items.`,
+    );
+  }
+  contents.forEach((item: unknown, i) => {
+    const path = `input.contents[${i}]`;
+    const set = isPlainObject(item) ? VL_MODALITIES.filter((k) => item[k] !== undefined) : [];
+    if (set.length !== 1 || !isNonBlank(field(item, set[0] as string))) {
+      throw new OctenValidationError(path, `${path} must set exactly one of text, image or video to a non-empty string.`);
+    }
+  });
+}
+
 const EXTRACT_MAX_URLS = 20;
 const EXTRACT_MAX_URL_LENGTH = 2048;
 

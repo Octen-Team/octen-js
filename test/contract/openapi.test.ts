@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { BroadSearchRequestDesc, BroadSearchResponseDesc } from '../../src/schema/broadSearch';
 import { BusinessSearchRequestDesc, BusinessSearchResponseDesc } from '../../src/schema/businessSearch';
 import { DesignSearchRequestDesc, DesignSearchResponseDesc } from '../../src/schema/designSearch';
+import { EmbeddingRequestDesc, EmbeddingResponseDesc } from '../../src/schema/embedding';
 import { ExtractRequestDesc, ExtractResponseDesc } from '../../src/schema/extract';
 import { ImageSearchRequestDesc, ImageSearchResponseDesc } from '../../src/schema/imageSearch';
 import { NewsSearchRequestDesc, NewsSearchResponseDesc } from '../../src/schema/newsSearch';
@@ -14,13 +15,16 @@ import {
   SearchResponseDesc,
 } from '../../src/schema/search';
 import { VideoSearchRequestDesc, VideoSearchResponseDesc } from '../../src/schema/videoSearch';
+import { VLEmbeddingRequestDesc, VLEmbeddingResponseDesc } from '../../src/schema/vlEmbedding';
 import type { ObjectDesc } from '../../src/schema/descriptor';
 import { DesignSearchResource } from '../../src/resources/designSearch';
+import { EmbeddingResource } from '../../src/resources/embedding';
 import { ExtractResource } from '../../src/resources/extract';
 import { ImageSearchResource } from '../../src/resources/imageSearch';
 import { PlaceSearchResource } from '../../src/resources/placeSearch';
 import { SearchResource } from '../../src/resources/search';
 import { VideoSearchResource } from '../../src/resources/videoSearch';
+import { VLEmbeddingResource } from '../../src/resources/vlEmbedding';
 import { BASE, makeFetch } from '../resources/helpers';
 import { compareRequest, compareResponse, loadKnownDiffs } from './compare';
 import { flattenSchema, loadSnapshot } from './flatten';
@@ -105,6 +109,19 @@ const endpoints: Endpoint[] = [
     request: ['ExtractRequest', ExtractRequestDesc],
     response: ['ExtractResponse', ExtractResponseDesc],
     send: (core) => new ExtractResource(core).extract({ urls: ['https://example.com'] }),
+  },
+  {
+    name: 'embedding',
+    request: ['EmbeddingRequest', EmbeddingRequestDesc],
+    response: ['EmbeddingResponse', EmbeddingResponseDesc],
+    send: (core) => new EmbeddingResource(core).create({ input: ['a'] }),
+  },
+  {
+    name: 'vl-embedding',
+    request: ['VLEmbeddingRequest', VLEmbeddingRequestDesc],
+    response: ['VLEmbeddingResponse', VLEmbeddingResponseDesc],
+    send: (core) =>
+      new VLEmbeddingResource(core).create({ model: 'octen-vl-embedding', input: { contents: [{ text: 'a' }] } }),
   },
 ];
 

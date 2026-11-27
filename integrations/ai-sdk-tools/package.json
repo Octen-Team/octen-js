@@ -1,6 +1,6 @@
 {
   "name": "@octen.ai/ai-sdk-tools",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Octen search tools for the Vercel AI SDK",
   "keywords": [
     "octen",
@@ -57,7 +57,7 @@
     "prepublishOnly": "npm run typecheck && npm test && npm run build"
   },
   "dependencies": {
-    "@octen.ai/sdk": "^0.3.0"
+    "@octen.ai/sdk": "^0.3.0 || ^0.4.0"
   },
   "peerDependencies": {
     "ai": "^5.0.0 || ^6.0.0 || ^7.0.0",

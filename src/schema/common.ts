@@ -1,7 +1,7 @@
 import type { ArrayDesc, ObjectDesc } from './descriptor';
 
 // Description fragments shared by several endpoints, mapped field by field to testdata/openapi.json (checked by the OpenAPI comparison test).
-// Request descriptions are never nullable. Response descriptions mark nothing required and carry no enums (the server may add values),
+// Request descriptions are nullable only where the spec says so (Embedding input_type). Response descriptions mark nothing required and carry no enums (the server may add values),
 // except request_id and the BusinessEntity `type` tag, which discriminates the union.
 
 export const stringArray = { t: 'array', items: { t: 'string' } } as const satisfies ArrayDesc;
