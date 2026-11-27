@@ -8,6 +8,19 @@ const enabled = process.env.OCTEN_LIVE === '1' && apiKey !== '';
 const IMAGE = 'https://interactive-examples.mdn.mozilla.net/media/cc0-images/grapefruit-slice-332-332.jpg';
 const VIDEO = 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4';
 
+function cosine(a: number[], b: number[]): number {
+  let dot = 0;
+  let na = 0;
+  let nb = 0;
+  a.forEach((v, k) => {
+    const w = b[k] ?? 0;
+    dot += v * w;
+    na += v * v;
+    nb += w * w;
+  });
+  return dot / Math.sqrt(na * nb);
+}
+
 describe.skipIf(!enabled)('live: Embedding and VL Embedding', () => {
   const client = (opts: { fetch?: typeof fetch } = {}) => new Octen({ apiKey, ...opts });
 
@@ -29,13 +42,19 @@ describe.skipIf(!enabled)('live: Embedding and VL Embedding', () => {
     const params = { model: 'octen-embedding-0.6b', dimension: 8 } as const;
     const batch = await client().embedding.create({ input: texts, ...params });
     expect(batch.data?.results?.map((r) => r.index)).toEqual([0, 1, 2]);
-    // Control: each text embedded alone gives the vector at its batch position
-    for (const [i, text] of texts.entries()) {
+    // Control: each text embedded alone. Batched values differ by about 1e-4 (seen 2026-11-27), so the batch
+    // vector at position i must be the one closest to text i alone, not equal to it.
+    const alone: number[][] = [];
+    for (const text of texts) {
       const single = await client().embedding.create({ input: [text], ...params });
-      const a = single.data?.results?.[0]?.embedding ?? [];
+      alone.push(single.data?.results?.[0]?.embedding ?? []);
+    }
+    for (const i of texts.keys()) {
       const b = batch.data?.results?.[i]?.embedding ?? [];
-      expect(a).toHaveLength(8);
-      a.forEach((v, k) => expect(b[k]).toBeCloseTo(v, 4));
+      expect(b).toHaveLength(8);
+      const sims = alone.map((a) => cosine(a, b));
+      expect(sims[i]).toBeGreaterThan(0.99);
+      sims.forEach((s, j) => j === i || expect(s).toBeLessThan(sims[i] as number));
     }
   });
 
