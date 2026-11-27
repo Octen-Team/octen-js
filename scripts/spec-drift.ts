@@ -20,17 +20,24 @@ const ENDPOINTS = [
   '/video-search',
   '/design-search',
   '/extract',
+  '/embedding',
+  '/vl-embedding',
 ];
 
-// flattenSchema drops minItems/maxItems; these arrays are checked locally (exactly one input, 1-20 URLs), so compare their bounds too
+// flattenSchema drops minItems/maxItems; these arrays are checked locally (exactly one input, 1-20 URLs, 1-1000 texts), so compare their bounds too
 const CARDINALITY = [
   ['/image-search', 'inputs'],
   ['/video-search', 'inputs'],
   ['/extract', 'urls'],
+  ['/embedding', 'input'],
 ] as const;
 
-// The spec states the urls limits (20 URLs, 2048 characters each) only in the description, so compare it verbatim
-const LIMIT_TEXT = [['/extract', 'urls']] as const;
+// The spec states the urls limits (20 URLs, 2048 characters each) and the VL contents limit (at most 20 items) only in
+// descriptions, so compare them verbatim
+const LIMIT_TEXT = [
+  ['/extract', 'urls'],
+  ['/vl-embedding', 'input'],
+] as const;
 
 // Value bounds the SDK relies on: the per-URL length bounds it checks, and the timeout range and default its HTTP timeout derives from
 const VALUE_BOUNDS = [

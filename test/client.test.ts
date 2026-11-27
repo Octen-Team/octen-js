@@ -352,7 +352,7 @@ describe('public entry point', () => {
     ]) {
       expect(publicApi, name).toHaveProperty(name);
     }
-    expect(VERSION).toBe('0.3.1');
+    expect(VERSION).toBe('0.4.0');
     expect(isOctenError(new OctenValidationError('x'))).toBe(true);
     for (const hidden of ['HttpCore', 'checkUnknownFields', 'prepareBody', 'retryDelayMs']) {
       expect(publicApi).not.toHaveProperty(hidden);

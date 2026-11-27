@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.2
+
+- No tool or API change: the dependency range for `@octen.ai/sdk` now also accepts 0.4.x (`^0.3.0 || ^0.4.0`), so installing it next to `@octen.ai/sdk` 0.4.0 shares one copy of the SDK. The tools use the same SDK methods as before.
+
 ## 0.3.1
 
 - No tool or API change: `result_type` (`standard` or `dynamic`) was already accepted through `defaults` by `octenWebSearch` (top level) and `octenBroadSearch` (inside `search_options`). This release adds tests and type checks for it and documents it in the README. The model still never sees it.

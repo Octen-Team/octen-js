@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.4.0
+
+- New methods: `embedding.create` (`POST /embedding`) and `vlEmbedding.create` (`POST /vl-embedding`), with request and response types checked against the public OpenAPI spec. The names match `octen-py`.
+- Local checks: Embedding's `input` must hold 1 to 1000 non-blank strings; VL Embedding's `input.contents` must hold 1 to 20 items, each with exactly one non-blank `text`, `image` or `video`. Image and video counts, `dimension` and `fps` are left to the server, as other ranges are.
+- Both use the client's default timeout (30 s). A long video can take longer: pass a larger `timeout` for that call.
+- `spec-drift` now also covers the two endpoints, including the `input` item limit and the VL contents limit.
+
 ## 0.3.1
 
 - No API change: `result_type` (`standard` or `dynamic`) was already accepted by `search.search` and, inside `search_options`, by `search.broadSearch`. This release adds tests that fix its request placement and check it against the live API, and README examples for both methods.

@@ -30,6 +30,15 @@ const ROUTES = {
   // 1 to 20 non-empty URL strings
   '/extract': (b) =>
     Array.isArray(b?.urls) && b.urls.length >= 1 && b.urls.length <= 20 && b.urls.every(nonEmpty) && b?.inputs === undefined,
+  // 1 to 1000 non-empty strings
+  '/embedding': (b) => Array.isArray(b?.input) && b.input.length >= 1 && b.input.length <= 1000 && b.input.every(nonEmpty),
+  // A model and 1 to 20 contents, each with exactly one of text, image or video
+  '/vl-embedding': (b) =>
+    nonEmpty(b?.model) &&
+    Array.isArray(b?.input?.contents) &&
+    b.input.contents.length >= 1 &&
+    b.input.contents.length <= 20 &&
+    b.input.contents.every((c) => ['text', 'image', 'video'].filter((k) => nonEmpty(c?.[k])).length === 1),
 };
 
 const server = createServer((req, res) => {

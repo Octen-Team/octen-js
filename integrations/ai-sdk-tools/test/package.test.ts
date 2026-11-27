@@ -22,9 +22,9 @@ describe('package metadata', () => {
     expect(pkg.peerDependencies.zod).toBe('^3.25.76 || ^4.1.8');
   });
 
-  // octenExtract needs the Extract API, added in SDK 0.3.0.
-  it('depends on the Octen SDK 0.3.x', () => {
-    expect(pkg.dependencies['@octen.ai/sdk']).toBe('^0.3.0');
+  // octenExtract needs the Extract API, added in SDK 0.3.0; 0.4.0 only adds endpoints the tools do not use.
+  it('depends on the Octen SDK 0.3.x or 0.4.x', () => {
+    expect(pkg.dependencies['@octen.ai/sdk']).toBe('^0.3.0 || ^0.4.0');
   });
 
   it('points repository at the package directory', () => {

@@ -2,11 +2,15 @@
 import Octen, { OctenAPIError, OctenRateLimitError, isOctenError } from '@octen.ai/sdk';
 import type {
   DesignSearchResponse,
+  EmbeddingParams,
+  EmbeddingResponse,
   ExtractParams,
   ExtractResponse,
   ImageSearchParams,
   SearchPremierResponse,
   SearchResponse,
+  VLEmbeddingParams,
+  VLEmbeddingResponse,
 } from '@octen.ai/sdk';
 
 // Explicit undefined: must also compile under exactOptionalPropertyTypes (promised in the README)
@@ -87,6 +91,20 @@ export async function callAll(): Promise<string[]> {
   const billed: number | undefined = extracted.meta?.usage?.successful_by_mode?.advanced_urls;
   void structure;
   void billed;
+  const embeddingParams: EmbeddingParams = { input: ['q'], model: 'octen-embedding-0.6b', dimension: 8, input_type: 'query' };
+  const embedded: EmbeddingResponse = await client.embedding.create(embeddingParams);
+  hit(ids, '/embedding', embedded.request_id);
+  const vector: number[] | undefined = embedded.data?.results?.[0]?.embedding;
+  void vector;
+  const vlParams: VLEmbeddingParams = {
+    model: 'octen-vl-embedding',
+    input: { contents: [{ text: 'q' }, { image: 'https://example.com/a.png' }] },
+    enable_fusion: true,
+  };
+  const vlEmbedded: VLEmbeddingResponse = await client.vlEmbedding.create(vlParams, { timeout: 5000 });
+  hit(ids, '/vl-embedding', vlEmbedded.request_id);
+  const kind: string | undefined = vlEmbedded.data?.results?.[0]?.type;
+  void kind;
   return ids;
 }
 
@@ -107,7 +125,7 @@ export async function errorHandling(): Promise<string> {
 
 callAll()
   .then((ids) => {
-    if (ids.length !== 11 || ids.some((id) => !id.startsWith('fake-'))) throw new Error(`unexpected ids ${ids.join(',')}`);
+    if (ids.length !== 13 || ids.some((id) => !id.startsWith('fake-'))) throw new Error(`unexpected ids ${ids.join(',')}`);
     return errorHandling();
   })
   .then((r) => {
